@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Asteroids Remastered - Key Generator</title>
+    <style>
+        body { background: #111; color: #fff; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        h1 { color: #00ccff; letter-spacing: 3px; }
+        .key { font-size: 28px; color: #00ff00; background: #000; padding: 15px 30px; border: 2px solid #00ff00; letter-spacing: 4px; margin: 20px; user-select: all; }
+        button { padding: 12px 30px; background: #00ccff; color: #000; border: none; font-family: inherit; font-size: 16px; font-weight: bold; cursor: pointer; margin: 10px; }
+        button:hover { background: #fff; }
+        .history { color: #555; font-size: 12px; margin-top: 20px; max-height: 200px; overflow-y: auto; }
+        .history div { margin: 3px 0; }
+        p { color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>KEY GENERATOR</h1>
+    <p>DO NOT DISTRIBUTE THIS FILE. For authorized use only.</p>
+    <div class="key" id="currentKey">Click Generate</div>
+    <div>
+        <button onclick="generate()">GENERATE NEW KEY</button>
+        <button onclick="copyKey()">COPY TO CLIPBOARD</button>
+    </div>
+    <div class="history" id="history"></div>
+
+    <script>
+    function generateKey() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        const rand4 = () => Array.from({length:4}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+        const p1 = rand4(), p2 = rand4();
+        let checksum = 0;
+        const mid = p1 + p2;
+        for (let i = 0; i < mid.length; i++) checksum = (checksum * 31 + mid.charCodeAt(i)) & 0xFFFF;
+        return 'ASTR-' + p1 + '-' + p2 + '-' + checksum.toString(16).toUpperCase().padStart(4, '0');
+    }
+
+    function generate() {
+        const key = generateKey();
+        document.getElementById('currentKey').textContent = key;
+        const hist = document.getElementById('history');
+        const d = document.createElement('div');
+        d.textContent = new Date().toLocaleTimeString() + ' — ' + key;
+        hist.prepend(d);
+    }
+
+    function copyKey() {
+        const key = document.getElementById('currentKey').textContent;
+        navigator.clipboard.writeText(key).then(() => {
+            document.getElementById('currentKey').style.borderColor = '#fff';
+            setTimeout(() => document.getElementById('currentKey').style.borderColor = '#00ff00', 500);
+        });
+    }
+
+    generate();
+    </script>
+</body>
+</html>

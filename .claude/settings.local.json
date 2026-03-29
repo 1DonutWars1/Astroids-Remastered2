@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed -n '474,2930p' index.html)",
+      "Bash(node --check /tmp/game_check.js)",
+      "Bash(grep -n \"^<script>$\" index.html)",
+      "Bash(grep -v \"//\")"
+    ]
+  }
+}

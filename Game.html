@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asteroids Remastered</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="achNotify">
+    <span class="ach-icon" id="achNotifyIcon"></span>
+    <div class="ach-label">ACHIEVEMENT UNLOCKED</div>
+    <div class="ach-name" id="achNotifyName"></div>
+    <div class="ach-desc" id="achNotifyDesc"></div>
+</div>
+
+<div id="achScreen">
+    <h2>ACHIEVEMENTS</h2>
+    <div id="dailyMissionBox" style="background:rgba(0,200,255,0.08);border:1px solid #00ccff;border-radius:8px;padding:12px 16px;margin-bottom:15px;text-align:left;">
+        <div style="color:#00ccff;font-size:11px;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">📋 DAILY MISSION</div>
+        <div id="dailyMissionDesc" style="color:#fff;font-size:14px;font-weight:bold;"></div>
+        <div id="dailyMissionStatus" style="font-size:12px;margin-top:4px;"></div>
+        <div style="color:#555;font-size:10px;margin-top:4px;">Reward: +3000 Score</div>
+    </div>
+    <div id="achProgress"></div>
+    <div class="ach-grid" id="achGrid"></div>
+    <button class="ach-close" onclick="closeAchievements()">BACK</button>
+</div>
+
+<div id="bossPracticeScreen" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:500px;background:rgba(5,5,15,0.95);border:2px solid #ff4444;padding:25px;z-index:150;pointer-events:auto;backdrop-filter:blur(10px);border-radius:10px;box-shadow:0 0 40px rgba(255,0,0,0.15);">
+    <h2 style="color:#ff4444;text-align:center;border-bottom:1px solid #ff4444;padding-bottom:8px;margin:0 0 15px;letter-spacing:3px;">BOSS PRACTICE</h2>
+    <p style="color:#888;font-size:12px;text-align:center;margin-bottom:15px;">Fight any boss directly. God mode ON, infinite ammo, no score saved.</p>
+    <div id="bossPracticeList" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <button class="ach-close" style="background:#ff4444;margin-top:15px;" onclick="closeBossPractice()">BACK</button>
+</div>
+
+<div id="licenseScreen">
+    <h2>ENTER LICENSE KEY</h2>
+    <p>A valid license key is required to play.</p>
+    <input type="text" id="licenseInput" placeholder="ASTR-XXXX-XXXX-XXXX" maxlength="19" autocomplete="off">
+    <div id="licenseError"></div>
+    <button id="licenseActivate" onclick="validateLicense()">ACTIVATE</button>
+</div>
+
+<div id="watermark"></div>
+
+<div id="splash">
+    <h1>ASTEROIDS</h1>
+    <h2>REMASTERED</h2>
+    <p>[ CLICK TO START ]</p>
+</div>
+
+<div id="ui">
+    <div class="ui-row" id="livesRow" style="display:none;">LIVES: <span id="livesVal">3</span></div>
+    <div class="ui-row" id="scoreRow">SCORE: <span id="scoreVal">0</span></div>
+    <div class="ui-row" id="highRow">HIGH: <span id="highVal">0</span></div>
+    <div class="ui-row" id="levelRow">LEVEL: <span id="levelVal">1</span></div>
+    <div class="ui-row" id="ammoRow">AMMO: <span id="ammoVal">50</span></div>
+    <div class="ui-row" id="timeRow">TIME: <span id="timeVal">0.0</span>s</div>
+    <div class="ui-row" id="comboRow">COMBO: x<span id="comboVal">1</span></div>
+    <div class="ui-row" id="powerupRow">TRIPLE SHOT!</div>
+    <div class="ui-row" id="godRow">GOD MODE</div>
+    <div class="ui-row" id="hyperRow">HYPER GUN</div>
+    <div class="ui-row" id="testRow">TEST MODE</div>
+    <div class="ui-row" id="shieldRow">SHIELD FUEL:
+        <div id="shieldPips">
+            <span class="pip" id="pip0"></span>
+            <span class="pip" id="pip1"></span>
+            <span class="pip" id="pip2"></span>
+        </div>
+    </div>
+    <div class="reload-border"><div class="reload-fill" id="reloadBar"></div></div>
+    <div class="ui-row" id="bossRow">BOSS: <span id="bossVal">20/20</span></div>
+    <div id="practiceHint">PRESS 'E' FOR SETTINGS</div>
+</div>
+
+<div id="debugMenu">
+    <h3>DEV CONSOLE</h3>
+    <div class="dev-hdr">CHEATS</div>
+    <button onclick="toggleGodMode()">TOGGLE GOD MODE</button>
+    <button onclick="toggleInfAmmo()">TOGGLE INF AMMO</button>
+    <button onclick="toggleHyperGun()">TOGGLE HYPER GUN</button>
+    <button onclick="skipLevel()">SKIP LEVEL</button>
+    <button onclick="nukeAll()">NUKE ENEMIES</button>
+    <button onclick="toggleMiniBossSpawns()">TOGGLE MINI BOSS SPAWNS</button>
+    <button onclick="toggleBossSpawns()">TOGGLE BOSS SPAWNS</button>
+    <div class="dev-hdr">SPAWN</div>
+    <button onclick="dropPowerup()">SPAWN TRIPLE SHOT</button>
+    <button onclick="spawnMiniBoss('chaser',true)">SPAWN CHASER</button>
+    <button onclick="spawnMiniBoss('shooter',true)">SPAWN SHOOTER</button>
+    <button onclick="spawnMiniBoss('blaster',true)">SPAWN BLASTER (DLC)</button>
+    <button onclick="spawnMiniBoss('spawner',true)">SPAWN SPAWNER (DLC)</button>
+    <button onclick="spawnBoss(1)">SPAWN BOSS 1</button>
+    <button onclick="spawnBoss(2)">SPAWN BOSS 2</button>
+    <button onclick="spawnBoss(3)">SPAWN BOSS 3 (SANS)</button>
+    <button onclick="spawnBoss(4)">SPAWN BOSS 4 (CYBORG/DLC)</button>
+    <button onclick="spawnBoss(5)">SPAWN BOSS 5 (SNAKE/DLC)</button>
+    <button onclick="spawnAsteroid(undefined,undefined,undefined,'fuel')">SPAWN FUEL</button>
+    <button onclick="startBossRush()">START BOSS RUSH (DLC)</button>
+    <button onclick="spawnGilbert()">SPAWN GILBERT (DLC)</button>
+    <button onclick="spawnGilbertAlly()">SPAWN GILBERT ALLY (DLC)</button>
+    <button onclick="enterStation()">ENTER STATION (DLC)</button>
+    <button onclick="startStationCutscene()">STATION CUTSCENE (DLC)</button>
+    <button onclick="G.mb+=500;updateUI();alert('Added 500 MB')">ADD 500 MB</button>
+    <div class="dev-hdr">TESTING</div>
+    <button onclick="toggleTestMode()" id="testModeBtn">ENABLE TEST MODE</button>
+    <button onclick="setLevel(prompt('Set level:'))">SET LEVEL</button>
+    <button onclick="setBossHP(prompt('Set boss HP:'))">SET BOSS HP</button>
+    <button onclick="teleportShip()">TELEPORT TO CENTER</button>
+    <button onclick="clearAll()">CLEAR EVERYTHING</button>
+    <button onclick="giveShield()">GIVE FULL SHIELD</button>
+    <div class="dev-hdr">SYSTEM</div>
+    <button onclick="addCheatScore(1000)">ADD 1000 PTS</button>
+    <button onclick="toggleDebug()" style="border-color:red;color:red;">CLOSE</button>
+</div>
+
+<div id="practiceMenu">
+    <h2>PRACTICE CONFIG</h2>
+    <div class="srow"><label>Bullet Speed</label><input type="number" id="ps_bspd" value="8"></div>
+    <div class="srow"><label>Default Ammo</label><input type="number" id="ps_ammo" value="50"></div>
+    <div class="srow"><label>Boss 1 HP</label><input type="number" id="ps_b1hp" value="25"></div>
+    <div class="srow"><label>Boss 2 HP</label><input type="number" id="ps_b2hp" value="45"></div>
+    <div class="srow"><label>Boss 3 HP</label><input type="number" id="ps_b3hp" value="80"></div>
+    <button class="apply-btn" onclick="applyPractice()">APPLY & RESUME</button>
+</div>
+
+<div id="settingsMenu">
+    <h2>SETTINGS</h2>
+
+    <div class="set-section">AUDIO</div>
+    <div class="set-row">
+        <label>Master Volume</label>
+        <input type="range" id="set_masterVol" min="0" max="100" value="80" oninput="applySettings()">
+        <span class="val" id="set_masterVol_val">80</span>
+    </div>
+    <div class="set-row">
+        <label>Music Volume</label>
+        <input type="range" id="set_musicVol" min="0" max="100" value="80" oninput="applySettings()">
+        <span class="val" id="set_musicVol_val">80</span>
+    </div>
+    <div class="set-row">
+        <label>SFX Volume</label>
+        <input type="range" id="set_sfxVol" min="0" max="100" value="80" oninput="applySettings()">
+        <span class="val" id="set_sfxVol_val">80</span>
+    </div>
+
+    <div class="set-section">DISPLAY</div>
+    <div class="set-row">
+        <label>Screen Shake</label>
+        <select id="set_shake" onchange="applySettings()">
+            <option value="full">Full</option>
+            <option value="reduced">Reduced</option>
+            <option value="off">Off</option>
+        </select>
+    </div>
+    <div class="set-row">
+        <label>Particle Effects</label>
+        <select id="set_particles" onchange="applySettings()">
+            <option value="full">Full</option>
+            <option value="reduced">Reduced</option>
+            <option value="off">Off</option>
+        </select>
+    </div>
+    <div class="set-row">
+        <label>Star Density</label>
+        <input type="range" id="set_stars" min="20" max="200" value="120" oninput="applySettings()">
+        <span class="val" id="set_stars_val">120</span>
+    </div>
+
+    <div class="set-section">GAMEPLAY</div>
+    <div class="set-row">
+        <label>Timer Display</label>
+        <select id="set_timer" onchange="applySettings()">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+        </select>
+    </div>
+    <div class="set-row">
+        <label>Boss HP Display</label>
+        <select id="set_bosshp" onchange="applySettings()">
+            <option value="fraction">HP / Max</option>
+            <option value="bar">Bar Only</option>
+        </select>
+    </div>
+
+    <div class="set-section">KEYBINDS (click to rebind)</div>
+    <div class="set-row">
+        <label>Thrust</label>
+        <button class="keybind-btn" id="kb_thrust" onclick="listenForKey('thrust')">W / Up</button>
+    </div>
+    <div class="set-row">
+        <label>Turn Left</label>
+        <button class="keybind-btn" id="kb_left" onclick="listenForKey('left')">A / Left</button>
+    </div>
+    <div class="set-row">
+        <label>Turn Right</label>
+        <button class="keybind-btn" id="kb_right" onclick="listenForKey('right')">D / Right</button>
+    </div>
+    <div class="set-row">
+        <label>Fire</label>
+        <button class="keybind-btn" id="kb_fire" onclick="listenForKey('fire')">Space</button>
+    </div>
+
+    <button class="set-close" onclick="closeSettings()">DONE</button>
+    <button class="set-reset" onclick="resetSettings()">RESET TO DEFAULTS</button>
+</div>
+
+<div id="menuScreen" class="screen">
+    <h1 style="color:#00ccff; text-shadow: 0 0 20px #00ccff;">ASTEROIDS</h1>
+    <h2>REMASTERED EDITION</h2>
+    <div class="slots">
+        <div class="slot" id="slot1" onclick="selectSlot(1)"></div>
+        <div class="slot" id="slot2" onclick="selectSlot(2)"></div>
+        <div class="slot" id="slot3" onclick="selectSlot(3)"></div>
+    </div>
+    <div class="btn-row">
+        <button class="btn btn-gold" onclick="startTutorial()">FLIGHT SCHOOL</button>
+        <button class="btn btn-blue" onclick="startPractice()">PRACTICE MODE</button>
+        <button class="btn" style="border-color:#ff4444;color:#ff4444;" onclick="openBossPractice()">BOSS PRACTICE</button>
+    </div>
+    <div style="margin-top:10px;">
+        <button class="btn" style="border-color:#888;color:#888;padding:10px 30px;font-size:16px;" onclick="openSettings()">SETTINGS</button>
+        <button class="btn" style="border-color:#ffd700;color:#ffd700;padding:10px 30px;font-size:16px;" onclick="openAchievements()">TROPHIES</button>
+        <button class="btn" id="dlcBtn" style="display:none;border-color:#ff00de;color:#ff00de;padding:10px 30px;font-size:16px;text-shadow:0 0 10px #ff00de;" onclick="openDLC()">DLC</button>
+    </div>
+    <div class="controls-hint">Controls customizable in Settings</div>
+</div>
+
+<div id="classSelect">
+    <div class="cs-inner">
+        <h1>CHOOSE YOUR CLASS</h1>
+        <h2>OR GO CLASSLESS FOR A BONUS</h2>
+        <div class="class-grid">
+            <div class="class-card cc-none" onclick="pickClass('none')">
+                <canvas class="cc-ship-preview" id="ccShip_none" width="100" height="80"></canvas>
+                <span class="cc-name" style="color:#ccc;">CLASSLESS</span>
+                <span class="cc-desc">No specialization. Start with raw potential.</span>
+                <span class="cc-perks"><span>+</span> 10,000 starting score</span>
+            </div>
+            <div class="class-card cc-agility" onclick="pickClass('agility')">
+                <canvas class="cc-ship-preview" id="ccShip_agility" width="100" height="80"></canvas>
+                <span class="cc-name">AGILITY</span>
+                <span class="cc-desc">Speed demon. Built to outrun everything.</span>
+                <span class="cc-perks"><span>+</span> Speed Lv 3<br><span>+</span> Agility Lv 2<br><span>+</span> Dash Module equipped</span>
+            </div>
+            <div class="class-card cc-tank" onclick="pickClass('tank')">
+                <canvas class="cc-ship-preview" id="ccShip_tank" width="100" height="80"></canvas>
+                <span class="cc-name">TANK</span>
+                <span class="cc-desc">Heavy armor. Outlast anything the void throws at you.</span>
+                <span class="cc-perks"><span>+</span> Ammo Capacity Lv 3<br><span>+</span> Reload Speed Lv 1<br><span>+</span> Shield Regen equipped</span>
+            </div>
+            <div class="class-card cc-gunner" onclick="pickClass('gunner')">
+                <canvas class="cc-ship-preview" id="ccShip_gunner" width="100" height="80"></canvas>
+                <span class="cc-name">GUNNER</span>
+                <span class="cc-desc">Maximum firepower. Shoot first, ask never.</span>
+                <span class="cc-perks"><span>+</span> Reload Speed Lv 2<br><span>+</span> Ammo Capacity Lv 1<br><span>+</span> Rear Turret equipped</span>
+            </div>
+            <div class="class-card cc-scavenger" onclick="pickClass('scavenger')">
+                <canvas class="cc-ship-preview" id="ccShip_scavenger" width="100" height="80"></canvas>
+                <span class="cc-name">SCAVENGER</span>
+                <span class="cc-desc">Resourceful survivor. Everything comes to you.</span>
+                <span class="cc-perks"><span>+</span> Ammo Capacity Lv 2<br><span>+</span> Ammo Magnet equipped<br><span>+</span> 200 MB starting currency</span>
+            </div>
+        </div>
+        <button class="cs-back" onclick="cancelClassSelect()">BACK</button>
+    </div>
+</div>
+
+<div id="overScreen" class="screen">
+    <h1>GAME OVER</h1>
+    <p style="font-size:22px; margin: 15px 0;">Score: <span id="finalScore">0</span></p>
+    <p style="color:#888; margin-bottom:15px;" id="savedInfo">Saved to Slot <span id="savedSlot">1</span></p>
+    <button class="btn btn-orange" id="retryBtn" style="display:none;" onclick="retryCheckpoint()">RETRY CHECKPOINT</button>
+    <button class="btn" onclick="returnToMenu()">MENU</button>
+</div>
+
+<div id="winScreen" class="screen">
+    <h1>MISSION COMPLETE</h1>
+    <h2 style="color:#ccc;">GALAXY SECURED</h2>
+    <p style="font-size:22px; margin: 15px 0;">Score: <span id="winScore">0</span></p>
+    <button class="btn btn-green" onclick="returnToMenu()">MENU</button>
+</div>
+
+<div id="pauseMenu" class="screen" style="display:none;min-width:400px;">
+    <h1 style="color:#00ccff;font-size:36px;text-shadow:0 0 15px #00ccff;">PAUSED</h1>
+    <h2 style="color:#666;font-size:14px;letter-spacing:3px;margin-bottom:20px;">PRESS ESC TO RESUME</h2>
+
+    <div style="text-align:left;margin:0 auto;max-width:320px;">
+        <div class="set-section">AUDIO</div>
+        <div class="set-row">
+            <label>Master Volume</label>
+            <input type="range" id="pause_masterVol" min="0" max="100" value="80" oninput="applyPauseAudio()">
+            <span class="val" id="pause_masterVol_val">80</span>
+        </div>
+        <div class="set-row">
+            <label>Music Volume</label>
+            <input type="range" id="pause_musicVol" min="0" max="100" value="80" oninput="applyPauseAudio()">
+            <span class="val" id="pause_musicVol_val">80</span>
+        </div>
+        <div class="set-row">
+            <label>SFX Volume</label>
+            <input type="range" id="pause_sfxVol" min="0" max="100" value="80" oninput="applyPauseAudio()">
+            <span class="val" id="pause_sfxVol_val">80</span>
+        </div>
+
+        <div class="set-section">DISPLAY</div>
+        <div class="set-row">
+            <label>Screen Shake</label>
+            <select id="pause_shake" onchange="applyPauseDisplay()">
+                <option value="full">Full</option>
+                <option value="reduced">Reduced</option>
+                <option value="off">Off</option>
+            </select>
+        </div>
+        <div class="set-row">
+            <label>Particles</label>
+            <select id="pause_particles" onchange="applyPauseDisplay()">
+                <option value="full">Full</option>
+                <option value="reduced">Reduced</option>
+                <option value="off">Off</option>
+            </select>
+        </div>
+        <div class="set-row">
+            <label>Timer Display</label>
+            <select id="pause_timer" onchange="applyPauseDisplay()">
+                <option value="on">On</option>
+                <option value="off">Off</option>
+            </select>
+        </div>
+        <div class="set-row">
+            <label>Boss HP Display</label>
+            <select id="pause_bosshp" onchange="applyPauseDisplay()">
+                <option value="fraction">HP / Max</option>
+                <option value="bar">Bar Only</option>
+            </select>
+        </div>
+    </div>
+
+    <div style="margin-top:20px;">
+        <button class="btn btn-blue" onclick="resumeGame()">RESUME</button>
+        <button class="btn" style="border-color:#ff4444;color:#ff4444;" onclick="quitToMenu()">QUIT TO MENU</button>
+    </div>
+</div>
+
+<audio id="bgmTrack" src="white_records-8-bit-background-music-for-arcade-game-come-on-mario-164702.mp3" loop preload="auto"></audio>
+<audio id="boss3Track" src="nickpanekaiassets-chiptune-medium-boss-218095.mp3" loop preload="auto"></audio>
+<audio id="boss3Phase2Track" src="audio_keeper-boss-battle-500204.mp3" loop preload="auto"></audio>
+<audio id="boss4Track" src="bouncyrunner-boss-fight-one-400508.mp3" loop preload="auto"></audio>
+<audio id="boss5Track" src="dstechnician-halodrome-120606.mp3" loop preload="auto"></audio>
+
+<div id="volumeBtn" onclick="Sound.toggleMute()">[ MUTE ]</div>
+
+<canvas id="c" width="900" height="650"></canvas>
+
+<script src="js/anti-piracy.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/globals.js"></script>
+<script src="js/saves.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/achievements.js"></script>
+<script src="js/gameplay.js"></script>
+<script src="js/dlc-gilbert.js"></script>
+<script src="js/station.js"></script>
+<script src="js/engine.js"></script>
+
+<!-- DLC auto-loader: if dlc.js exists, it loads and enables DLC features. If not, onerror fires silently. -->
+<script src="dlc.js" onload="checkDLC()" onerror="console.log('[GAME] No DLC found — base game only.')"></script>
+<script src="devkey.js" onload="verifyDevKey()" onerror="console.log('[GAME] No dev key found — cheat codes disabled.')"></script>
+
+</body>
+</html>
