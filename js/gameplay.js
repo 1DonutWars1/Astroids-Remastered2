@@ -166,6 +166,7 @@ function returnToMenu() {
     asteroids=[]; miniBosses=[]; enemyBullets=[]; gasterBlasters=[]; boss=null;
     G.godMode=false; G.infAmmo=false; G.hyperGun=false; G.noMiniBoss=false; G.noBoss=false;
     G.gilbert=null; G.gilbertState='none'; G.bossRush=false; G.cyborgScraps=[];
+    engineTrail=[]; shootingStars=[];
     G.gilbertDialogue=''; G.gilbertDialogueQueue=[]; G.rope=false;
     G.widescreenReturning=false; canvas.width=900; W=900;
     G.mode='space';G.stationCutscene=null;G.stationDialogue='';
@@ -308,8 +309,19 @@ function applyPractice() {
 function boom(x,y,color,count=12) {
     if(settings.particles==='off') return;
     if(settings.particles==='reduced') count=Math.max(2,Math.floor(count*0.4));
-    for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,sp=Math.random()*3+1;
-    particles.push({x,y,dx:Math.cos(a)*sp,dy:Math.sin(a)*sp,life:30+Math.random()*20,maxLife:50,color,size:Math.random()*2.5+1});}
+    for(let i=0;i<count;i++){
+        const a=Math.random()*Math.PI*2;
+        const sp=Math.random()*3.5+0.8;
+        const life=25+Math.random()*30;
+        particles.push({x,y,dx:Math.cos(a)*sp,dy:Math.sin(a)*sp,life,maxLife:life+10,color,size:Math.random()*3+0.8});
+    }
+    // Add a few bright white sparks for extra punch
+    const sparkCount=Math.max(1,Math.floor(count*0.2));
+    for(let i=0;i<sparkCount;i++){
+        const a=Math.random()*Math.PI*2;
+        const sp=Math.random()*5+2;
+        particles.push({x,y,dx:Math.cos(a)*sp,dy:Math.sin(a)*sp,life:10+Math.random()*10,maxLife:22,color:'#ffffff',size:Math.random()*1.5+0.5});
+    }
 }
 function spawnAsteroid(x,y,r,type='normal') {
     const baseR=r||(Math.random()<0.2?55:28), verts=Math.floor(Math.random()*5)+7, offsets=[];

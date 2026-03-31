@@ -83,3 +83,13 @@ const BASE_THRUST=0.32, BASE_TURN=0.11, BASE_SHOT_CD=16;
 // Stars
 for (let i = 0; i < 120; i++) stars.push({ x: Math.random()*W, y: Math.random()*H, size: Math.random()*1.8+0.2, speed: Math.random()*0.3+0.1, alpha: Math.random()*0.6+0.2 });
 
+// Ambient space dust motes
+let spaceDust = [];
+for (let i = 0; i < 30; i++) spaceDust.push({ x: Math.random()*W, y: Math.random()*H, size: Math.random()*1.5+0.5, dx: (Math.random()-0.5)*0.15, dy: (Math.random()-0.5)*0.15, alpha: Math.random()*0.08+0.02 });
+
+// Shooting stars (occasional)
+let shootingStars = [];
+
+// Engine trail particles (separate from boom particles for persistence)
+let engineTrail = [];
+
