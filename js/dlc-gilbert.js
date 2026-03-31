@@ -260,7 +260,6 @@ function updateGilbert(){
         }
         G.gilbert.dx*=0.97;G.gilbert.dy*=0.97;
         G.gilbert.x+=G.gilbert.dx;G.gilbert.y+=G.gilbert.dy;
-        G.gilbert.angle+=0.02;
         // Keep on screen
         if(G.gilbert.x<G.gilbert.r)G.gilbert.x=G.gilbert.r;
         if(G.gilbert.x>W-G.gilbert.r)G.gilbert.x=W-G.gilbert.r;
@@ -272,31 +271,37 @@ function updateGilbert(){
         G.gilbertShootTimer++;
         const gFireRate=Math.max(10,(isP2Fight?25:45)-(G.gilbertUpgrades.fireRate||0)*8);
         const gRange=400+(G.gilbertUpgrades.range||0)*100;
-        if(G.gilbertShootTimer>gFireRate){
-            let target=null,minD=gRange;
-            // Target asteroids
-            for(const a of asteroids){
-                if(a.type==='fuel') continue;
-                const d=Math.hypot(a.x-G.gilbert.x,a.y-G.gilbert.y);
-                if(d<minD){minD=d;target={x:a.x,y:a.y};}
-            }
-            // Target mini bosses
-            for(const mb of miniBosses){
-                const d=Math.hypot(mb.x-G.gilbert.x,mb.y-G.gilbert.y);
-                if(d<minD){minD=d;target={x:mb.x,y:mb.y};}
-            }
-            // Target boss
-            if(boss&&boss.state!=='enter'&&boss.state!=='dialogue'){
-                const d=Math.hypot(boss.x-G.gilbert.x,boss.y-G.gilbert.y);
-                if(d<minD){minD=d;target={x:boss.x,y:boss.y};}
-            }
-            if(target){
-                const angle=Math.atan2(target.y-G.gilbert.y,target.x-G.gilbert.x);
-                bullets.push({x:G.gilbert.x+Math.cos(angle)*G.gilbert.r,
-                    y:G.gilbert.y+Math.sin(angle)*G.gilbert.r,
-                    dx:Math.cos(angle)*6,dy:Math.sin(angle)*6,trail:[],gilbert:true});
-                G.gilbertShootTimer=0;
-            }
+        // Find nearest target for aiming
+        let aimTarget=null,aimMinD=gRange;
+        for(const a of asteroids){
+            if(a.type==='fuel') continue;
+            const d=Math.hypot(a.x-G.gilbert.x,a.y-G.gilbert.y);
+            if(d<aimMinD){aimMinD=d;aimTarget={x:a.x,y:a.y};}
+        }
+        for(const mb of miniBosses){
+            const d=Math.hypot(mb.x-G.gilbert.x,mb.y-G.gilbert.y);
+            if(d<aimMinD){aimMinD=d;aimTarget={x:mb.x,y:mb.y};}
+        }
+        if(boss&&boss.state!=='enter'&&boss.state!=='dialogue'){
+            const d=Math.hypot(boss.x-G.gilbert.x,boss.y-G.gilbert.y);
+            if(d<aimMinD){aimMinD=d;aimTarget={x:boss.x,y:boss.y};}
+        }
+        // Face toward target (smooth rotation)
+        if(aimTarget){
+            const goalAngle=Math.atan2(aimTarget.y-G.gilbert.y,aimTarget.x-G.gilbert.x);
+            let diff=goalAngle-G.gilbert.angle;
+            while(diff>Math.PI)diff-=Math.PI*2;while(diff<-Math.PI)diff+=Math.PI*2;
+            G.gilbert.angle+=diff*0.12;
+        } else {
+            // Slow idle spin when no target
+            G.gilbert.angle+=0.01;
+        }
+        if(G.gilbertShootTimer>gFireRate&&aimTarget){
+            const angle=Math.atan2(aimTarget.y-G.gilbert.y,aimTarget.x-G.gilbert.x);
+            bullets.push({x:G.gilbert.x+Math.cos(angle)*G.gilbert.r,
+                y:G.gilbert.y+Math.sin(angle)*G.gilbert.r,
+                dx:Math.cos(angle)*6,dy:Math.sin(angle)*6,trail:[],gilbert:true});
+            G.gilbertShootTimer=0;
         }
         return;
     }
