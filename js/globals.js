@@ -55,7 +55,7 @@ const G = {
     stationUnlocked: false
 };
 
-let pSettings = { bulletSpeed: 8, ammo: 50, b1hp: 25, b2hp: 45, b3hp: 80 };
+let pSettings = { bulletSpeed: 8, ammo: 50, b1hp: 25, b2hp: 45, b3hp: 100 };
 
 // Difficulty multipliers: easy helps new players, hard for veterans
 const DIFFICULTY = {

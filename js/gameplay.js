@@ -297,7 +297,7 @@ function applyPractice() {
     pSettings.ammo=parseInt(document.getElementById('ps_ammo').value)||50;
     pSettings.b1hp=parseInt(document.getElementById('ps_b1hp').value)||25;
     pSettings.b2hp=parseInt(document.getElementById('ps_b2hp').value)||45;
-    pSettings.b3hp=parseInt(document.getElementById('ps_b3hp').value)||80;
+    pSettings.b3hp=parseInt(document.getElementById('ps_b3hp').value)||100;
     bulletSpeed=pSettings.bulletSpeed;
     $practice.style.display='none'; G.practicePaused=false;
 }

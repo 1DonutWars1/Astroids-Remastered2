@@ -22,7 +22,7 @@ const MODULE_DEFS={
 const STATION_NPCS=[
     // Floor 1 (floor:0)
     {id:'banker',x:350,floor:0,name:'BANKER',color:'#ffdd00',shape:'square',
-        lines:["Need to convert your Score?","100 Score = 1 MB.","I'll handle the exchange."],role:'banker'},
+        lines:["Need to convert your Score?","50 Score = 1 MB.","I'll handle the exchange."],role:'banker'},
     {id:'mechanic',x:700,floor:0,name:'MECHANIC',color:'#ff8800',shape:'hex',
         lines:["Welcome to my stand.","I can tune up your ship.","What do you need?"],role:'shop_upgrades'},
     {id:'engineer',x:1100,floor:0,name:'ENGINEER',color:'#00ffaa',shape:'diamond',
