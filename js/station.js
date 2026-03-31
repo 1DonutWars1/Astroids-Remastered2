@@ -44,18 +44,12 @@ function enterStation(){
     G.mode='station';
     G.station.playerX=350;G.station.playerY=480;G.station.playerVX=0;
     G.station.cameraX=0;G.station.shopOpen=false;G.station.interactTarget=null;
-    // Save high score BEFORE converting
+    // Keep score intact — player converts manually at the Banker NPC
     G.stationUnlocked=true;
-    if(G.slotId){
-        const s=saves[G.slotId];
-        if(G.score>s.high)s.high=G.score;
-    }
-    // Convert score to MB
-    const earned=Math.floor(G.score/100);
-    G.mb+=earned;G.score=0;
     // Save
     if(G.slotId){
         const s=saves[G.slotId];
+        if(G.score>s.high)s.high=G.score;
         s.mb=G.mb;s.upgrades=Object.assign({},G.upgrades);
         s.gilbertUpgrades=Object.assign({},G.gilbertUpgrades);
         s.modules=G.modules.slice();s.equippedModules=G.equippedModules.slice();
