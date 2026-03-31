@@ -227,6 +227,28 @@
     <div class="controls-hint">Controls customizable in Settings</div>
 </div>
 
+<div id="difficultySelect" style="display:none;">
+    <div class="cs-inner">
+        <h1>SELECT DIFFICULTY</h1>
+        <h2>THIS AFFECTS YOUR ENTIRE RUN</h2>
+        <div class="diff-grid">
+            <div class="diff-card" onclick="pickDifficulty('easy')" style="border-color:#00ff88;">
+                <span class="diff-name" style="color:#00ff88;">EASY</span>
+                <span class="diff-desc">Fewer &amp; slower asteroids, more ammo, weaker bosses. Great for learning the ropes.</span>
+            </div>
+            <div class="diff-card" onclick="pickDifficulty('normal')" style="border-color:#00ccff;">
+                <span class="diff-name" style="color:#00ccff;">NORMAL</span>
+                <span class="diff-desc">The intended experience. Balanced challenge for most players.</span>
+            </div>
+            <div class="diff-card" onclick="pickDifficulty('hard')" style="border-color:#ff4444;">
+                <span class="diff-name" style="color:#ff4444;">HARD</span>
+                <span class="diff-desc">More &amp; faster asteroids, less ammo, tougher bosses. For veterans only.</span>
+            </div>
+        </div>
+        <button class="cs-back" onclick="cancelDifficultySelect()">BACK</button>
+    </div>
+</div>
+
 <div id="classSelect">
     <div class="cs-inner">
         <h1>CHOOSE YOUR CLASS</h1>

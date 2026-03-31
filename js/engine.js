@@ -124,17 +124,18 @@ function update() {
     // SPAWNING (blocked during boss rush and Gilbert dialogue)
     if(!boss&&!G.tutorial&&!G.bossRush&&!G.gilbertDialogue){
         G.spawnTimer++;
-        const maxAst=5+G.level*3, rate=Math.max(30,90-G.level*10);
+        const diff=DIFFICULTY[currentDifficulty]||DIFFICULTY.normal;
+        const maxAst=Math.round((5+G.level*3)*diff.astMax), rate=Math.max(30,Math.round((90-G.level*10)*diff.astRate));
         if(G.spawnTimer>rate&&asteroids.length<maxAst){spawnAsteroid();G.spawnTimer=0;}
-        if(!G.noMiniBoss&&Math.random()<0.0002*G.level) spawnMiniBoss();
+        if(!G.noMiniBoss&&Math.random()<0.0002*G.level*diff.mbChance) spawnMiniBoss();
         // fuel spawns after boss 2
-        if(G.hasForceField){G.fuelTimer++;if(G.fuelTimer>1500){spawnAsteroid(undefined,undefined,undefined,'fuel');G.fuelTimer=0;}}
+        if(G.hasForceField){G.fuelTimer++;if(G.fuelTimer>Math.round(1500*diff.fuelRate)){spawnAsteroid(undefined,undefined,undefined,'fuel');G.fuelTimer=0;}}
     }
 
     // Force field drop pickup
     if(G.forceFieldDrop){
         if(Math.hypot(ship.x-G.forceFieldDrop.x,ship.y-G.forceFieldDrop.y)<ship.r+G.forceFieldDrop.size){
-            G.hasForceField=true; G.shieldFuel=3; updateShieldUI();
+            G.hasForceField=true; G.shieldFuel=getMaxShieldFuel(); updateShieldUI();
             boom(ship.x,ship.y,'cyan',30); Sound.powerup(); G.forceFieldDrop=null;
             unlockAch('shield_up');
             if(window.DLC&&window.DLC.loaded) gilbertIntro('forcefield',GILBERT_INTROS.forcefield);
@@ -672,8 +673,8 @@ function update() {
             if(boss&&Math.hypot(bullets[j].x-boss.x,bullets[j].y-boss.y)<boss.r+5){
                 boom(bullets[j].x,bullets[j].y,'red',3);boss.hp--;Sound.hit();
                 // Sans finisher threshold: at 80 HP with Gilbert ally, lock HP and trigger finisher
-                if((boss.type===3||boss.type===10)&&boss.hp<=40&&!boss.gilbertFinisherTriggered&&window.DLC&&window.DLC.loaded&&G.gilbertState==='ally'){
-                    boss.hp=40;boss.gilbertFinisherTriggered=true;
+                if((boss.type===3||boss.type===10)&&boss.hp<=Math.round(boss.maxHp*0.4)&&!boss.gilbertFinisherTriggered&&window.DLC&&window.DLC.loaded&&G.gilbertState==='ally'){
+                    boss.hp=Math.round(boss.maxHp*0.4);boss.gilbertFinisherTriggered=true;
                     boss.state='gilbert_finisher';boss.timer=0;boss.dx=0;boss.dy=0;
                     gasterBlasters=[];enemyBullets=[];asteroids=[];
                 }

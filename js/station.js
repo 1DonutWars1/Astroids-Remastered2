@@ -4,7 +4,7 @@
 const UPGRADE_DEFS={
     speed:{name:'Speed',desc:'+Thrust power',maxLv:5,costs:[50,100,200,400,800]},
     agility:{name:'Agility',desc:'+Turn speed',maxLv:5,costs:[50,100,200,400,800]},
-    hull:{name:'Hull',desc:'+Extra shield pips',maxLv:3,costs:[80,160,300]},
+    hull:{name:'Hull',desc:'+Extra shield pips',maxLv:2,costs:[80,160]},
     ammoCap:{name:'Ammo Capacity',desc:'+15 starting ammo',maxLv:3,costs:[40,80,160]},
     reload:{name:'Reload Speed',desc:'-Shot cooldown',maxLv:3,costs:[60,120,240]},
 };
@@ -44,10 +44,15 @@ function enterStation(){
     G.mode='station';
     G.station.playerX=350;G.station.playerY=480;G.station.playerVX=0;
     G.station.cameraX=0;G.station.shopOpen=false;G.station.interactTarget=null;
+    // Save high score BEFORE converting
+    G.stationUnlocked=true;
+    if(G.slotId){
+        const s=saves[G.slotId];
+        if(G.score>s.high)s.high=G.score;
+    }
     // Convert score to MB
     const earned=Math.floor(G.score/100);
     G.mb+=earned;G.score=0;
-    G.stationUnlocked=true;
     // Save
     if(G.slotId){
         const s=saves[G.slotId];
@@ -55,7 +60,6 @@ function enterStation(){
         s.gilbertUpgrades=Object.assign({},G.gilbertUpgrades);
         s.modules=G.modules.slice();s.equippedModules=G.equippedModules.slice();
         s.stationUnlocked=true;s.maxLvl=Math.max(s.maxLvl,G.level);
-        if(G.score>s.high)s.high=G.score;
         saveToDisk();
     }
     canvas.width=900;W=900;
@@ -89,6 +93,11 @@ function buyUpgrade(key){
     THRUST=BASE_THRUST+(G.upgrades.speed||0)*0.06;
     TURN=BASE_TURN+(G.upgrades.agility||0)*0.02;
     SHOT_CD=Math.max(6,BASE_SHOT_CD-(G.upgrades.reload||0)*2);
+    // Hull upgrade: increase shield capacity
+    if(key==='hull'&&G.hasForceField){
+        G.shieldFuel=3+(G.upgrades.hull||0);
+        updateShieldUI();
+    }
     Sound.powerup();saveStation();
 }
 function buyGilbertUpgrade(key){

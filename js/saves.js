@@ -9,7 +9,9 @@ function renderSlots() {
         if (!d) el.innerHTML=`<span class="slot-title">SLOT ${i}</span><span class="slot-empty">EMPTY</span>`;
         else {
             const cls=d.playerClass&&CLASS_DEFS[d.playerClass]?CLASS_DEFS[d.playerClass]:null;
-            const clsTag=cls?`<span style="color:${cls.color};font-size:11px;">${cls.name}</span><br>`:'';
+            const diffDef=DIFFICULTY[d.difficulty]||DIFFICULTY.normal;
+            const diffTag=`<span style="color:${diffDef.color};font-size:10px;">${diffDef.label}</span> `;
+            const clsTag=cls?`${diffTag}<span style="color:${cls.color};font-size:11px;">${cls.name}</span><br>`:'';
             el.innerHTML=`<span class="slot-title">SLOT ${i}</span><div class="slot-info">${clsTag}HIGH: ${d.high}<br>MAX LVL: ${d.maxLvl}</div><button class="del-btn" onclick="delSlot(event,${i})">DELETE</button>`;
         }
     }
@@ -18,11 +20,13 @@ function delSlot(e,id) { e.stopPropagation(); Sound.ui(); if(confirm('Delete Slo
 function selectSlot(id) {
     if(event&&event.target&&event.target.classList.contains('del-btn')) return;
     Sound.ui();
-    // New slot → show class selection first
-    if(!saves[id]){ openClassSelect(id); return; }
+    // New slot → show difficulty selection first, then class
+    if(!saves[id]){ openDifficultySelect(id); return; }
     G.slotId=id; G.tutorial=false; G.practice=false;
     // Migrate old saves
     const s=saves[id];
+    // Apply saved difficulty
+    currentDifficulty=s.difficulty||'normal';
     if(!s.mb) s.mb=0;
     if(!s.upgrades) s.upgrades={speed:0,agility:0,hull:0,ammoCap:0,reload:0};
     if(!s.gilbertUpgrades) s.gilbertUpgrades={fireRate:0,range:0,damage:0};
@@ -187,6 +191,24 @@ function drawClassShipPreview(canvasId, classKey) {
 }
 
 let _pendingSlotId = null;
+let _pendingDifficulty = null;
+
+function openDifficultySelect(slotId) {
+    _pendingSlotId = slotId;
+    document.getElementById('difficultySelect').style.display = 'block';
+}
+function cancelDifficultySelect() {
+    Sound.ui();
+    _pendingSlotId = null;
+    document.getElementById('difficultySelect').style.display = 'none';
+}
+function pickDifficulty(diff) {
+    Sound.ui();
+    _pendingDifficulty = diff;
+    document.getElementById('difficultySelect').style.display = 'none';
+    openClassSelect(_pendingSlotId);
+}
+
 function openClassSelect(slotId) {
     _pendingSlotId = slotId;
     document.getElementById('classSelect').style.display = 'block';
@@ -205,7 +227,10 @@ function pickClass(cls) {
     document.getElementById('classSelect').style.display = 'none';
     const def = CLASS_DEFS[cls];
     const id = _pendingSlotId;
+    const difficulty = _pendingDifficulty || 'normal';
     _pendingSlotId = null;
+    _pendingDifficulty = null;
+    currentDifficulty = difficulty;
     // Create save with class data baked in
     const baseUpgrades = {speed:0,agility:0,hull:0,ammoCap:0,reload:0};
     Object.assign(baseUpgrades, def.upgrades);
@@ -216,15 +241,16 @@ function pickClass(cls) {
         modules: def.modules.slice(),
         equippedModules: def.equipped.slice(),
         stationUnlocked: false, checkpoint: 1,
-        playerClass: cls
+        playerClass: cls,
+        difficulty: difficulty
     };
     saveToDisk();
     // Now select the slot normally
     selectSlot(id);
 }
 
-function startTutorial() { Sound.ui(); G.tutorial=true; G.practice=false; G.slotId=null; startGame(); }
-function startPractice() { Sound.ui(); G.practice=true; G.tutorial=false; G.slotId=null; startGame(); }
+function startTutorial() { Sound.ui(); G.tutorial=true; G.practice=false; G.slotId=null; currentDifficulty='normal'; startGame(); }
+function startPractice() { Sound.ui(); G.practice=true; G.tutorial=false; G.slotId=null; currentDifficulty='normal'; startGame(); }
 
 // Boss Practice
 const BOSS_DEFS=[
@@ -265,7 +291,7 @@ function startBossPractice(bossType){
     // Override: god mode, infinite ammo, skip to boss
     G.godMode=true;G.infAmmo=true;G.ammo=999;
     document.getElementById('godRow').style.display='block';
-    G.hasForceField=true;G.shieldFuel=3;updateShieldUI();
+    G.hasForceField=true;G.shieldFuel=getMaxShieldFuel();updateShieldUI();
     // Set appropriate level
     if(bossType===1) G.level=1;
     else if(bossType===2) G.level=2;

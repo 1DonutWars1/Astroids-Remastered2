@@ -9,7 +9,8 @@ function startGame() {
 
     G.running=true; G.paused=false; G.score=0; G.level=1; G.albertMode=false; G.fastTravelOpen=false;
     G.widescreenReturning=false; canvas.width=900; W=900;
-    G.ammo = G.tutorial ? 999 : (G.practice ? pSettings.ammo : 50);
+    const diff = DIFFICULTY[currentDifficulty] || DIFFICULTY.normal;
+    G.ammo = G.tutorial ? 999 : (G.practice ? pSettings.ammo : diff.ammo);
     bulletSpeed = G.practice ? pSettings.bulletSpeed : 8;
     G.combo=0; G.comboTimer=0;
     G.waveStart=performance.now(); G.shotTimer=0;
@@ -178,7 +179,7 @@ function retryCheckpoint() {
         G.running=true;G.ammo=50;
         asteroids=[];bullets=[];particles=[];ammoBoxes=[];powerups=[];
         miniBosses=[];enemyBullets=[];gasterBlasters=[];boss=null;
-        G.hasForceField=true;G.shieldFuel=3;updateShieldUI();
+        G.hasForceField=true;G.shieldFuel=getMaxShieldFuel();updateShieldUI();
         if(G.gilbertState==='none'){spawnGilbertAlly();G.albertMode=false;}
         canvas.width=900;W=900;G.widescreenReturning=false;
         enterStation();
@@ -281,7 +282,7 @@ function clearAll(){
     G.cyborgScraps=[];
 }
 function giveShield(){
-    G.hasForceField=true;G.shieldFuel=3;updateShieldUI();
+    G.hasForceField=true;G.shieldFuel=getMaxShieldFuel();updateShieldUI();
 }
 
 // Practice menu
@@ -313,7 +314,7 @@ function boom(x,y,color,count=12) {
 function spawnAsteroid(x,y,r,type='normal') {
     const baseR=r||(Math.random()<0.2?55:28), verts=Math.floor(Math.random()*5)+7, offsets=[];
     for(let i=0;i<verts;i++) offsets.push((Math.random()-0.5)*baseR*0.5);
-    const speed=1.5+G.level*0.15;
+    const speed=(1.5+G.level*0.15)*(DIFFICULTY[currentDifficulty]||DIFFICULTY.normal).astSpeed;
     let dx=(Math.random()-0.5)*speed, dy=(Math.random()-0.5)*speed;
     if(G.tutorial){dx=0;dy=0;}
     asteroids.push({
@@ -374,12 +375,13 @@ function spawnBoss(type) {
     for(const m of miniBosses)boom(m.x,m.y,'purple',15); miniBosses=[]; enemyBullets=[]; gasterBlasters=[];
     // Type 10 uses Sans (type 3) logic internally
     const isSans = (type===3||type===10);
+    const diff=DIFFICULTY[currentDifficulty]||DIFFICULTY.normal;
     let hp;
-    if(type===5) hp=10;
-    else if(type===4) hp=30;
-    else if(isSans) hp=G.practice?pSettings.b3hp:100;
+    if(type===5) hp=Math.round(10*diff.bossHp);
+    else if(type===4) hp=Math.round(30*diff.bossHp);
+    else if(isSans) hp=G.practice?pSettings.b3hp:Math.round(100*diff.bossHp);
     else if(G.practice) hp=type===1?pSettings.b1hp:pSettings.b2hp;
-    else hp=type===1?25:type===2?45:80;
+    else hp=Math.round((type===1?25:type===2?45:80)*diff.bossHp);
 
     if(type===5){
         // --- SNAKE BOSS ---

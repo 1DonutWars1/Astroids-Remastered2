@@ -164,10 +164,21 @@ let dailyMissionChecked=false; // prevent multiple completions per frame
 // ============================================================
 //  SHIELD UI
 // ============================================================
+function getMaxShieldFuel() { return 3+(G.upgrades.hull||0); }
 function updateShieldUI() {
     const show = G.hasForceField;
     document.getElementById('shieldRow').style.display = show ? 'block' : 'none';
-    for (let i=0;i<3;i++) {
+    const maxPips = getMaxShieldFuel();
+    const container = document.getElementById('shieldPips');
+    // Rebuild pips if count changed
+    while(container.children.length < maxPips){
+        const span = document.createElement('span');
+        span.className = 'pip';
+        span.id = 'pip'+container.children.length;
+        container.appendChild(span);
+    }
+    while(container.children.length > maxPips) container.removeChild(container.lastChild);
+    for (let i=0;i<maxPips;i++) {
         document.getElementById('pip'+i).className = 'pip' + (i < G.shieldFuel ? ' on' : '');
     }
 }

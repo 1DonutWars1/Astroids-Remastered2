@@ -57,6 +57,14 @@ const G = {
 
 let pSettings = { bulletSpeed: 8, ammo: 50, b1hp: 25, b2hp: 45, b3hp: 80 };
 
+// Difficulty multipliers: easy helps new players, hard for veterans
+const DIFFICULTY = {
+    easy:   { label:'EASY',   color:'#00ff88', astMax:0.6, astRate:1.5, astSpeed:0.7, mbChance:0.5, ammo:70, bossHp:0.7, fuelRate:0.7, desc:'Fewer & slower asteroids, more ammo, weaker bosses' },
+    normal: { label:'NORMAL', color:'#00ccff', astMax:1.0, astRate:1.0, astSpeed:1.0, mbChance:1.0, ammo:50, bossHp:1.0, fuelRate:1.0, desc:'The intended experience' },
+    hard:   { label:'HARD',   color:'#ff4444', astMax:1.4, astRate:0.7, astSpeed:1.3, mbChance:1.5, ammo:35, bossHp:1.3, fuelRate:1.4, desc:'More & faster asteroids, less ammo, tougher bosses' }
+};
+let currentDifficulty = 'normal'; // active difficulty for current run
+
 let saves = { 1: null, 2: null, 3: null };
 let ship = { x: W/2, y: H/2, a: -Math.PI/2, r: 14, tx: 0, ty: 0 };
 let asteroids = [], bullets = [], particles = [], ammoBoxes = [], powerups = [];
