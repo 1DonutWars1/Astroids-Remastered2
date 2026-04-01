@@ -1,4 +1,9 @@
 Bugs to fix:
-Extra shield pips not working
-practice mode: sans has 80 heslth instead of 100, and Albert doesn't one-shot him
-Score gets reset every time you go to space station
+in level two sans fight activate when you die
+practice mode ends on first boss
+how to play:
+download the zipped folder
+open game.html
+open keygen.html
+generate a code
+enter the code
