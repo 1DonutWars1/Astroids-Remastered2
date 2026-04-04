@@ -559,63 +559,124 @@ function drawStation(){
 
     // === PLAYER HOLOGRAM ROBOT ===
     ctx.save();ctx.translate(st.playerX,floorY-30);
+
+    // --- PROJECTOR BEAM (ground up-cast) ---
+    const beamG=ctx.createLinearGradient(0,22,0,-50);
+    beamG.addColorStop(0,'rgba(0,220,255,0.22)');
+    beamG.addColorStop(0.5,'rgba(0,180,255,0.08)');
+    beamG.addColorStop(1,'transparent');
+    ctx.fillStyle=beamG;
+    ctx.beginPath();
+    ctx.moveTo(-22,22);ctx.lineTo(22,22);ctx.lineTo(14,-46);ctx.lineTo(-14,-46);
+    ctx.closePath();ctx.fill();
+
+    // --- GROUND PROJECTOR DISC ---
+    const discPulse=0.7+Math.sin(T/280)*0.3;
+    const discG=ctx.createRadialGradient(0,22,0,0,22,26);
+    discG.addColorStop(0,`rgba(0,240,255,${discPulse*0.55})`);
+    discG.addColorStop(0.6,`rgba(0,150,255,${discPulse*0.18})`);
+    discG.addColorStop(1,'transparent');
+    ctx.fillStyle=discG;
+    ctx.beginPath();ctx.ellipse(0,22,26,6,0,0,Math.PI*2);ctx.fill();
+    // Disc ring
+    ctx.strokeStyle=`rgba(0,240,255,${discPulse*0.8})`;ctx.lineWidth=1;
+    ctx.beginPath();ctx.ellipse(0,22,22,5,0,0,Math.PI*2);ctx.stroke();
+
     const facing=st.playerFacing;
     ctx.scale(facing,1);
     const walking=Math.abs(st.playerVX)>0.3;
-    // Smooth sine-based walk phase
     const walkPhase=walking?T/150:0;
-    const legSwing=Math.sin(walkPhase)*6;  // legs swing ±6px
-    const armSwing=Math.sin(walkPhase)*4;  // arms swing ±4px (opposite legs)
-    const bodyBob=walking?Math.abs(Math.sin(walkPhase*2))*2:0; // subtle up/down bob
-    // Hologram glow
-    ctx.shadowBlur=12;ctx.shadowColor='#00ccff';
-    ctx.globalAlpha=0.8+Math.sin(T/300)*0.05;
-    // -- Head --
-    ctx.fillStyle='#00ddee';
-    ctx.beginPath();ctx.arc(0,-28+bodyBob,8,0,Math.PI*2);ctx.fill();
-    // Visor (always faces right in local coords)
-    ctx.fillStyle='rgba(255,255,255,0.85)';
-    ctx.fillRect(2,-30+bodyBob,5,3);
-    // Antenna
-    ctx.strokeStyle='#00aacc';ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.moveTo(0,-36+bodyBob);ctx.lineTo(0,-40+bodyBob);ctx.stroke();
-    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,-40+bodyBob,1.5,0,Math.PI*2);ctx.fill();
-    // -- Torso --
-    ctx.fillStyle='#00bbdd';
-    ctx.beginPath();
-    ctx.moveTo(-7,-20+bodyBob);ctx.lineTo(7,-20+bodyBob);
-    ctx.lineTo(6,6+bodyBob);ctx.lineTo(-6,6+bodyBob);
-    ctx.closePath();ctx.fill();
-    // Chest detail
-    ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(-4,-14+bodyBob);ctx.lineTo(4,-14+bodyBob);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(-3,-10+bodyBob);ctx.lineTo(3,-10+bodyBob);ctx.stroke();
-    // -- Arms (swing opposite to legs) --
-    ctx.fillStyle='#009dbb';
-    // Left arm
-    ctx.save();ctx.translate(-8,-16+bodyBob);ctx.rotate((-armSwing)*Math.PI/60);
-    ctx.fillRect(-2,0,4,14);ctx.restore();
-    // Right arm
-    ctx.save();ctx.translate(8,-16+bodyBob);ctx.rotate((armSwing)*Math.PI/60);
-    ctx.fillRect(-2,0,4,14);ctx.restore();
-    // -- Legs (swing with walk) --
-    ctx.fillStyle='#0088aa';
-    // Left leg
-    ctx.save();ctx.translate(-3,6+bodyBob);ctx.rotate((legSwing)*Math.PI/80);
-    ctx.fillRect(-2,0,4,14);
-    ctx.fillStyle='#00aacc';ctx.fillRect(-3,13,5,3); // foot
+    const legSwing=Math.sin(walkPhase)*6;
+    const armSwing=Math.sin(walkPhase)*4;
+    const bodyBob=walking?Math.abs(Math.sin(walkPhase*2))*2:Math.sin(T/600)*0.8;
+    // Idle float when not walking
+    const idleFloat=walking?0:Math.sin(T/800)*1.5;
+    const totalBob=bodyBob+idleFloat;
+
+    // Flicker state (random drop-outs)
+    const flickerOn=Math.random()>0.015;
+    const glitchShift=Math.random()<0.025?(Math.random()-0.5)*3:0;
+
+    // Master hologram alpha with subtle modulation
+    const baseAlpha=(0.78+Math.sin(T/300)*0.08)*(flickerOn?1:0.4);
+
+    // --- DRAW ROBOT FIGURE (as a function so we can render 3 chromatic layers) ---
+    const drawFig=(off,col,alpha)=>{
+        ctx.save();ctx.translate(off,0);
+        ctx.globalAlpha=alpha;
+        ctx.shadowBlur=18;ctx.shadowColor=col;
+        // Head
+        ctx.fillStyle=col;
+        ctx.beginPath();ctx.arc(0,-28+totalBob,8,0,Math.PI*2);ctx.fill();
+        // Visor
+        ctx.fillStyle='rgba(255,255,255,0.9)';
+        ctx.fillRect(2,-30+totalBob,5,3);
+        // Antenna
+        ctx.strokeStyle=col;ctx.lineWidth=1.5;
+        ctx.beginPath();ctx.moveTo(0,-36+totalBob);ctx.lineTo(0,-40+totalBob);ctx.stroke();
+        ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,-40+totalBob,1.6,0,Math.PI*2);ctx.fill();
+        // Torso
+        ctx.fillStyle=col;
+        ctx.beginPath();
+        ctx.moveTo(-7,-20+totalBob);ctx.lineTo(7,-20+totalBob);
+        ctx.lineTo(6,6+totalBob);ctx.lineTo(-6,6+totalBob);
+        ctx.closePath();ctx.fill();
+        // Arms
+        ctx.save();ctx.translate(-8,-16+totalBob);ctx.rotate((-armSwing)*Math.PI/60);
+        ctx.fillRect(-2,0,4,14);ctx.restore();
+        ctx.save();ctx.translate(8,-16+totalBob);ctx.rotate((armSwing)*Math.PI/60);
+        ctx.fillRect(-2,0,4,14);ctx.restore();
+        // Legs
+        ctx.save();ctx.translate(-3,6+totalBob);ctx.rotate((legSwing)*Math.PI/80);
+        ctx.fillRect(-2,0,4,14);ctx.fillRect(-3,13,5,3);ctx.restore();
+        ctx.save();ctx.translate(3,6+totalBob);ctx.rotate((-legSwing)*Math.PI/80);
+        ctx.fillRect(-2,0,4,14);ctx.fillRect(-3,13,5,3);ctx.restore();
+        ctx.shadowBlur=0;
+        ctx.restore();
+    };
+
+    // Chromatic aberration: R offset +1, G normal, B offset -1
+    drawFig(1+glitchShift,'rgba(255,80,140,0.55)',baseAlpha*0.65);
+    drawFig(-1-glitchShift,'rgba(0,220,255,0.65)',baseAlpha*0.75);
+    drawFig(0,'#00ddee',baseAlpha);
+
+    // --- HOLOGRAM SCAN BANDS (multiple horizontal lines continuously sweeping) ---
+    ctx.save();
+    ctx.beginPath();ctx.rect(-14,-44,28,64);ctx.clip();
+    for(let sb=0;sb<4;sb++){
+        const sy=((T/20+sb*17)%64)-44+totalBob;
+        const alpha=0.08+0.06*Math.sin(T/400+sb);
+        ctx.globalAlpha=alpha;
+        const sbg=ctx.createLinearGradient(0,sy-1,0,sy+2);
+        sbg.addColorStop(0,'transparent');sbg.addColorStop(0.5,'#aaeeff');sbg.addColorStop(1,'transparent');
+        ctx.fillStyle=sbg;ctx.fillRect(-14,sy-1,28,3);
+    }
+    // Bright sweep band
+    const bigY=((T/12)%90)-44+totalBob;
+    ctx.globalAlpha=0.28;
+    const bbg=ctx.createLinearGradient(0,bigY-3,0,bigY+4);
+    bbg.addColorStop(0,'transparent');bbg.addColorStop(0.5,'#ffffff');bbg.addColorStop(1,'transparent');
+    ctx.fillStyle=bbg;ctx.fillRect(-14,bigY-3,28,7);
+    // Fine static noise
+    ctx.globalAlpha=0.08;ctx.fillStyle='#aaeeff';
+    for(let n=0;n<6;n++){
+        const nx=(Math.random()-0.5)*28;
+        const ny=(Math.random()-0.5)*64-12;
+        ctx.fillRect(nx,ny,1+Math.random()*3,1);
+    }
     ctx.restore();
-    // Right leg
-    ctx.save();ctx.translate(3,6+bodyBob);ctx.rotate((-legSwing)*Math.PI/80);
-    ctx.fillStyle='#0088aa';ctx.fillRect(-2,0,4,14);
-    ctx.fillStyle='#00aacc';ctx.fillRect(-3,13,5,3); // foot
-    ctx.restore();
-    // -- Hologram scan line (single, sweeps down) --
-    const scanY=((T/15)%70)-35;
-    ctx.globalAlpha=0.1;ctx.fillStyle='#aaeeff';ctx.fillRect(-12,scanY+bodyBob,24,2);
-    ctx.globalAlpha=0.8+Math.sin(T/300)*0.05;
-    // -- Hologram flicker (rare) --
-    if(Math.random()<0.02){ctx.globalAlpha=0.3;ctx.fillStyle='#00eeff';ctx.fillRect(-10,-38,20,60);}
+
+    // Rare glitch block (horizontal displacement)
+    if(Math.random()<0.02){
+        const gy=-40+Math.random()*60;
+        const gh=2+Math.random()*4;
+        const gdx=(Math.random()-0.5)*6;
+        ctx.globalAlpha=0.35;ctx.fillStyle='#ff44aa';
+        ctx.fillRect(-14+gdx,gy+totalBob,28,gh);
+        ctx.globalAlpha=0.25;ctx.fillStyle='#00ffff';
+        ctx.fillRect(-14-gdx,gy+totalBob,28,gh);
+    }
+
     ctx.globalAlpha=1;ctx.shadowBlur=0;
     ctx.restore();
 

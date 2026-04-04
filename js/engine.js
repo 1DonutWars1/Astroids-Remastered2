@@ -769,17 +769,28 @@ function draw() {
     else{bgGrad.addColorStop(0,'#080c18');bgGrad.addColorStop(0.3,'#040810');bgGrad.addColorStop(0.7,'#020408');bgGrad.addColorStop(1,'#010103');}
     ctx.fillStyle=bgGrad;ctx.fillRect(-10,-10,W+20,H+20);
 
-    // Animated nebula clouds — larger, more varied
-    for(let i=0;i<5;i++){
-        const nx=W*(0.1+i*0.2)+Math.sin(T/10000+i*1.7)*60;
-        const ny=H*(0.15+i*0.18)+Math.cos(T/8000+i*2.3)*45;
-        const nr=120+i*30+Math.sin(T/12000+i)*20;
-        ctx.globalAlpha=isP2?0.04:0.025;
+    // Animated nebula clouds — larger, more varied, more vivid
+    for(let i=0;i<7;i++){
+        const nx=W*(0.08+i*0.15)+Math.sin(T/10000+i*1.7)*80;
+        const ny=H*(0.12+i*0.14)+Math.cos(T/8000+i*2.3)*55;
+        const nr=150+i*40+Math.sin(T/12000+i)*30;
+        ctx.globalAlpha=isP2?0.08:0.055;
         const ng=ctx.createRadialGradient(nx,ny,0,nx,ny,nr);
-        const nebColors=isP2?['#ff00ff','#cc00aa','#ff4488','#aa00ff','#ff0066']:['#1144aa','#0066cc','#004488','#2244cc','#003366'];
-        ng.addColorStop(0,nebColors[i%nebColors.length]);ng.addColorStop(0.6,nebColors[(i+2)%nebColors.length]+'44');ng.addColorStop(1,'transparent');
+        const nebColors=isP2?['#ff00ff','#cc00aa','#ff4488','#aa00ff','#ff0066','#dd22bb']:['#2266dd','#0088ee','#4466ff','#3355dd','#2244bb','#1144aa','#5500cc'];
+        ng.addColorStop(0,nebColors[i%nebColors.length]);ng.addColorStop(0.4,nebColors[(i+2)%nebColors.length]+'66');ng.addColorStop(0.75,nebColors[(i+3)%nebColors.length]+'22');ng.addColorStop(1,'transparent');
         ctx.fillStyle=ng;ctx.fillRect(0,0,W,H);
     }
+    // Distant galaxy smear
+    ctx.globalAlpha=isP2?0.06:0.04;
+    const gx=W*0.75+Math.sin(T/15000)*40, gy=H*0.3;
+    const galG=ctx.createRadialGradient(gx,gy,0,gx,gy,200);
+    galG.addColorStop(0,isP2?'#ffaaff':'#aaccff');
+    galG.addColorStop(0.3,isP2?'#ff44aa66':'#4488dd66');
+    galG.addColorStop(1,'transparent');
+    ctx.fillStyle=galG;
+    ctx.save();ctx.translate(gx,gy);ctx.rotate(T/30000);ctx.scale(1.6,0.4);
+    ctx.beginPath();ctx.arc(0,0,200,0,Math.PI*2);ctx.fill();
+    ctx.restore();
     ctx.globalAlpha=1;
 
     // Subtle dust lane
@@ -791,25 +802,29 @@ function draw() {
     ctx.globalAlpha=1;
 
     // Stars with color variety, twinkle, and depth layers
-    const starColors=isP2?['#ff88cc','#ff44aa','#ffaadd','#cc44ff']:['#ffffff','#aaccff','#ffeecc','#88aaff','#ccddff'];
+    const starColors=isP2?['#ff88cc','#ff44aa','#ffaadd','#cc44ff','#ff66ee']:['#ffffff','#aaccff','#ffeecc','#88aaff','#ccddff','#ffccee'];
     for(const s of stars){
-        const twinkle=Math.sin(T/600+s.x*3+s.y)*0.3+Math.sin(T/900+s.y*2)*0.1;
-        ctx.globalAlpha=Math.max(0.04,s.alpha+twinkle);
+        const twinkle=Math.sin(T/600+s.x*3+s.y)*0.35+Math.sin(T/900+s.y*2)*0.15;
+        ctx.globalAlpha=Math.max(0.05,s.alpha+twinkle);
         const col=starColors[Math.floor(s.x+s.y)%starColors.length];
         ctx.fillStyle=col;
         ctx.beginPath();ctx.arc(s.x,s.y,s.size,0,Math.PI*2);ctx.fill();
         // Bright stars get a soft glow halo + cross flare
         if(s.size>1.2&&s.alpha>0.4){
             // Glow halo
-            ctx.globalAlpha*=0.15;
-            const sg=ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,s.size*4);
-            sg.addColorStop(0,col);sg.addColorStop(1,'transparent');
-            ctx.fillStyle=sg;ctx.beginPath();ctx.arc(s.x,s.y,s.size*4,0,Math.PI*2);ctx.fill();
+            ctx.globalAlpha*=0.22;
+            const sg=ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,s.size*5);
+            sg.addColorStop(0,col);sg.addColorStop(0.4,col+'66');sg.addColorStop(1,'transparent');
+            ctx.fillStyle=sg;ctx.beginPath();ctx.arc(s.x,s.y,s.size*5,0,Math.PI*2);ctx.fill();
             // Cross flare
-            ctx.globalAlpha=Math.max(0.04,s.alpha+twinkle)*0.25;
-            ctx.strokeStyle=col;ctx.lineWidth=0.5;
-            const fl=3+s.size*2;
+            ctx.globalAlpha=Math.max(0.04,s.alpha+twinkle)*0.4;
+            ctx.strokeStyle=col;ctx.lineWidth=0.7;
+            const fl=4+s.size*2.5;
             ctx.beginPath();ctx.moveTo(s.x-fl,s.y);ctx.lineTo(s.x+fl,s.y);ctx.moveTo(s.x,s.y-fl);ctx.lineTo(s.x,s.y+fl);ctx.stroke();
+            // Diagonal secondary flare
+            ctx.globalAlpha*=0.5;ctx.lineWidth=0.4;
+            const fl2=fl*0.6;
+            ctx.beginPath();ctx.moveTo(s.x-fl2,s.y-fl2);ctx.lineTo(s.x+fl2,s.y+fl2);ctx.moveTo(s.x-fl2,s.y+fl2);ctx.lineTo(s.x+fl2,s.y-fl2);ctx.stroke();
         }
     }
     ctx.globalAlpha=1;
@@ -1026,16 +1041,16 @@ function draw() {
     for(const a of asteroids){
         ctx.save();ctx.translate(a.x,a.y);ctx.rotate(a.angle);
         if(a.type==='fuel'){
-            ctx.shadowBlur=18;ctx.shadowColor='#ffcc00';
-            ctx.strokeStyle='#ddcc00';ctx.fillStyle='#1a1800';
+            ctx.shadowBlur=28;ctx.shadowColor='#ffcc00';
+            ctx.strokeStyle='#ffdd22';ctx.fillStyle='#2a2400';
         } else if(isP2){
-            ctx.shadowBlur=10;ctx.shadowColor='#00ddff';
-            ctx.strokeStyle='#00bbcc';ctx.fillStyle='rgba(0,30,35,0.7)';
+            ctx.shadowBlur=16;ctx.shadowColor='#00ddff';
+            ctx.strokeStyle='#00ddee';ctx.fillStyle='rgba(0,40,48,0.75)';
         } else {
-            ctx.shadowBlur=4;ctx.shadowColor='rgba(100,100,120,0.3)';
-            const ag=ctx.createRadialGradient(-a.r*0.3,-a.r*0.3,a.r*0.1,a.r*0.1,a.r*0.1,a.r);
-            ag.addColorStop(0,'#252525');ag.addColorStop(0.5,'#141414');ag.addColorStop(1,'#080808');
-            ctx.fillStyle=ag;ctx.strokeStyle='#555';
+            ctx.shadowBlur=8;ctx.shadowColor='rgba(140,140,180,0.5)';
+            const ag=ctx.createRadialGradient(-a.r*0.35,-a.r*0.35,a.r*0.08,a.r*0.15,a.r*0.15,a.r*1.1);
+            ag.addColorStop(0,'#3a3a42');ag.addColorStop(0.35,'#1e1e24');ag.addColorStop(0.75,'#0f0f14');ag.addColorStop(1,'#050508');
+            ctx.fillStyle=ag;ctx.strokeStyle='#6a6a78';
         }
         ctx.lineWidth=1.5;ctx.beginPath();
         for(let i=0;i<a.verts;i++){const ang=(Math.PI*2/a.verts)*i,r=a.r+a.offsets[i];i===0?ctx.moveTo(Math.cos(ang)*r,Math.sin(ang)*r):ctx.lineTo(Math.cos(ang)*r,Math.sin(ang)*r);}
@@ -1397,15 +1412,25 @@ function draw() {
         // Warning text with pulsing + scanline effect
         if(boss.state==='enter'){
             const wa=0.5+Math.sin(T/100)*0.5;
-            // Red screen flash
-            ctx.globalAlpha=wa*0.04;ctx.fillStyle='#ff0000';ctx.fillRect(0,0,W,H);
+            // Red screen flash with scanning bars
+            ctx.globalAlpha=wa*0.08;ctx.fillStyle='#ff0000';ctx.fillRect(0,0,W,H);
+            // Horizontal warning bars
+            ctx.globalAlpha=wa*0.25;ctx.fillStyle='#ff0000';
+            ctx.fillRect(0,H/2-60,W,2);ctx.fillRect(0,H/2+55,W,2);
+            // Diagonal caution stripes
+            ctx.globalAlpha=wa*0.15;
+            for(let cs=-W;cs<W*2;cs+=40){
+                ctx.fillStyle=cs%80===0?'#ff0000':'#ffcc00';
+                ctx.save();ctx.translate(cs,H/2-58);ctx.rotate(-0.4);
+                ctx.fillRect(0,0,18,4);ctx.restore();
+            }
             // Warning text
-            ctx.globalAlpha=wa;ctx.font='bold 44px Courier New';ctx.fillStyle='#ff2222';ctx.textAlign='center';
-            ctx.shadowBlur=40;ctx.shadowColor='#ff0000';
-            ctx.fillText('WARNING',W/2,H/2);
-            ctx.shadowBlur=15;
-            ctx.font='13px Courier New';ctx.fillStyle='#ff6666';ctx.letterSpacing='4px';
-            ctx.fillText('BOSS APPROACHING',W/2,H/2+28);
+            ctx.globalAlpha=wa;ctx.font='bold 56px Courier New';ctx.fillStyle='#ff2222';ctx.textAlign='center';
+            ctx.shadowBlur=60;ctx.shadowColor='#ff0000';
+            ctx.fillText('⚠ WARNING ⚠',W/2,H/2);
+            ctx.shadowBlur=25;
+            ctx.font='bold 15px Courier New';ctx.fillStyle='#ffaaaa';ctx.letterSpacing='4px';
+            ctx.fillText('BOSS  APPROACHING',W/2,H/2+32);
             ctx.shadowBlur=0;ctx.globalAlpha=1;
         }
         if(boss.state==='dialogue'){
@@ -2152,9 +2177,14 @@ function draw() {
             ctx.fillStyle=sg;ctx.fill();
             // Outline (class color) with glow
             ctx.strokeStyle=isP2?'#ff00ff':_classCol;
-            if(isP2){ctx.shadowBlur=22;ctx.shadowColor='#ff00ff';}
-            else{ctx.shadowBlur=10;ctx.shadowColor=_classCol;}
-            ctx.lineWidth=2;ctx.stroke();
+            if(isP2){ctx.shadowBlur=32;ctx.shadowColor='#ff00ff';}
+            else{ctx.shadowBlur=18;ctx.shadowColor=_classCol;}
+            ctx.lineWidth=2.3;ctx.stroke();
+            // Double-stroke outer glow for bloom
+            ctx.shadowBlur=0;ctx.globalAlpha=0.35;ctx.lineWidth=1;
+            ctx.strokeStyle=isP2?'#ffaaff':_classCol;
+            ctx.beginPath();_shape.body(ctx,ship.r*1.08);ctx.closePath();ctx.stroke();
+            ctx.globalAlpha=1;
             ctx.shadowBlur=0;
             // Second inner stroke for hull detail
             ctx.globalAlpha=0.12;ctx.strokeStyle=isP2?'#ff88ff':_classCol;ctx.lineWidth=1;
@@ -2250,19 +2280,27 @@ function draw() {
             ctx.beginPath();ctx.arc(b.trail[i].x,b.trail[i].y,tSz,0,Math.PI*2);ctx.fill();
         }
         ctx.globalAlpha=1;
+        // Wide bloom halo
+        ctx.shadowBlur=28;ctx.shadowColor=bGlow;
+        const bBloom=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,14);
+        bBloom.addColorStop(0,bCol+'66');bBloom.addColorStop(0.4,bCol+'22');bBloom.addColorStop(1,'transparent');
+        ctx.fillStyle=bBloom;ctx.beginPath();ctx.arc(b.x,b.y,14,0,Math.PI*2);ctx.fill();
         // Outer glow halo
-        ctx.shadowBlur=18;ctx.shadowColor=bGlow;
         const bOuter=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,8);
-        bOuter.addColorStop(0,bCol+'88');bOuter.addColorStop(1,'transparent');
+        bOuter.addColorStop(0,bCol+'cc');bOuter.addColorStop(1,'transparent');
         ctx.fillStyle=bOuter;ctx.beginPath();ctx.arc(b.x,b.y,8,0,Math.PI*2);ctx.fill();
         // Bullet head glow
         const bg=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,5);
         bg.addColorStop(0,'#fff');bg.addColorStop(0.35,isGilbert?allyCol:(isTriple?'#ffcc00':'#ff8888'));bg.addColorStop(1,'transparent');
         ctx.fillStyle=bg;ctx.beginPath();ctx.arc(b.x,b.y,5,0,Math.PI*2);ctx.fill();
+        // Cross flare (star burst)
+        ctx.globalAlpha=0.7;ctx.strokeStyle=bCol;ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(b.x-9,b.y);ctx.lineTo(b.x+9,b.y);ctx.moveTo(b.x,b.y-9);ctx.lineTo(b.x,b.y+9);ctx.stroke();
+        ctx.globalAlpha=1;
         // Hot core
         ctx.fillStyle=isGilbert?allyCore:(isTriple?'#ffee88':'#ffdddd');
-        ctx.beginPath();ctx.arc(b.x,b.y,2,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(b.x,b.y,1,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.arc(b.x,b.y,2.2,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(b.x,b.y,1.2,0,Math.PI*2);ctx.fill();
         ctx.shadowBlur=0;
     }
 
