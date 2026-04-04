@@ -196,7 +196,16 @@ function retryCheckpoint() {
     G.running=true;
     if (G.checkpoint>=3) {
         G.level=G.checkpoint; G.hasForceField=true; G.shieldFuel=3; updateShieldUI();
-        if(G.checkpoint===3) spawnBoss(3); else Sound.playMusic('bgm');
+        if(G.checkpoint===3){
+            if(window.DLC&&window.DLC.loaded){
+                // DLC: replace the Sans fight with the Boss Rush (cyborg comes after, as usual)
+                for(let k=0;k<8;k++)spawnAsteroid();
+                G.bossRushStartTime=performance.now();
+                Sound.playMusic('bgm');
+            } else {
+                spawnBoss(3);
+            }
+        } else Sound.playMusic('bgm');
     }
     updateUI();
 }
@@ -474,7 +483,6 @@ function hurtPlayer(instantKill) {
 }
 function endGame() {
     G.running=false; Sound.playMusic('none'); Sound.explode();
-    document.getElementById('retryBtn').style.display=((G.checkpoint>=3||G.stationUnlocked)&&!G.practice)?'inline-block':'none';
     if(G.slotId){const s=saves[G.slotId];if(G.score>s.high)s.high=G.score;if(G.level>s.maxLvl)s.maxLvl=G.level;saveToDisk();
         document.getElementById('savedSlot').innerText=G.slotId;document.getElementById('savedInfo').style.display='block';
     } else document.getElementById('savedInfo').style.display='none';

@@ -615,7 +615,6 @@ function update() {
                                     }
                                     document.getElementById('bossRow').style.display='none';
                                     Sound.playMusic('bgm');
-                                    if(G.practice){boss=null;winGame();return;}
                                     G.widescreenReturning=true;G.widescreenReturnProgress=1;
                                     boss=null;G.level++;G.levelsCleared++;
                                     G.waveStart=performance.now();G.spawnTimer=0;
@@ -699,9 +698,6 @@ function update() {
                     }
                     document.getElementById('bossRow').style.display='none';
                     Sound.playMusic('bgm');
-
-                    // Practice mode: stop after boss kill
-                    if(G.practice){boss=null;winGame();return;}
 
                     // --- BOSS DEFEAT FLOW ---
                     if(boss.type===2){
