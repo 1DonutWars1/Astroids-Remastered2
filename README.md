@@ -1,6 +1,4 @@
-Bugs to fix:
-in level two sans fight activate when you die
-practice mode ends on first boss
+Gilbert still appear when he needs saving during level six.
 how to play:
 download the zipped folder
 open game.html
