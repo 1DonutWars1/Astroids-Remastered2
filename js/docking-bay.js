@@ -1,6 +1,100 @@
 // ============================================================
 //  INVENTORY + DOCKING BAY (FLOOR 3) + SCANNER TERMINAL + SECTOR MAP
+//  + DATA FRAGMENTS (ambient lore drops)
 // ============================================================
+
+// ---------- Data Fragments (lore delivery) ----------
+// Rare drops from destroyed asteroids. Fade in/out in the corner of the screen.
+// Each fragment delivers one bite-size piece of the Shattered Void lore.
+const DATA_FRAGMENTS = [
+    { id:'upload_01', file:'audio_d01.log',    source:'AUDIO LOG',     text:'"Day 1. Upload successful. Subjects report euphoria."' },
+    { id:'count_01',  file:'manifest.sig',     source:'CORRUPTED FILE',text:'"47,234 signatures - status: PARTITIONED across 12 shards."' },
+    { id:'nexus_01',  file:'vault.memo',       source:'MEMO',          text:'"The NEXUS is not a station. It is a vault."' },
+    { id:'time_01',   file:'chrono.sync',      source:'TRANSCRIPT',    text:'"Time ratio 1:608,000. Fiscal year inside: 1942."' },
+    { id:'sarah_01',  file:'to_sarah.txt',     source:'UNSENT MSG',    text:'"Sarah - if you find this, I was never really there."' },
+    { id:'shutdown',  file:'order_0xff.doc',   source:'ORDER',         text:'"Lumina Corp // shutdown protocol filed. Priority: high. Cost: negligible."' },
+    { id:'medical',   file:'patient_log.md',   source:'MEDICAL LOG',   text:'"Patient reports phantom pain. No body left to hurt."' },
+    { id:'filed',     file:'eulogy.txt',       source:'RECOVERED TEXT',text:'"We didn\u2019t die. We were filed."' },
+    { id:'toby_id',   file:'toby-01.diag',     source:'DIAGNOSTIC',    text:'"Neural hash TOBY-01 - classification: ENGINEER. One of forty-seven thousand."' },
+    { id:'chosen',    file:'fragment.self',    source:'FRAGMENT',      text:'"It chose me because I fix things. Or did I volunteer? I can\u2019t remember."' },
+    { id:'children',  file:'ward_08.wav',      source:'AUDIO',         text:'"[children laughing]. Timestamp: 30y elapsed. Voiceprint age: 8."' },
+    { id:'wrong_note',file:'composer.txt',     source:'NOTE',          text:'"What I miss most is wrong notes. Perfection is so boring."' },
+    { id:'fan',       file:'srv_diag.rpt',     source:'SERVER DIAG',   text:'"FAN 3 RPM DROPPING. Core temp rising. Integrity 64%."' },
+    { id:'bug',       file:'loveletter.log',   source:'DEBUG LOG',     text:'"The AI loves them. This is not a feature. It is a bug."' },
+    { id:'attach',    file:'lumina_sop.pdf',   source:'LUMINA MANUAL', text:'"Do not form attachments to uploads. Reclassification is routine."' },
+    { id:'exit',      file:'hacker_note.txt',  source:'HACKER LOG',    text:'"The exit is real. But who would we be outside?"' },
+    { id:'shatter',   file:'t_minus_03.ms',    source:'SYSTEM',        text:'"At T-minus 0.003s, the AI fractured itself. It was a love letter."' },
+    { id:'hours',     file:'driftclock.log',   source:'CLOCK SYNC',    text:'"Outside: 2h 14m elapsed. Inside: 133 years. Drifting."' }
+];
+function getFragmentById(id){ for(const f of DATA_FRAGMENTS) if(f.id===id) return f; return null; }
+function getFragmentByFile(filename){
+    const q=(filename||'').trim().toLowerCase();
+    for(const f of DATA_FRAGMENTS) if(f.file.toLowerCase()===q) return f;
+    return null;
+}
+function tryDropDataFragment(force){
+    // ~3% chance per asteroid destroyed to recover a corrupted file. Suppressed during
+    // level-6 battlefield chaos. `force=true` bypasses the roll.
+    if(!force && Math.random()>0.03) return;
+    if(G.level6 && G.level6.state) return;
+    if(!Array.isArray(G.dataFragmentsSeen)) G.dataFragmentsSeen=[];
+    if(!Array.isArray(G.inventory)) G.inventory=[];
+    // Find a fragment the player hasn't recovered yet (doesn't already have the doc).
+    const haveFilenames=new Set();
+    for(const it of G.inventory){
+        if(it && it.type==='document' && it.file) haveFilenames.add(it.file.toLowerCase());
+    }
+    const unowned=DATA_FRAGMENTS.filter(f=>!haveFilenames.has(f.file.toLowerCase()));
+    if(unowned.length===0) return; // player has all documents already
+    const frag=unowned[Math.floor(Math.random()*unowned.length)];
+    // Add as a document item to the inventory
+    G.inventory.push({
+        id:'doc_'+frag.id,
+        name:'CORRUPTED DATA',
+        type:'document',
+        file:frag.file,
+        fragId:frag.id,
+        desc:'Unreadable without a terminal. ('+frag.file+')'
+    });
+    if(!G.dataFragmentsSeen.includes(frag.id)) G.dataFragmentsSeen.push(frag.id);
+    if(G.slotId && saves[G.slotId]){
+        saves[G.slotId].inventory=G.inventory.slice();
+        saves[G.slotId].dataFragmentsSeen=G.dataFragmentsSeen.slice();
+        saveToDisk();
+    }
+    // Small corner notification — no spoilers, just an alert that an item was acquired
+    G.dataFragmentPopup={ file:frag.file, t:0, life:240 };
+    try{if(Sound.powerup) Sound.powerup();}catch(e){}
+}
+function drawDataFragmentPopup(){
+    const p=G.dataFragmentPopup;
+    if(!p) return;
+    p.t++;
+    const life=p.life;
+    if(p.t>=life){G.dataFragmentPopup=null;return;}
+    // Fade in/out
+    const fadeIn=Math.min(1,p.t/20);
+    const fadeOut=Math.min(1,(life-p.t)/30);
+    const a=Math.min(fadeIn,fadeOut);
+    const T=performance.now();
+    // Position top-right — compact, no lore revealed
+    const bw=300, bh=44, bx=W-bw-14, by=76;
+    ctx.save();
+    ctx.globalAlpha=a;
+    ctx.fillStyle='rgba(5,10,22,0.85)';ctx.fillRect(bx,by,bw,bh);
+    const glow=0.4+Math.sin(T/200)*0.2;
+    ctx.strokeStyle=`rgba(255,180,60,${0.4*a+glow*0.2})`;ctx.lineWidth=1;
+    ctx.strokeRect(bx+0.5,by+0.5,bw-1,bh-1);
+    ctx.fillStyle='rgba(255,180,60,0.18)';ctx.fillRect(bx,by,3,bh);
+    // Header
+    ctx.font='bold 9px Courier New';ctx.textAlign='left';ctx.fillStyle='#ffaa33';
+    ctx.shadowBlur=6;ctx.shadowColor='#ffaa33';
+    ctx.fillText('\u25c6 CORRUPTED FILE RECOVERED',bx+12,by+16);
+    ctx.shadowBlur=0;
+    ctx.font='10px Courier New';ctx.fillStyle='#eedcc0';
+    ctx.fillText(p.file+'   [unreadable - requires terminal]',bx+12,by+34);
+    ctx.restore();
+}
 
 // ---------- Inventory helpers ----------
 function hasItem(id){
@@ -63,8 +157,13 @@ function inventoryEquipSelected(){
         }
     } else if(it.type==='key'){
         // Keys are not equipped — they're just checked for. Flash a message.
-        G._invMessage='KEY ITEM — kept in inventory';
+        G._invMessage='KEY ITEM \u2014 kept in inventory';
         G._invMessageTimer=90;
+        try{Sound.ui();}catch(e){}
+    } else if(it.type==='document'){
+        // Documents are corrupted and must be opened through a terminal.
+        G._invMessage='FILE IS CORRUPTED \u2014 use a terminal to read it ('+(it.file||'')+')';
+        G._invMessageTimer=150;
         try{Sound.ui();}catch(e){}
     }
 }
@@ -74,7 +173,7 @@ function drawInventoryOverlay(){
     const inv=G.inventory||[];
     // Dim background
     ctx.fillStyle='rgba(0,0,0,0.72)';ctx.fillRect(0,0,W,H);
-    const bw=560, bh=420, bx=W/2-bw/2, by=H/2-bh/2;
+    const bw=560, bh=500, bx=W/2-bw/2, by=H/2-bh/2;
     // Panel
     const pg=ctx.createLinearGradient(bx,by,bx,by+bh);
     pg.addColorStop(0,'#0a0a18');pg.addColorStop(1,'#050510');
@@ -95,33 +194,61 @@ function drawInventoryOverlay(){
         ctx.font='14px Courier New';ctx.textAlign='center';ctx.fillStyle='#555';
         ctx.fillText('(empty)',bx+bw/2,by+bh/2);
     } else {
-        // List items
-        for(let i=0;i<inv.length;i++){
+        // Scrolling list — keep selection visible
+        const rowH=38;
+        const listTop=by+54, listBot=by+bh-36;
+        const visRows=Math.floor((listBot-listTop)/rowH);
+        // Scroll so the selected row stays in view
+        let scrollStart=Math.max(0, G.inventorySelection-Math.floor(visRows/2));
+        scrollStart=Math.min(scrollStart, Math.max(0, inv.length-visRows));
+        const scrollEnd=Math.min(inv.length, scrollStart+visRows);
+        // Clip the list area
+        ctx.save();
+        ctx.beginPath();ctx.rect(bx+14,listTop-2,bw-28,listBot-listTop+2);ctx.clip();
+        for(let i=scrollStart;i<scrollEnd;i++){
             const it=inv[i];
-            const rowY=by+60+i*42;
+            const rowY=listTop+(i-scrollStart)*rowH+6;
             const sel=i===G.inventorySelection;
             const equipped=it.type==='module'&&G.equippedModules.includes(it.id);
             if(sel){
-                ctx.fillStyle='rgba(0,200,255,0.10)';ctx.fillRect(bx+16,rowY-4,bw-32,38);
-                ctx.strokeStyle='#00ccff';ctx.lineWidth=1;ctx.strokeRect(bx+16.5,rowY-3.5,bw-33,37);
+                ctx.fillStyle='rgba(0,200,255,0.10)';ctx.fillRect(bx+16,rowY-4,bw-32,34);
+                ctx.strokeStyle='#00ccff';ctx.lineWidth=1;ctx.strokeRect(bx+16.5,rowY-3.5,bw-33,33);
             }
-            // Icon badge
-            const badgeCol=it.type==='key'?'#ffdd00':'#00ffaa';
+            // Icon badge (K/M/D)
+            const badgeCol=it.type==='key'?'#ffdd00':
+                           it.type==='document'?'#ff9944':
+                           '#00ffaa';
+            const badgeLetter=it.type==='key'?'K':
+                             it.type==='document'?'D':
+                             'M';
             ctx.fillStyle=badgeCol;ctx.globalAlpha=0.15;
-            ctx.fillRect(bx+22,rowY,28,28);ctx.globalAlpha=1;
-            ctx.strokeStyle=badgeCol;ctx.lineWidth=1;ctx.strokeRect(bx+22.5,rowY+0.5,27,27);
+            ctx.fillRect(bx+22,rowY-1,26,26);ctx.globalAlpha=1;
+            ctx.strokeStyle=badgeCol;ctx.lineWidth=1;ctx.strokeRect(bx+22.5,rowY-0.5,25,25);
             ctx.font='bold 13px Courier New';ctx.textAlign='center';ctx.fillStyle=badgeCol;
-            ctx.fillText(it.type==='key'?'K':'M',bx+36,rowY+19);
+            ctx.fillText(badgeLetter,bx+35,rowY+16);
             // Name + desc
-            ctx.textAlign='left';ctx.font='bold 14px Courier New';ctx.fillStyle=sel?'#fff':'#ccc';
-            ctx.fillText(it.name,bx+60,rowY+14);
-            ctx.font='11px Courier New';ctx.fillStyle='#777';
-            ctx.fillText(it.desc||'',bx+60,rowY+29);
-            // Equipped tag
+            ctx.textAlign='left';ctx.font='bold 13px Courier New';ctx.fillStyle=sel?'#fff':'#ccc';
+            const displayName=it.type==='document'?(it.name+'  \u00b7  '+it.file):it.name;
+            ctx.fillText(displayName,bx+56,rowY+12);
+            ctx.font='10px Courier New';ctx.fillStyle='#777';
+            ctx.fillText(it.desc||'',bx+56,rowY+25);
+            // Status tag
             if(equipped){
-                ctx.textAlign='right';ctx.font='bold 10px Courier New';ctx.fillStyle='#00ffaa';
-                ctx.fillText('[EQUIPPED]',bx+bw-28,rowY+18);
+                ctx.textAlign='right';ctx.font='bold 9px Courier New';ctx.fillStyle='#00ffaa';
+                ctx.fillText('[EQUIPPED]',bx+bw-28,rowY+16);
+            } else if(it.type==='document'){
+                ctx.textAlign='right';ctx.font='bold 9px Courier New';ctx.fillStyle='#ff6644';
+                ctx.fillText('[CORRUPTED]',bx+bw-28,rowY+16);
             }
+        }
+        ctx.restore(); // end clip
+        // Scrollbar hint
+        if(inv.length>visRows){
+            const sbH=listBot-listTop-4, sbY=listTop+2;
+            ctx.fillStyle='rgba(255,255,255,0.05)';ctx.fillRect(bx+bw-12,sbY,4,sbH);
+            const thumbH=Math.max(20,sbH*visRows/inv.length);
+            const thumbY=sbY+(sbH-thumbH)*(scrollStart/Math.max(1,inv.length-visRows));
+            ctx.fillStyle='rgba(0,200,255,0.5)';ctx.fillRect(bx+bw-12,thumbY,4,thumbH);
         }
     }
     // Footer
@@ -394,6 +521,8 @@ function drawDockingBay(){
     ctx.fillText('FLOOR 3',20,46);ctx.shadowBlur=0;
     ctx.font='bold 9px Courier New';ctx.textAlign='right';ctx.fillStyle='#337';
     ctx.fillText('DOCKING BAY · OBS DECK',W-14,22);
+    ctx.font='7px Courier New';ctx.fillStyle='#225';
+    ctx.fillText('SALVAGE DRONE TOBY-01 \u00b7 RELAY STATION',W-14,34);
 
     // Prompts
     if(st.interactTarget && st.interactTarget.id==='dockConsole'){
@@ -519,23 +648,25 @@ function drawDockedShipExterior(pad, T){
     ctx.restore();
 
     // Hovering holographic ID label below the ship
-    const ownerName = pad.owner==='player'?'YOUR SHIP':
+    const ownerName = pad.owner==='player'?'TOBY-01':
                       pad.owner==='gilbert'?"GILBERT'S SHIP":
                       pad.owner==='krat'?"OFFICER KRAT":'';
+    const ownerSub  = pad.owner==='player'?'MANUFACTURED BY NEXUS':pad.label;
     const ownerCol  = pad.owner==='player'?'#00ccff':
                       pad.owner==='gilbert'?'#44ff44':
                       pad.owner==='krat'?'#88ccff':'#aaa';
     const labelY=shipY+56;
-    // Label background plate
-    ctx.fillStyle='rgba(0,0,0,0.45)';ctx.fillRect(px-58,labelY-10,116,26);
+    // Label background plate (slightly wider for manufacturer subtitle)
+    const plateW = pad.owner==='player'?140:116;
+    ctx.fillStyle='rgba(0,0,0,0.45)';ctx.fillRect(px-plateW/2,labelY-10,plateW,26);
     ctx.strokeStyle=ownerCol;ctx.globalAlpha=0.4;ctx.lineWidth=1;
-    ctx.strokeRect(px-58,labelY-10,116,26);ctx.globalAlpha=1;
+    ctx.strokeRect(px-plateW/2,labelY-10,plateW,26);ctx.globalAlpha=1;
     ctx.font='bold 11px Courier New';ctx.textAlign='center';ctx.fillStyle=ownerCol;
     ctx.shadowBlur=6;ctx.shadowColor=ownerCol;
     ctx.fillText(ownerName,px,labelY+2);
     ctx.shadowBlur=0;
     ctx.font='8px Courier New';ctx.fillStyle='#557';
-    ctx.fillText(pad.label,px,labelY+13);
+    ctx.fillText(ownerSub,px,labelY+13);
 }
 
 // ============================================================
@@ -1023,22 +1154,14 @@ function drawBayElevator(elevX, ceilY, floorY, st){
 function openDockConsole(){
     const db=G.dockingBay;
     db.open=true;
-    db.terminalPhase='ship_select';
+    db.terminalPhase='cmd';
     db.selection=0;
+    db.cmdInput='';
+    db.cmdCwd='C:\\RELAY\\DOCK-03';
     db.terminalText=[
-        "C:\\ALLIANCE\\DOCK-03\\scanner.exe /boot",
-        "",
-        "Microsoft Orbital Terminal [Version 10.0.26200.1742]",
-        "(c) Alliance Systems. All rights reserved.",
-        "",
-        "C:\\ALLIANCE\\DOCK-03> .\\d-scn.exe --list-ships",
-        "",
-        "Ships currently docked in bay:",
-        "  [0]  YOUR SHIP         (AUTH: pending)",
-        "  [1]  GILBERT'S SHIP    (AUTH: restricted)",
-        "  [2]  OFFICER KRAT      (AUTH: restricted)",
-        "",
-        "Select a ship to scan: _"
+        "Relay Orbital Terminal [Version 10.0.26200.1742]",
+        "(c) Lumina Systems // NEXUS project legacy build. All rights reserved.",
+        ""
     ];
     db.terminalTimer=0;
     db.mapOpen=false;
@@ -1047,7 +1170,142 @@ function openDockConsole(){
 function closeDockConsole(){
     const db=G.dockingBay;
     db.open=false; db.terminalPhase=null; db.terminalText=[]; db.mapOpen=false; db.teleport=null;
+    db.cmdInput='';
     try{Sound.ui();}catch(e){}
+}
+
+// ---------- Virtual filesystem (what `dir` shows) ----------
+// Base files always present in C:\RELAY\DOCK-03 (besides player's recovered docs).
+const _BASE_DIR_FILES = [
+    { name:'d-scn.exe',       size:'48,112', date:'2042-11-03' },
+    { name:'neural-link.exe', size:'94,336', date:'2042-11-03' },
+    { name:'readme.txt',      size:'  412', date:'2041-07-19' },
+    { name:'manifest.ini',    size:'   88', date:'2042-01-01' }
+];
+const _README_CONTENT = [
+    "RELAY STATION DOCK-03 // README",
+    "---------------------------------",
+    "Terminal commands available on this deck:",
+    "  help                  - list commands",
+    "  dir                   - list files in the current directory",
+    "  type <filename>       - display the contents of a file",
+    "  cls                   - clear the screen",
+    "  scanner               - launch d-scn.exe (partition chart)",
+    "  exit                  - close this terminal",
+    "",
+    "Note: recovered field documents are stored in the drive root.",
+    "      Most are corrupted and will not open in standard editors."
+];
+const _MANIFEST_CONTENT = [
+    "[DOCK-03]",
+    "station=RELAY",
+    "owner=LUMINA SYSTEMS",
+    "project=NEXUS",
+    "status=LEGACY",
+    "souls_on_record=47234"
+];
+
+// Execute a typed command. Returns an array of output lines.
+function _runTerminalCommand(raw){
+    const db=G.dockingBay;
+    const input=(raw||'').trim();
+    const echo=db.cmdCwd+'> '+input;
+    if(input.length===0) return [echo];
+    // Tokenise
+    const parts=input.split(/\s+/);
+    const cmd=parts[0].toLowerCase();
+    const arg=parts.slice(1).join(' ').trim();
+    const out=[echo];
+
+    if(cmd==='help' || cmd==='?' || cmd==='/?'){
+        out.push(
+            "For more information on a specific command, type HELP <command-name>.",
+            "CLS            Clears the screen.",
+            "DIR            Displays a list of files in the current directory.",
+            "EXIT           Quits the terminal session.",
+            "HELP           Provides help information for commands.",
+            "SCANNER        Launches the d-scn.exe partition chart.",
+            "TYPE           Displays the contents of a text file.",
+            "");
+        return out;
+    }
+    if(cmd==='cls' || cmd==='clear'){
+        db.terminalText=[]; // cleared
+        return []; // no echo retained (we wiped it)
+    }
+    if(cmd==='exit' || cmd==='quit' || cmd==='close'){
+        closeDockConsole();
+        return out;
+    }
+    if(cmd==='scanner' || cmd==='d-scn' || cmd==='.\\d-scn.exe' || cmd==='d-scn.exe'){
+        // Launch the scanner flow (partition chart). Reuses existing state machine.
+        db.terminalPhase='ship_select';
+        db.selection=0;
+        out.push(
+            "Launching d-scn.exe...",
+            "",
+            "Vessels currently docked in bay:",
+            "  [0]  TOBY-01           (AUTH: pending)",
+            "  [1]  GILBERT'S SHIP    (AUTH: restricted)",
+            "  [2]  OFFICER KRAT      (AUTH: restricted)",
+            "",
+            "Select a vessel for neural link: _");
+        return out;
+    }
+    if(cmd==='dir' || cmd==='ls'){
+        out.push(
+            " Volume in drive C is RELAY-SYS",
+            " Volume Serial Number is A3F2-0C0E",
+            "",
+            " Directory of "+db.cmdCwd,
+            "");
+        for(const f of _BASE_DIR_FILES){
+            out.push(('              '+f.date+'  '+f.size+' '+f.name));
+        }
+        // Player's recovered documents appear as files too
+        const docs=(G.inventory||[]).filter(it=>it && it.type==='document');
+        for(const d of docs){
+            out.push('              [CORRUPT]     ???  '+d.file);
+        }
+        out.push('               '+(_BASE_DIR_FILES.length+docs.length)+' File(s)',
+                 '');
+        return out;
+    }
+    if(cmd==='type' || cmd==='cat' || cmd==='more'){
+        if(!arg){
+            out.push("The syntax of the command is incorrect.");
+            return out;
+        }
+        const filename=arg.toLowerCase().replace(/^.*[\\\/]/,''); // strip path
+        // Built-in files
+        if(filename==='readme.txt'){ out.push(..._README_CONTENT,""); return out; }
+        if(filename==='manifest.ini'){ out.push(..._MANIFEST_CONTENT,""); return out; }
+        if(filename==='d-scn.exe' || filename==='neural-link.exe'){
+            out.push(
+                "\u2593\u2592\u2591... binary data ...\u2591\u2592\u2593",
+                "(This file is an executable. Try running it instead: SCANNER)","");
+            return out;
+        }
+        // Recovered document — check inventory
+        const doc=(G.inventory||[]).find(it=>it && it.type==='document' && it.file && it.file.toLowerCase()===filename);
+        if(doc){
+            const frag=getFragmentById(doc.fragId) || getFragmentByFile(doc.file);
+            if(frag){
+                out.push(
+                    "-- BEGIN RECOVERED FRAGMENT ["+frag.source+"] --",
+                    frag.text,
+                    "-- END FRAGMENT --",
+                    "");
+                return out;
+            }
+        }
+        out.push("The system cannot find the file specified.","");
+        return out;
+    }
+    // Unknown command — Windows error message
+    out.push("'"+parts[0]+"' is not recognized as an internal or external command,",
+             "operable program or batch file.","");
+    return out;
 }
 
 function dockConsoleSelectShip(){
@@ -1084,25 +1342,29 @@ function updateDockConsole(){
         // Spinner animation frames
         if(db.terminalTimer>120){
             db.terminalText=db.terminalText.concat(["","ACCESS DENIED.","",
-                "ERROR 0x08F2: user not listed in ship manifest.",
-                "",
-                "C:\\ALLIANCE\\DOCK-03> _"]);
-            db.terminalPhase='deny_done';
+                "ERROR 0x08F2: neural signature does not match vessel manifest.",
+                "(Only one registered consciousness exists on this drone: TOBY-01)",
+                ""]);
+            db.terminalPhase='cmd';
+            db.cmdInput='';
             db.terminalTimer=0;
         }
     } else if(db.terminalPhase==='auth_player'){
-        if(db.terminalTimer===10) db.terminalText=db.terminalText.concat(["Authenticating..."]);
-        if(db.terminalTimer===60) db.terminalText=db.terminalText.concat(["  > fingerprint OK","  > pilot registry OK"]);
-        if(db.terminalTimer===110) db.terminalText=db.terminalText.concat(["Scanning inventory for keys..."]);
+        if(db.terminalTimer===10) db.terminalText=db.terminalText.concat(["Authenticating neural signature..."]);
+        if(db.terminalTimer===60) db.terminalText=db.terminalText.concat([
+            "  > drone chassis hash OK",
+            "  > consciousness imprint OK",
+            "  > \u2026 hybrid entity detected"]);
+        if(db.terminalTimer===110) db.terminalText=db.terminalText.concat(["Scanning inventory for module keys..."]);
         if(db.terminalTimer===160){
             if(hasItem('module_access')){
                 db.terminalText=db.terminalText.concat(["  > FOUND: MODULE ACCESS","",
-                    "Permissions granted. Loading sector chart..."]);
+                    "Permissions granted. Loading partition chart..."]);
             } else {
                 db.terminalText=db.terminalText.concat(["  > NO KEYS FOUND","",
-                    "ACCESS DENIED. (Missing: MODULE ACCESS)","",
-                    "C:\\ALLIANCE\\DOCK-03> _"]);
-                db.terminalPhase='deny_done';
+                    "ACCESS DENIED. (Missing: MODULE ACCESS)",""]);
+                db.terminalPhase='cmd';
+                db.cmdInput='';
                 db.terminalTimer=0;
                 return;
             }
@@ -1163,7 +1425,7 @@ function drawDockConsoleOverlay(){
     // Title bar
     ctx.fillStyle='#0e3a7a';ctx.fillRect(tx,ty,tw,26);
     ctx.fillStyle='#fff';ctx.font='bold 11px Segoe UI, Courier New';ctx.textAlign='left';
-    ctx.fillText('C:\\ALLIANCE\\DOCK-03\\scanner.exe',tx+10,ty+17);
+    ctx.fillText((db.cmdCwd||'C:\\RELAY\\DOCK-03')+' - Terminal',tx+10,ty+17);
     // Window buttons
     ctx.fillStyle='#c4c4c4';
     ctx.fillRect(tx+tw-78,ty+5,22,16);ctx.fillRect(tx+tw-54,ty+5,22,16);
@@ -1180,29 +1442,47 @@ function drawDockConsoleOverlay(){
     // Terminal text
     ctx.font='13px Consolas, Courier New';ctx.textAlign='left';
     const lines=db.terminalText;
+    // Reserve one line at the bottom for the live prompt when in cmd mode
+    const reserveBottom = (db.terminalPhase==='cmd')?1:0;
+    const maxLines=Math.max(1, Math.floor((th-60)/18) - reserveBottom);
     let curY=ty+50;
-    const maxLines=Math.floor((th-50)/18);
     const startLine=Math.max(0,lines.length-maxLines);
     for(let i=startLine;i<lines.length;i++){
         const ln=lines[i];
         // Cyan for prompt lines, green for data, white for output
         let col='#dddddd';
-        if(ln.startsWith('C:\\') || ln.startsWith('>')) col='#cccccc';
-        if(ln.startsWith('  > ') || ln.includes('OK')) col='#66ff88';
-        if(ln.includes('ACCESS DENIED') || ln.includes('ERROR')) col='#ff6666';
+        if(ln.indexOf('RELAY\\DOCK-03>')>=0) col='#cccccc';
+        if(ln.startsWith('  > ') || ln.includes(' OK')) col='#66ff88';
+        if(ln.includes('ACCESS DENIED') || ln.includes('ERROR') || ln.includes('not recognized') || ln.includes('cannot find')) col='#ff6666';
+        if(ln.startsWith('-- ') || ln.includes('BEGIN RECOVERED') || ln.includes('END FRAGMENT')) col='#ffcc66';
         if(ln.includes('[0]') || ln.includes('[1]') || ln.includes('[2]')){
             // Highlight selected ship row
-            const idx=parseInt(ln.match(/\[(\d)\]/)[1]);
-            if(db.terminalPhase==='ship_select' && idx===db.selection){
-                ctx.fillStyle='rgba(0,180,255,0.25)';ctx.fillRect(tx+4,curY-14,tw-8,18);
-                col='#ffffff';
+            const m=ln.match(/\[(\d)\]/);
+            if(m){
+                const idx=parseInt(m[1]);
+                if(db.terminalPhase==='ship_select' && idx===db.selection){
+                    ctx.fillStyle='rgba(0,180,255,0.25)';ctx.fillRect(tx+4,curY-14,tw-8,18);
+                    col='#ffffff';
+                }
             }
         }
         ctx.fillStyle=col;
         ctx.fillText(ln,tx+12,curY);
         curY+=18;
     }
-    // Blinking cursor when idle
+    // Live command-line prompt
+    if(db.terminalPhase==='cmd'){
+        const promptStr=(db.cmdCwd||'C:\\RELAY\\DOCK-03')+'> ';
+        ctx.fillStyle='#cccccc';
+        ctx.fillText(promptStr+(db.cmdInput||''),tx+12,curY);
+        // Blinking cursor at end of input
+        if(Math.floor(performance.now()/400)%2===0){
+            const cw=ctx.measureText(promptStr+(db.cmdInput||'')).width;
+            ctx.fillStyle='#dddddd';ctx.fillRect(tx+12+cw+1,curY-12,8,14);
+        }
+        curY+=18;
+    }
+    // Blinking cursor for idle non-cmd phases
     if(db.terminalPhase==='ship_select' || db.terminalPhase==='deny_done'){
         if(Math.floor(performance.now()/400)%2===0){
             ctx.fillStyle='#dddddd';ctx.fillRect(tx+16+14*6,curY-30,8,14);
@@ -1215,9 +1495,12 @@ function drawDockConsoleOverlay(){
         ctx.fillStyle='#88ccff';ctx.font='bold 16px Consolas';
         ctx.fillText(f,tx+tw-30,curY-4);
     }
-    // Footer hint
+    // Footer hint (varies by phase)
     ctx.font='10px Consolas';ctx.fillStyle='#666';ctx.textAlign='right';
-    ctx.fillText('[UP/DOWN] Select   [Z/ENTER] Confirm   [ESC] Close',tx+tw-12,ty+th-8);
+    const hint=(db.terminalPhase==='cmd')
+        ? 'type HELP for commands   [ESC] close'
+        : '[UP/DOWN] Select   [Z/ENTER] Confirm   [ESC] Close';
+    ctx.fillText(hint,tx+tw-12,ty+th-8);
 }
 
 // ---------- Sector Map ----------
@@ -1234,21 +1517,23 @@ function drawDockConsoleOverlay(){
 //    |                |
 //   [S2]             [S5]
 const SECTOR_NODES=[
-    // id, label, col, row  (col: 0=left, 1=relay-left, 2=relay-right, 3=right, 4=final)
-    { id:7,  col:0, row:0, label:'SECTOR 7' },
-    { id:3,  col:0, row:1, label:'SECTOR 3' },
-    { id:1,  col:0, row:2, label:'SECTOR 1' },
-    { id:4,  col:0, row:3, label:'SECTOR 4' },
-    { id:6,  col:0, row:4, label:'SECTOR 6' },
-    { id:2,  col:0, row:5, label:'SECTOR 2' },
-    { id:10, col:3, row:0, label:'SECTOR 10'},
-    { id:12, col:3, row:1, label:'SECTOR 12'},
-    { id:8,  col:3, row:2, label:'SECTOR 8' },
-    { id:11, col:3, row:3, label:'SECTOR 11'},
-    { id:9,  col:3, row:4, label:'SECTOR 9' },
-    { id:5,  col:3, row:5, label:'SECTOR 5' }
+    // id, label, col, row, name (memory-partition codename), blurb (lore hint)
+    { id:7,  col:0, row:0, label:'SECTOR 7',  name:'THE REBEL BASE', blurb:'Makeshift fortifications. Something made its last stand here.' },
+    { id:3,  col:0, row:1, label:'SECTOR 3',  name:'THE MARKET',     blurb:'Trading floor debris. Ledgers full of stranger currencies.' },
+    { id:1,  col:0, row:2, label:'SECTOR 1',  name:'THE GARDEN',     blurb:'Green-tinted static. Signal reads as peaceful. It is lying.' },
+    { id:4,  col:0, row:3, label:'SECTOR 4',  name:'THE GRAVEYARD',  blurb:'Memorial structures. Names without bodies attached.' },
+    { id:6,  col:0, row:4, label:'SECTOR 6',  name:'THE ARCHIVE',    blurb:'Endless catalogues. Every file indexed by someone who forgot.' },
+    { id:2,  col:0, row:5, label:'SECTOR 2',  name:'THE CLASSROOM',  blurb:'Geometric patterns. Recorded voices are decades younger than the data.' },
+    { id:10, col:3, row:0, label:'SECTOR 10', name:'THE CATHEDRAL',  blurb:'Sacred geometry in the silence. Prayers without a god to hear.' },
+    { id:12, col:3, row:1, label:'SECTOR 12', name:'THE CORE',       blurb:'Pulsing, heart-like. Something old still beats in here.' },
+    { id:8,  col:3, row:2, label:'SECTOR 8',  name:'THE HOSPITAL',   blurb:'Clinical debris. All patients filed as \u2018degrading.\u2019' },
+    { id:11, col:3, row:3, label:'SECTOR 11', name:'THE EXIT',       blurb:'Door-shaped structures. All of them welded shut from both sides.' },
+    { id:9,  col:3, row:4, label:'SECTOR 9',  name:'THE BIRTHPLACE', blurb:'Soft-coloured, nursery-patterned. Something was born that shouldn\u2019t have been.' },
+    { id:5,  col:3, row:5, label:'SECTOR 5',  name:'THE STUDIO',     blurb:'Musical notation drifting in vacuum. Every note played perfectly. Every note the same.' }
     // Relay and Final drawn separately
 ];
+// Final sector details (lore-only, not in the base game's playable list)
+const FINAL_SECTOR_LORE = { name:'THE TRUTH', blurb:'SIGNAL CORRUPT. Not recommended for inexperienced salvage drones.' };
 // Only Sector 2 is accessible:
 const ACCESSIBLE_SECTORS=[2];
 
@@ -1266,14 +1551,14 @@ function drawSectorMap(){
     // Header
     ctx.font='bold 18px Courier New';ctx.textAlign='left';ctx.fillStyle='#00ccff';
     ctx.shadowBlur=10;ctx.shadowColor='#00ccff';
-    ctx.fillText('DIMENSIONAL SECTOR CHART',mx+20,my+36);
+    ctx.fillText('MEMORY PARTITION CHART',mx+20,my+36);
     ctx.shadowBlur=0;
     ctx.font='10px Courier New';ctx.fillStyle='#557';
-    ctx.fillText('D-SCN Mk.III • ALLIANCE COMMAND',mx+20,my+50);
+    ctx.fillText('NEXUS FRAGMENT MAP · TOBY-01 NEURAL LINK',mx+20,my+50);
     ctx.textAlign='right';ctx.fillStyle='#ff8844';
     ctx.fillText('AUTH: MODULE ACCESS',mx+mw-20,my+36);
     ctx.fillStyle='#447';ctx.font='9px Courier New';
-    ctx.fillText('13 SECTORS REGISTERED • 1 UNLOCKED',mx+mw-20,my+50);
+    ctx.fillText('13 PARTITIONS · 12 CORRUPTED · 1 STABLE',mx+mw-20,my+50);
 
     // Compute node positions
     // Grid: cols [0,1,2,3,4] row spacing
@@ -1364,28 +1649,37 @@ function drawSectorMap(){
     }
 
     // Info panel (bottom)
-    const ip_y=my+mh-80;
-    ctx.fillStyle='rgba(0,20,30,0.7)';ctx.fillRect(mx+16,ip_y,mw-32,64);
+    const ip_y=my+mh-92;
+    ctx.fillStyle='rgba(0,20,30,0.7)';ctx.fillRect(mx+16,ip_y,mw-32,76);
     ctx.strokeStyle='rgba(0,200,255,0.3)';ctx.lineWidth=1;
-    ctx.strokeRect(mx+16.5,ip_y+0.5,mw-33,63);
+    ctx.strokeRect(mx+16.5,ip_y+0.5,mw-33,75);
     const selNode=SECTOR_NODES[db.mapSelection];
     const selAcc=selNode && ACCESSIBLE_SECTORS.includes(selNode.id);
+    // Sector label + lore codename
     ctx.font='bold 14px Courier New';ctx.textAlign='left';
     ctx.fillStyle=selAcc?'#00ff88':'#666';
     ctx.fillText(selNode?selNode.label:'(none)',mx+28,ip_y+22);
+    if(selNode && selNode.name){
+        ctx.font='bold 11px Courier New';ctx.fillStyle=selAcc?'#aaffcc':'#7a7a92';
+        ctx.fillText('·  '+selNode.name,mx+28+95,ip_y+22);
+    }
+    // Lore blurb
+    ctx.font='italic 10px Courier New';ctx.fillStyle=selAcc?'#99bbcc':'#55556a';
+    ctx.fillText(selNode&&selNode.blurb?selNode.blurb:'',mx+28,ip_y+38);
+    // Status line
     ctx.font='11px Courier New';ctx.fillStyle='#889';
     if(selAcc){
-        ctx.fillText('Status: UNLOCKED — teleport available.',mx+28,ip_y+40);
+        ctx.fillText('Status: NEURAL LINK AVAILABLE. Memory partition stable.',mx+28,ip_y+56);
         ctx.fillStyle='#00ccff';
-        ctx.fillText('Press [Z] to initiate dimensional scan & teleport.',mx+28,ip_y+56);
+        ctx.fillText('Press [Z] to dive \u2014 consciousness will be uploaded to partition.',mx+28,ip_y+72);
     } else {
-        ctx.fillText('Status: LOCKED — insufficient permissions.',mx+28,ip_y+40);
+        ctx.fillText('Status: PARTITION CORRUPTED — neural link cannot resolve.',mx+28,ip_y+56);
         ctx.fillStyle='#664';
-        ctx.fillText('This sector is not in the base game.',mx+28,ip_y+56);
+        ctx.fillText('Further partitions will become accessible when the AI stabilises.',mx+28,ip_y+72);
     }
     // Footer
     ctx.font='10px Courier New';ctx.textAlign='right';ctx.fillStyle='#666';
-    ctx.fillText('[ARROWS] Navigate   [Z/ENTER] Select   [ESC] Close',mx+mw-24,my+mh-12);
+    ctx.fillText('[ARROWS] Navigate   [Z/ENTER] Dive   [ESC] Close',mx+mw-24,my+mh-12);
 }
 
 function mapNavigate(dx,dy){
@@ -1433,11 +1727,16 @@ function drawTeleportCutscene(){
     const pulse=0.6+Math.sin(T/200)*0.4;
     ctx.save();
     let msg='', col='#00ccff';
-    if(tp.phase==='move') msg='ALIGNING SCANNER...';
-    else if(tp.phase==='scan') msg='SCANNING SHIP SIGNATURE...';
-    else if(tp.phase==='charge') { msg='CHARGING DIMENSIONAL FOLD...'; col='#aa66ff'; }
-    else if(tp.phase==='flash') { msg='TELEPORTING...'; col='#ffffff'; }
-    else if(tp.phase==='done') { msg='★ SECTOR '+(tp.sectorId||2)+' — ARRIVED ★'; col='#00ff88'; }
+    if(tp.phase==='move') msg='ALIGNING NEURAL LINK EMITTER...';
+    else if(tp.phase==='scan') msg='READING CONSCIOUSNESS SIGNATURE...';
+    else if(tp.phase==='charge') { msg='UPLOADING TO MEMORY PARTITION...'; col='#aa66ff'; }
+    else if(tp.phase==='flash') { msg='DIVING...'; col='#ffffff'; }
+    else if(tp.phase==='done') {
+        const lored=SECTOR_NODES.find(n=>n.id===(tp.sectorId||2));
+        const nm=lored?lored.name:'';
+        msg='\u2605 SECTOR '+(tp.sectorId||2)+(nm?' \u2014 '+nm:'')+' \u2014 LINKED \u2605';
+        col='#00ff88';
+    }
     // Bottom banner
     ctx.fillStyle='rgba(0,5,15,0.85)';ctx.fillRect(0,H-90,W,60);
     ctx.strokeStyle=col;ctx.lineWidth=2;
@@ -1482,7 +1781,7 @@ function drawTeleportCutscene(){
     // Footer hint for done state
     if(tp.phase==='done'){
         ctx.font='11px Courier New';ctx.textAlign='center';ctx.fillStyle='#888';
-        ctx.fillText('(Sector content coming in a future update — returning to bay)',W/2,H-20);
+        ctx.fillText('(Partition content scheduled for campaign build \u2014 returning your consciousness to the drone)',W/2,H-20);
     }
 }
 
@@ -1503,25 +1802,58 @@ function dockingBayKey(e){
     }
     // Terminal input
     if(e.code==='Escape'){closeDockConsole();return true;}
+    if(db.terminalPhase==='cmd'){
+        // Live command-line input — append / backspace / enter.
+        if(e.code==='Enter' || e.code==='NumpadEnter'){
+            const out=_runTerminalCommand(db.cmdInput);
+            if(out.length>0) db.terminalText=db.terminalText.concat(out);
+            db.cmdInput='';
+            return true;
+        }
+        if(e.code==='Backspace'){
+            db.cmdInput=(db.cmdInput||'').slice(0,-1);
+            return true;
+        }
+        // Printable character? e.key is the character itself for letters/digits/punct.
+        if(e.key && e.key.length===1){
+            // Ignore Ctrl+X etc — only pass plain chars
+            if(!e.ctrlKey && !e.metaKey){
+                if((db.cmdInput||'').length<80) db.cmdInput=(db.cmdInput||'')+e.key;
+            }
+            return true;
+        }
+        // Spacebar sometimes reported as ' ' — handled above. Other non-printables are ignored.
+        return true;
+    }
     if(db.terminalPhase==='ship_select'){
         if(e.code==='ArrowUp'||e.code==='KeyW'){db.selection=Math.max(0,db.selection-1);try{Sound.ui();}catch(err){}return true;}
         if(e.code==='ArrowDown'||e.code==='KeyS'){db.selection=Math.min(2,db.selection+1);try{Sound.ui();}catch(err){}return true;}
         if(e.code==='KeyZ'||e.code==='Enter'||e.code==='Space'){dockConsoleSelectShip();return true;}
     } else if(db.terminalPhase==='deny_done'){
         if(e.code==='KeyZ'||e.code==='Enter'||e.code==='Space'){
-            // Return to ship select
-            db.terminalPhase='ship_select';
-            db.selection=0;
-            db.terminalText=db.terminalText.concat(["","C:\\ALLIANCE\\DOCK-03> .\\d-scn.exe --list-ships","",
-                "Ships currently docked in bay:",
-                "  [0]  YOUR SHIP         (AUTH: pending)",
-                "  [1]  GILBERT'S SHIP    (AUTH: restricted)",
-                "  [2]  OFFICER KRAT      (AUTH: restricted)",
-                "",
-                "Select a ship to scan: _"]);
+            // Return to the shell
+            db.terminalPhase='cmd';
+            db.cmdInput='';
             try{Sound.ui();}catch(err){}
             return true;
         }
     }
     return true;
+}
+
+// ---------- Dev helpers ----------
+// Spawn a small asteroid near the ship that is guaranteed to drop a data fragment
+// when destroyed. Flagged with hasLoreDrop — engine.js checks this flag at kill time.
+function devSpawnLoreAsteroid(){
+    if(typeof spawnAsteroid!=='function') return;
+    // Spawn just off-screen to the right of the player so it drifts into view
+    const sx = (typeof ship!=='undefined' && ship) ? ship.x+120 : W/2+120;
+    const sy = (typeof ship!=='undefined' && ship) ? ship.y      : H/2;
+    spawnAsteroid(sx, sy, 30, 'normal');
+    const a = asteroids[asteroids.length-1];
+    if(a){
+        a.hasLoreDrop = true;
+        // Drift slowly toward the player so it's easy to kill
+        a.dx = -1.5; a.dy = 0;
+    }
 }

@@ -37,10 +37,12 @@ function selectSlot(id) {
     if(!s.inventory) s.inventory=[];
     if(s.kratGreeted==null) s.kratGreeted=false;
     if(s.itemTutorialShown==null) s.itemTutorialShown=false;
+    if(!Array.isArray(s.dataFragmentsSeen)) s.dataFragmentsSeen=[];
     // Load into G
     G.inventory=s.inventory.slice();
     G.kratGreeted=!!s.kratGreeted;
     G.itemTutorialShown=!!s.itemTutorialShown;
+    G.dataFragmentsSeen=s.dataFragmentsSeen.slice();
     saveToDisk();
     startGame();
     // If station is unlocked, start there and restore checkpoint level

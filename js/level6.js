@@ -439,6 +439,13 @@ function updateBattleBots(){
                 playerTargetCount++;
             }
         }
+        // Validate current target first — invalidate if it points at a teammate,
+        // a captor, or is out of range after an array splice. This prevents a
+        // one-frame drift bug that made larger alliance bots (Krat) visibly stall.
+        if(b.targetIdx>=0){
+            const tCheck = (b.targetIdx<battleBots.length)?battleBots[b.targetIdx]:null;
+            if(!tCheck || tCheck.team===b.team || tCheck.captor) b.targetIdx=-1;
+        }
         // Find target — alliance prioritizes rouges attacking the player (Gilbert strongly)
         if(b.shootTimer%15===0 || b.targetIdx<0){
             let bestD=1e9, bestI=-1;
@@ -462,11 +469,11 @@ function updateBattleBots(){
             tx=playerWX; ty=playerWY; d=playerD; ta=Math.atan2(ty-b.y,tx-b.x);
         } else if(b.targetIdx>=0 && b.targetIdx<battleBots.length && battleBots[b.targetIdx]){
             const t=battleBots[b.targetIdx];
-            if(t.team===b.team){b.targetIdx=-1; b.x+=b.vx; b.y+=b.vy; continue;}
             tx=t.x; ty=t.y;
             d=Math.hypot(tx-b.x,ty-b.y);
             ta=Math.atan2(ty-b.y,tx-b.x);
         } else {
+            // No enemies exist — drift with decay
             b.x+=b.vx; b.y+=b.vy; b.vx*=0.9; b.vy*=0.9; continue;
         }
         let da=((ta-b.angle+Math.PI*3)%(Math.PI*2))-Math.PI;

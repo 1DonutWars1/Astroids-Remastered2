@@ -206,7 +206,8 @@ function update() {
                     if(!_isBig&&a.r>20&&!G.tutorial){spawnAsteroid(a.x,a.y,a.r/2);spawnAsteroid(a.x,a.y,a.r/2);}
                     G.asteroidsDestroyed++;unlockAch('first_blood');if(G.asteroidsDestroyed>=100)unlockAch('rock_crusher');
                     if(G.tripleShotTimer>0)unlockAch('triple_threat');
-                    if(window.DLC&&window.DLC.loaded){G.consecutiveKills++;if(G.consecutiveKills>=10)unlockAch('dlc_chain_reaction');if(G.asteroidsDestroyed>=250)unlockAch('dlc_mass_destroyer');}}
+                    if(window.DLC&&window.DLC.loaded){G.consecutiveKills++;if(G.consecutiveKills>=10)unlockAch('dlc_chain_reaction');if(G.asteroidsDestroyed>=250)unlockAch('dlc_mass_destroyer');}
+                    if(typeof tryDropDataFragment==='function') tryDropDataFragment(!!a.hasLoreDrop);}
                 bullets.splice(j,1);asteroids.splice(i,1);addScore(100);break;
             }
         }
@@ -2504,6 +2505,7 @@ function draw() {
 
     ctx.restore();
     // Inventory / tutorial overlays (space mode — always on top, unaffected by shake)
+    if(typeof drawDataFragmentPopup==='function') drawDataFragmentPopup();
     if(typeof drawItemTutorialToast==='function') drawItemTutorialToast();
     if(typeof drawInventoryOverlay==='function') drawInventoryOverlay();
 }
@@ -2540,8 +2542,10 @@ document.addEventListener('keydown', e => {
         if(e.code==='KeyZ'||e.code==='Enter'){if(typeof inventoryEquipSelected==='function') inventoryEquipSelected();return;}
         return;
     }
-    // When docking bay console is open, route keys
+    // When docking bay console is open, route keys (prevent browser defaults
+    // like Tab navigation, Space scrolling, Arrow keys etc.)
     if(G.dockingBay && G.dockingBay.open){
+        e.preventDefault();
         if(typeof dockingBayKey==='function') dockingBayKey(e);
         return;
     }

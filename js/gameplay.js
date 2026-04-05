@@ -35,6 +35,8 @@ function startGame() {
     G.gilbertSeen={};
     // Reset inventory UI state (data itself is restored from save below)
     G.inventoryOpen=false; G.inventorySelection=0;
+    G.dataFragmentPopup=null;
+    if(!Array.isArray(G.dataFragmentsSeen)) G.dataFragmentsSeen=[];
     G.dockingBay={open:false,selection:0,terminalPhase:null,terminalText:[],terminalTimer:0,
                   mapOpen:false,mapSelection:5,teleport:null};
 
@@ -73,6 +75,7 @@ function startGame() {
         G.inventory=(saves[G.slotId].inventory||[]).slice();
         G.kratGreeted=!!saves[G.slotId].kratGreeted;
         G.itemTutorialShown=!!saves[G.slotId].itemTutorialShown;
+        G.dataFragmentsSeen=(saves[G.slotId].dataFragmentsSeen||[]).slice();
         // Migrate owned modules into inventory so they appear there
         if(typeof MODULE_DEFS!=='undefined'){
             for(const m of G.modules){

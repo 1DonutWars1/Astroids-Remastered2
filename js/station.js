@@ -28,17 +28,27 @@ const STATION_NPCS=[
     {id:'engineer',x:1100,floor:0,name:'ENGINEER',color:'#00ffaa',shape:'diamond',
         lines:["Looking for modules?","These'll give you an edge out there."],role:'shop_modules'},
     {id:'pilot',x:1500,floor:0,name:'PILOT VERA',color:'#ff44aa',shape:'hex',
-        lines:["I used to fly out there too.","Watch your back past level 6.","The deeper you go, the weirder it gets."]},
+        lines:["I used to fly out there too.","Watch your back past level 6.","The deeper you go, the weirder it gets.","Sometimes the rocks look almost... written. Like text you can't read."]},
     // Floor 2 (floor:1)
     {id:'gilbert_npc',x:400,floor:1,name:'GILBERT',color:'#44ff44',shape:'gilbert',
         lines:["This place is pretty nice!","Talk to the Banker to convert Score to MB.","Then buy upgrades for both of us!"],role:'shop_gilbert'},
     {id:'scientist',x:800,floor:1,name:'DR. NOVA',color:'#cc66ff',shape:'diamond',
-        lines:["Fascinating... a Fragment, here.","The asteroids aren't natural, you know.","Something is sending them."]},
+        lines:["Fascinating... a Fragment, here.","The asteroids aren't natural, you know.","Something is sending them.","I pulled headers from one. Embedded metadata. A name: NEXUS.","47,234 signatures in a single shard. Does that number mean anything to you?"]},
     {id:'commander',x:1200,floor:1,name:'COMMANDER',color:'#ffdd00',shape:'hex',
-        lines:["This is the command center.","Your progress is saved when you dock.","Stay sharp out there, Fragment."]},
+        lines:["This is the command center.","Your progress is saved when you dock.","Stay sharp out there, Fragment.","Between you and me \u2014 I don't think this station is as old as it should be.","Clocks on the deep deck run slow. Or ours run fast. Hard to tell which."]},
 ];
 const STATION_WIDTH=1800;
 const STATION_FLOORS=3; // 0=ground, 1=upper, 2=docking bay (requires MODULE ACCESS key)
+
+// Hide certain NPCs until story flags are met. Krat only appears at the station
+// after the rescue (when the MODULE ACCESS key is in the player's inventory).
+function _npcHidden(npc){
+    if(!npc) return false;
+    if(npc.id==='krat'){
+        return !(typeof hasItem==='function' && hasItem('module_access'));
+    }
+    return false;
+}
 
 function enterStation(){
     G.mode='station';
@@ -72,6 +82,7 @@ function enterStation(){
         s.inventory=(G.inventory||[]).slice();
         s.kratGreeted=!!G.kratGreeted;
         s.itemTutorialShown=!!G.itemTutorialShown;
+        s.dataFragmentsSeen=(G.dataFragmentsSeen||[]).slice();
         saveToDisk();
     }
     canvas.width=900;W=900;
@@ -109,6 +120,7 @@ function saveStation(){
     s.inventory=(G.inventory||[]).slice();
     s.kratGreeted=!!G.kratGreeted;
     s.itemTutorialShown=!!G.itemTutorialShown;
+    s.dataFragmentsSeen=(G.dataFragmentsSeen||[]).slice();
     // Persist level 6 progress
     if(G.level6){
         if(G.level6.bigShotUnlocked) s.bigShotUnlocked=true;
@@ -182,6 +194,7 @@ function updateStation(){
     } else {
         // NPC proximity (only on current floor)
         for(const npc of STATION_NPCS){
+            if(_npcHidden(npc)) continue;
             if(npc.floor===st.floor&&Math.abs(st.playerX-npc.x)<60){st.interactTarget=npc;break;}
         }
         // Airlock proximity (floor 0 only, left side)
@@ -493,6 +506,7 @@ function drawStation(){
     // === SHOP STANDS ===
     for(const npc of STATION_NPCS){
         if(npc.floor!==flr) continue;
+        if(_npcHidden(npc)) continue;
         if(npc.role&&(npc.role.startsWith('shop')||npc.role==='banker')){
             // Counter body with gradient
             const shopBodyG=ctx.createLinearGradient(npc.x-35,floorY-55,npc.x-35,floorY);
@@ -534,6 +548,7 @@ function drawStation(){
     // === NPCs ===
     for(const npc of STATION_NPCS){
         if(npc.floor!==flr) continue;
+        if(_npcHidden(npc)) continue;
         const isNear=st.interactTarget&&st.interactTarget.id===npc.id;
         const npcY=floorY-70;
         ctx.save();ctx.translate(npc.x,npcY);
@@ -804,6 +819,7 @@ function drawStation(){
     if(st.shopOpen) drawShop();
 
     // Inventory / tutorial overlays
+    if(typeof drawDataFragmentPopup==='function') drawDataFragmentPopup();
     if(typeof drawItemTutorialToast==='function') drawItemTutorialToast();
     if(typeof drawInventoryOverlay==='function') drawInventoryOverlay();
 
