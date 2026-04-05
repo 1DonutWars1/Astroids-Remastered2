@@ -11,18 +11,20 @@ const Sound = {
         this.master.connect(this.ctx.destination);
         this.initTracks();
     },
-    bgmAudio: null, boss3Audio: null, boss3P2Audio: null, boss4Audio: null, boss5Audio: null, currentTrack: 'none',
+    bgmAudio: null, boss3Audio: null, boss3P2Audio: null, boss4Audio: null, boss5Audio: null, rougeAudio: null, currentTrack: 'none',
     initTracks() {
         this.bgmAudio = document.getElementById('bgmTrack');
         this.boss3Audio = document.getElementById('boss3Track');
         this.boss3P2Audio = document.getElementById('boss3Phase2Track');
         this.boss4Audio = document.getElementById('boss4Track');
         this.boss5Audio = document.getElementById('boss5Track');
+        this.rougeAudio = document.getElementById('rougeTrack');
         if(this.bgmAudio) this.bgmAudio.volume = 0.8;
         if(this.boss3Audio) this.boss3Audio.volume = 0.8;
         if(this.boss3P2Audio) this.boss3P2Audio.volume = 0.8;
         if(this.boss4Audio) this.boss4Audio.volume = 0.8;
         if(this.boss5Audio) this.boss5Audio.volume = 0.8;
+        if(this.rougeAudio) this.rougeAudio.volume = 0.8;
     },
     toggleMute() {
         this.muted = !this.muted;
@@ -33,6 +35,7 @@ const Sound = {
         if(this.boss3P2Audio) this.boss3P2Audio.volume = vol;
         if(this.boss4Audio) this.boss4Audio.volume = vol;
         if(this.boss5Audio) this.boss5Audio.volume = vol;
+        if(this.rougeAudio) this.rougeAudio.volume = vol;
     },
     tone(freq, dur, type, vol, slide) {
         if (!this.ctx || this.muted) return;
@@ -61,6 +64,7 @@ const Sound = {
         if(this.boss3P2Audio){this.boss3P2Audio.pause();this.boss3P2Audio.currentTime=0;}
         if(this.boss4Audio){this.boss4Audio.pause();this.boss4Audio.currentTime=0;}
         if(this.boss5Audio){this.boss5Audio.pause();this.boss5Audio.currentTime=0;}
+        if(this.rougeAudio){this.rougeAudio.pause();this.rougeAudio.currentTime=0;}
     },
 
     // Synth fallbacks
@@ -143,6 +147,11 @@ const Sound = {
             if(this.boss5Audio&&!this.muted){
                 this.boss5Audio.play().catch(()=>{this._synthBoss2();});
             } else this._synthBoss2();
+        }
+        else if(track==='rouge'){
+            if(this.rougeAudio&&!this.muted){
+                this.rougeAudio.play().catch(()=>{this._synthBoss1();});
+            } else this._synthBoss1();
         }
     },
 

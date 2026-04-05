@@ -134,6 +134,7 @@ function applyPauseAudio(){
     if(Sound.boss3P2Audio) Sound.boss3P2Audio.volume=Sound.muted?0:mv;
     if(Sound.boss4Audio) Sound.boss4Audio.volume=Sound.muted?0:mv;
     if(Sound.boss5Audio) Sound.boss5Audio.volume=Sound.muted?0:mv;
+    if(Sound.rougeAudio) Sound.rougeAudio.volume=Sound.muted?0:mv;
     // Sync main settings UI too
     document.getElementById('set_masterVol').value=settings.masterVol;
     document.getElementById('set_musicVol').value=settings.musicVol;

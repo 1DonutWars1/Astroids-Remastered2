@@ -62,6 +62,7 @@ function applySettings() {
     if (Sound.boss3Audio) Sound.boss3Audio.volume = Sound.muted ? 0 : mv;
     if (Sound.boss3P2Audio) Sound.boss3P2Audio.volume = Sound.muted ? 0 : mv;
     if (Sound.boss5Audio) Sound.boss5Audio.volume = Sound.muted ? 0 : mv;
+    if (Sound.rougeAudio) Sound.rougeAudio.volume = Sound.muted ? 0 : mv;
 
     // Apply star density
     while (stars.length > settings.starCount) stars.pop();

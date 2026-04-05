@@ -38,10 +38,16 @@ function selectSlot(id) {
     startGame();
     // If station is unlocked, start there and restore checkpoint level
     if(s.stationUnlocked&&window.DLC&&window.DLC.loaded){
-        G.level=s.checkpoint||6;
+        // Station is only reached after boss 5, so level must be at least 6
+        G.level=Math.max(6,s.checkpoint||6);
+        G.checkpoint=G.level;
         G.stationUnlocked=true;
         // Spawn Gilbert ally if past boss 5
         if(G.gilbertState==='none'){spawnGilbertAlly();G.albertMode=false;}
+        // Restore level 6 progress (so fight doesn't re-trigger on reload)
+        if(G.level6){
+            if(s.bigShotUnlocked) G.level6.bigShotUnlocked=true;
+        }
         enterStation();
     }
 }
@@ -260,6 +266,9 @@ const BOSS_DEFS=[
     {type:5,name:'Boss 5 — Snake',color:'#ffaa00',desc:'Destroy segments first. 10 HP head.',dlc:true},
     {type:3,name:'Boss 3 — Sans',color:'#fff',desc:'Two phases, gaster blasters. 100 HP.',dlc:false},
     {type:10,name:'Boss 10 — Sans (DLC)',color:'#ff00ff',desc:'DLC final boss. 100 HP.',dlc:true},
+    {type:'bossRush',name:'Boss Rush (DLC)',color:'#ffaa00',desc:'4 waves of mini-bosses.',dlc:true},
+    {type:'rougeAmbush',name:'Rouge Ambush (DLC)',color:'#ff6622',desc:'Kidnap + arena fight.',dlc:true},
+    {type:'rougeBattle',name:'Rouge Battlefield (DLC)',color:'#ff8844',desc:'60s fullscreen war.',dlc:true},
 ];
 function openBossPractice(){
     try{Sound.ui();}catch(e){}
@@ -292,6 +301,36 @@ function startBossPractice(bossType){
     G.godMode=true;G.infAmmo=true;G.ammo=999;
     document.getElementById('godRow').style.display='block';
     G.hasForceField=true;G.shieldFuel=getMaxShieldFuel();updateShieldUI();
+    // Special DLC set-pieces (boss rush, rouge war phases)
+    if(bossType==='bossRush'){
+        G.level=3;
+        asteroids=[];
+        spawnGilbertAlly(); G.albertMode=true;
+        if(typeof startBossRush==='function') startBossRush();
+        updateUI(); return;
+    }
+    if(bossType==='rougeAmbush'){
+        G.level=6; G.stationUnlocked=true;
+        asteroids=[]; miniBosses=[]; enemyBullets=[];
+        spawnGilbertAlly(); G.albertMode=true;
+        if(typeof startLevel6==='function'){
+            startLevel6();
+            // Skip to the kidnap sequence
+            G.level6.state='kidnap_warn'; G.level6.timer=60*2.9;
+        }
+        updateUI(); return;
+    }
+    if(bossType==='rougeBattle'){
+        G.level=6; G.stationUnlocked=true;
+        asteroids=[]; miniBosses=[]; enemyBullets=[];
+        spawnGilbertAlly(); G.albertMode=true;
+        if(typeof startLevel6==='function' && typeof setupBattlefield==='function'){
+            startLevel6();
+            setupBattlefield();
+            G.level6.state='battlefield'; G.level6.timer=0;
+        }
+        updateUI(); return;
+    }
     // Set appropriate level
     if(bossType===1) G.level=1;
     else if(bossType===2) G.level=2;

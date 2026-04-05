@@ -16,7 +16,10 @@ function update() {
     if(G.tutorial) updateTutorial();
 
     if(G.comboTimer>0)G.comboTimer--; else{G.combo=0;G.consecutiveKills=0;document.getElementById('comboRow').style.display='none';}
-    if(isAction('fire')) shoot();
+    // Block normal shooting while charging big shot (level 6 charging or post-level6 hold-charge)
+    const _blockShoot=(G.level6&&(G.level6.state==='gilbert_found'||G.level6.state==='charging'||G.level6.state==='release_prompt'))
+                    ||(G.bigShotCharge>0);
+    if(isAction('fire')&&!_blockShoot) shoot();
     if(G.shotTimer>0) G.shotTimer--;
     if(G.invincibleTimer>0) G.invincibleTimer--;
     if(G.tripleShotTimer>0){G.tripleShotTimer--;document.getElementById('powerupRow').style.display=G.tripleShotTimer>0?'block':'none';}
@@ -80,7 +83,8 @@ function update() {
     }
 
     // LEVEL TRIGGER (blocked during boss rush and Gilbert events)
-    if(!boss&&!G.tutorial&&!G.noBoss&&!G.bossRush&&(G.gilbertState==='none'||G.gilbertState==='rope'||G.gilbertState==='ally'||G.gilbertState==='scrap_collect')&&elapsed>BOSS_TIME){
+    const _l6State=G.level6&&G.level6.state;
+    if(!boss&&!G.tutorial&&!G.noBoss&&!G.bossRush&&!_l6State&&(G.gilbertState==='none'||G.gilbertState==='rope'||G.gilbertState==='ally'||G.gilbertState==='scrap_collect')&&elapsed>BOSS_TIME){
         if(window.DLC&&window.DLC.loaded){
             // DLC: 10 levels. Bosses at 1, 2, 4(cyborg), 10(sans). Others are wave-only.
             if(G.level<=2) spawnBoss(G.level);
@@ -105,6 +109,11 @@ function update() {
     // Boss rush wave management
     if(G.bossRush) updateBossRush();
 
+    // Level 6 state machine (Rouge war)
+    if(typeof updateLevel6==='function') updateLevel6();
+    if(typeof updateRouges==='function' && rouges.length>0) updateRouges();
+    if(typeof updateBigShot==='function') updateBigShot();
+
     // Gilbert update
     if(window.DLC&&window.DLC.loaded) updateGilbert();
     // Gilbert quip timer
@@ -121,13 +130,21 @@ function update() {
         }
     }
 
-    // SPAWNING (blocked during boss rush and Gilbert dialogue)
-    if(!boss&&!G.tutorial&&!G.bossRush&&!G.gilbertDialogue){
+    // Determine if level 6 is in a phase that suppresses normal gameplay spawning
+    const _l6=G.level6&&G.level6.state;
+    const _l6Suppress = _l6==='kidnap_grab'||_l6==='arena_enter'||_l6==='arena'||_l6==='arena_surround'
+        ||_l6==='rescue_arrive'||_l6==='rescue_dialog'||_l6==='ambush'
+        ||_l6==='battlefield'||_l6==='gilbert_yell'||_l6==='battlefield_hunt'
+        ||_l6==='gilbert_found'||_l6==='charging'||_l6==='release_prompt'
+        ||_l6==='released'||_l6==='victory'||_l6==='failed';
+    // SPAWNING (blocked during boss rush, Gilbert dialogue, and level 6 cutscenes)
+    if(!boss&&!G.tutorial&&!G.bossRush&&!G.gilbertDialogue&&!_l6Suppress){
         G.spawnTimer++;
         const diff=DIFFICULTY[currentDifficulty]||DIFFICULTY.normal;
         const maxAst=Math.round((5+G.level*3)*diff.astMax), rate=Math.max(30,Math.round((90-G.level*10)*diff.astRate));
         if(G.spawnTimer>rate&&asteroids.length<maxAst){spawnAsteroid();G.spawnTimer=0;}
-        if(!G.noMiniBoss&&Math.random()<0.0002*G.level*diff.mbChance) spawnMiniBoss();
+        // Block mini-boss spawns during ANY active level 6 state (so rouges get the spotlight)
+        if(!G.noMiniBoss&&!_l6State&&Math.random()<0.0002*G.level*diff.mbChance) spawnMiniBoss();
         // fuel spawns after boss 2
         if(G.hasForceField){G.fuelTimer++;if(G.fuelTimer>Math.round(1500*diff.fuelRate)){spawnAsteroid(undefined,undefined,undefined,'fuel');G.fuelTimer=0;}}
     }
@@ -182,7 +199,11 @@ function update() {
                     continue;
                 }
                 if(a.type==='fuel'){boom(a.x,a.y,'#ffff00');Sound.powerup();if(G.hasForceField&&G.shieldFuel<3){G.shieldFuel++;updateShieldUI();}G.fuelCollected++;if(G.fuelCollected>=5)unlockAch('fuel_collector');if(window.DLC&&window.DLC.loaded)gilbertIntro('fuel',GILBERT_INTROS.fuel);}
-                else{boom(a.x,a.y,'#888');Sound.explode();if(a.r>20&&!G.tutorial){spawnAsteroid(a.x,a.y,a.r/2);spawnAsteroid(a.x,a.y,a.r/2);}
+                else{
+                    const _isBig=bullets[j].big;
+                    boom(a.x,a.y,_isBig?'#ffff00':'#888',_isBig?18:8);Sound.explode();
+                    // Big shot vaporizes — no split. Normal bullet splits large asteroids.
+                    if(!_isBig&&a.r>20&&!G.tutorial){spawnAsteroid(a.x,a.y,a.r/2);spawnAsteroid(a.x,a.y,a.r/2);}
                     G.asteroidsDestroyed++;unlockAch('first_blood');if(G.asteroidsDestroyed>=100)unlockAch('rock_crusher');
                     if(G.tripleShotTimer>0)unlockAch('triple_threat');
                     if(window.DLC&&window.DLC.loaded){G.consecutiveKills++;if(G.consecutiveKills>=10)unlockAch('dlc_chain_reaction');if(G.asteroidsDestroyed>=250)unlockAch('dlc_mass_destroyer');}}
@@ -262,7 +283,7 @@ function update() {
         for(let j=bullets.length-1;j>=0;j--){
             if(Math.hypot(bullets[j].x-mb.x,bullets[j].y-mb.y)<mb.r+4){
                 const hitCol=mb.type==='blaster'?'cyan':mb.type==='spawner'?'#44ff44':(mb.type==='shooter'?'red':'violet');
-                boom(bullets[j].x,bullets[j].y,hitCol,4);mb.hp--;Sound.hit();bullets.splice(j,1);
+                const _dmgMB=bullets[j].big?(bullets[j].damage||5):1;boom(bullets[j].x,bullets[j].y,hitCol,4);mb.hp-=_dmgMB;Sound.hit();bullets.splice(j,1);
                 if(mb.hp<=0){boom(mb.x,mb.y,hitCol,25);Sound.explode();addScore(mb.type==='blaster'?1000:mb.type==='spawner'?600:(mb.type==='shooter'?800:400));G.mb+=(mb.type==='blaster'?8:mb.type==='spawner'?5:(mb.type==='shooter'?6:3));G.miniBossKills++;if(G.miniBossKills>=5)unlockAch('bounty_hunter');if(window.DLC&&window.DLC.loaded&&G.miniBossKills>=10)unlockAch('dlc_exterminator');miniBosses.splice(i,1);break;}
             }
         }
@@ -604,7 +625,7 @@ function update() {
                                 // Deflect — head is shielded
                                 boom(bullets[j].x,bullets[j].y,'white',3);Sound.shieldSfx();
                             } else {
-                                boss.hp--;boom(bullets[j].x,bullets[j].y,'red',5);Sound.hit();updateUI();
+                                const _dmgH=bullets[j].big?(bullets[j].damage||5):1;boss.hp-=_dmgH;boom(bullets[j].x,bullets[j].y,'red',5);Sound.hit();updateUI();
                                 if(boss.hp<=0){
                                     boom(boss.x,boss.y,'orange',50);shake(12,25);Sound.explode();
                                     addScore(4000);
@@ -672,7 +693,7 @@ function update() {
             }
             if(boss&&boss.type===5) continue; // Snake collision handled above
             if(boss&&Math.hypot(bullets[j].x-boss.x,bullets[j].y-boss.y)<boss.r+5){
-                boom(bullets[j].x,bullets[j].y,'red',3);boss.hp--;Sound.hit();
+                const _dmgB=bullets[j].big?(bullets[j].damage||5):1;boom(bullets[j].x,bullets[j].y,'red',3);boss.hp-=_dmgB;Sound.hit();
                 // Sans finisher threshold: at 80 HP with Gilbert ally, lock HP and trigger finisher
                 if((boss.type===3||boss.type===10)&&boss.hp<=Math.round(boss.maxHp*0.4)&&!boss.gilbertFinisherTriggered&&window.DLC&&window.DLC.loaded&&G.gilbertState==='ally'){
                     boss.hp=Math.round(boss.maxHp*0.4);boss.gilbertFinisherTriggered=true;
@@ -2264,6 +2285,33 @@ function draw() {
 
     // --- BULLETS (elongated with glow trails) ---
     for(const b of bullets){
+        // Big shot rendering (huge golden plasma ball)
+        if(b.big){
+            const bsP=0.75+Math.sin(T/80)*0.25;
+            ctx.shadowBlur=45;ctx.shadowColor='#ffcc00';
+            // Outer aura
+            ctx.globalAlpha=0.4*bsP;
+            const bOut=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,26);
+            bOut.addColorStop(0,'#ffff88');bOut.addColorStop(0.3,'#ffcc00');bOut.addColorStop(0.7,'#ff6600');bOut.addColorStop(1,'transparent');
+            ctx.fillStyle=bOut;ctx.beginPath();ctx.arc(b.x,b.y,26,0,Math.PI*2);ctx.fill();
+            // Mid aura
+            ctx.globalAlpha=0.8;
+            const bMid=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,14);
+            bMid.addColorStop(0,'#ffffff');bMid.addColorStop(0.4,'#ffff44');bMid.addColorStop(1,'#ffaa00');
+            ctx.fillStyle=bMid;ctx.beginPath();ctx.arc(b.x,b.y,14,0,Math.PI*2);ctx.fill();
+            // Hot core
+            ctx.globalAlpha=1;ctx.fillStyle='#ffffff';
+            ctx.beginPath();ctx.arc(b.x,b.y,6,0,Math.PI*2);ctx.fill();
+            // Star burst rays
+            ctx.strokeStyle='#ffff88';ctx.lineWidth=2;ctx.globalAlpha=bsP*0.7;
+            for(let r=0;r<4;r++){
+                const ra=r*Math.PI/2+T/400;
+                ctx.beginPath();ctx.moveTo(b.x-Math.cos(ra)*22,b.y-Math.sin(ra)*22);
+                ctx.lineTo(b.x+Math.cos(ra)*22,b.y+Math.sin(ra)*22);ctx.stroke();
+            }
+            ctx.shadowBlur=0;ctx.globalAlpha=1;
+            continue;
+        }
         const isTriple=G.tripleShotTimer>0;
         const isGilbert=!!b.gilbert;
         const allyCol=G.albertMode?'#4488ff':'#44ff44';
@@ -2398,6 +2446,11 @@ function draw() {
 
     // Cutscene overlay
     if(G.stationCutscene) drawCutscene();
+
+    // Level 6 rouges + overlay
+    if(typeof drawRouges==='function' && rouges.length>0) drawRouges();
+    if(typeof drawLevel6==='function') drawLevel6();
+    if(typeof drawBigShotUI==='function') drawBigShotUI();
 
     // === POST-PROCESSING EFFECTS ===
 
@@ -2534,8 +2587,8 @@ document.addEventListener('keydown', e => {
     }
     if(G.stationCutscene) return; // Block all input during other cutscene phases
 
-    // Fast travel menu (X key)
-    if(e.code==='KeyX'&&G.running&&G.stationUnlocked&&!boss&&G.mode==='space'&&!G.bossRush&&!G.stationCutscene){
+    // Fast travel menu (X key) — blocked during level 6 events
+    if(e.code==='KeyX'&&G.running&&G.stationUnlocked&&!boss&&G.mode==='space'&&!G.bossRush&&!G.stationCutscene&&!(G.level6&&G.level6.state)){
         G.fastTravelOpen=!G.fastTravelOpen;Sound.ui();return;
     }
     // Confirm fast travel

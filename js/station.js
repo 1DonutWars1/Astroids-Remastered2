@@ -46,6 +46,21 @@ function enterStation(){
     G.station.cameraX=0;G.station.shopOpen=false;G.station.interactTarget=null;
     // Keep score intact — player converts manually at the Banker NPC
     G.stationUnlocked=true;
+    // If player somehow entered station during an active level 6 battle, clean up
+    if(G.level6 && G.level6.state){
+        G.level6.state=null;
+        if(typeof rouges!=='undefined') rouges.length=0;
+        if(typeof battleBots!=='undefined') battleBots.length=0;
+        if(typeof battleBullets!=='undefined') battleBullets.length=0;
+        if(typeof battleDebris!=='undefined') battleDebris.length=0;
+        // Restore canvas size if it was expanded
+        if(G.level6.savedCanvasW){
+            canvas.width=G.level6.savedCanvasW; canvas.height=G.level6.savedCanvasH;
+            W=canvas.width; H=canvas.height;
+            G.level6.savedCanvasW=null; G.level6.savedCanvasH=null;
+        }
+        G.level6.camera.x=0; G.level6.camera.y=0;
+    }
     // Save
     if(G.slotId){
         const s=saves[G.slotId];
@@ -53,7 +68,7 @@ function enterStation(){
         s.mb=G.mb;s.upgrades=Object.assign({},G.upgrades);
         s.gilbertUpgrades=Object.assign({},G.gilbertUpgrades);
         s.modules=G.modules.slice();s.equippedModules=G.equippedModules.slice();
-        s.stationUnlocked=true;s.maxLvl=Math.max(s.maxLvl,G.level);
+        s.stationUnlocked=true;s.checkpoint=G.checkpoint||G.level;s.maxLvl=Math.max(s.maxLvl,G.level);
         saveToDisk();
     }
     canvas.width=900;W=900;
@@ -65,6 +80,17 @@ function leaveStation(){
     G.waveStart=performance.now();G.spawnTimer=0;
     asteroids=[];for(let k=0;k<6;k++)spawnAsteroid();
     G.invincibleTimer=90;
+    // Trigger level 6 rouge war only the first time — persist across reloads via save
+    const saveRec=G.slotId?saves[G.slotId]:null;
+    const alreadyTriggered=saveRec&&saveRec.level6Triggered;
+    if(window.DLC&&window.DLC.loaded&&G.level>=6&&G.level<7
+        &&typeof startLevel6==='function'
+        &&!G.level6.state&&!G.level6.bigShotUnlocked
+        &&!alreadyTriggered){
+        startLevel6();
+        // Mark triggered so reloads don't restart the fight
+        if(saveRec){saveRec.level6Triggered=true;saveToDisk();}
+    }
     updateUI();
 }
 function saveStation(){
@@ -74,6 +100,10 @@ function saveStation(){
     s.gilbertUpgrades=Object.assign({},G.gilbertUpgrades);
     s.modules=G.modules.slice();s.equippedModules=G.equippedModules.slice();
     s.stationUnlocked=true;s.checkpoint=G.level;s.maxLvl=Math.max(s.maxLvl||1,G.level);
+    // Persist level 6 progress
+    if(G.level6){
+        if(G.level6.bigShotUnlocked) s.bigShotUnlocked=true;
+    }
     saveToDisk();
 }
 function buyUpgrade(key){
@@ -791,88 +821,311 @@ function drawShop(){
 // Cutscene: post-boss-5
 function startStationCutscene(){
     G.stationCutscene='clearing';G.stationCutsceneTimer=0;
-    G.npcShip={x:W+60,y:H/2,angle:Math.PI};
+    // Target X for approach (stored so easing can use it consistently)
+    G.npcShip={
+        x:W+80, y:H/2, angle:Math.PI,
+        targetX:W*0.62, targetY:H/2,
+        startX:W+80, startY:H/2,
+        vx:0, vy:0, bobOffset:0, thrustLevel:0,
+        warpTrail:1, trail:[]
+    };
     asteroids=[];miniBosses=[];enemyBullets=[];gasterBlasters=[];
 }
+// Cubic ease-out
+function _easeOut(t){return 1-Math.pow(1-t,3);}
+function _easeInOut(t){return t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;}
 function updateCutscene(){
     G.stationCutsceneTimer++;
+    const n=G.npcShip;
     if(G.stationCutscene==='clearing'){
         if(G.stationCutsceneTimer===1) gilbertQuip("Huh... the asteroids stopped. That's... new.");
         if(G.stationCutsceneTimer>120) {G.stationCutscene='approach';G.stationCutsceneTimer=0;}
     } else if(G.stationCutscene==='approach'){
-        G.npcShip.x+=(W*0.6-G.npcShip.x)*0.03;
-        G.npcShip.y=H/2+Math.sin(G.stationCutsceneTimer*0.03)*30;
-        if(G.stationCutsceneTimer>120){G.stationCutscene='choice';G.stationCutsceneTimer=0;G.dialogueChoiceIndex=0;}
+        // Smooth deceleration: eased position from startX to targetX over 140 frames
+        const dur=140;
+        const t=Math.min(1,G.stationCutsceneTimer/dur);
+        const e=_easeOut(t);
+        const prevX=n.x;
+        n.x=n.startX+(n.targetX-n.startX)*e;
+        // Bob fades IN as ship slows down (not right when warp-in happens)
+        const bobAmp=30*e*(1-0.5*e); // peaks mid-approach, less at end
+        n.bobOffset=Math.sin(G.stationCutsceneTimer*0.04)*bobAmp;
+        n.y=n.targetY+n.bobOffset;
+        // Derive velocity for engine thrust intensity
+        n.vx=n.x-prevX;
+        // Warp trail decays from 1 to 0 over the first 50 frames
+        n.warpTrail=Math.max(0,1-G.stationCutsceneTimer/50);
+        // Thrust intensity: high while decelerating hard, drops off
+        n.thrustLevel=Math.max(0.25,Math.min(1,Math.abs(n.vx)/4));
+        if(G.stationCutsceneTimer>dur+20){G.stationCutscene='choice';G.stationCutsceneTimer=0;G.dialogueChoiceIndex=0;}
     } else if(G.stationCutscene==='choice'){
-        // Waiting for player input (handled in keydown)
+        // Gentle idle float
+        n.bobOffset=Math.sin(G.stationCutsceneTimer*0.03)*12;
+        n.y=n.targetY+n.bobOffset;
+        n.thrustLevel=0.25+Math.sin(G.stationCutsceneTimer*0.08)*0.05;
+        n.vx=0;
     } else if(G.stationCutscene==='who_response'){
+        n.bobOffset=Math.sin(G.stationCutsceneTimer*0.03)*12;
+        n.y=n.targetY+n.bobOffset;
+        n.thrustLevel=0.25;
         if(G.stationCutsceneTimer>240){G.stationCutscene='gilbert_defend';G.stationCutsceneTimer=0;}
     } else if(G.stationCutscene==='gilbert_defend'){
-        // Move Gilbert between ships
+        n.bobOffset=Math.sin(G.stationCutsceneTimer*0.03)*12;
+        n.y=n.targetY+n.bobOffset;
+        n.thrustLevel=0.25;
         if(G.gilbert){
-            const tx=(ship.x+G.npcShip.x)/2,ty=(ship.y+G.npcShip.y)/2;
+            const tx=(ship.x+n.x)/2,ty=(ship.y+n.y)/2;
             G.gilbert.x+=(tx-G.gilbert.x)*0.05;G.gilbert.y+=(ty-G.gilbert.y)*0.05;
         }
         if(G.stationCutsceneTimer>300){G.stationCutscene='follow';G.stationCutsceneTimer=0;}
     } else if(G.stationCutscene==='help_response'){
+        n.bobOffset=Math.sin(G.stationCutsceneTimer*0.03)*12;
+        n.y=n.targetY+n.bobOffset;
+        n.thrustLevel=0.25;
         if(G.stationCutsceneTimer>180){G.stationCutscene='follow';G.stationCutsceneTimer=0;}
     } else if(G.stationCutscene==='follow'){
-        G.npcShip.x+=3;
-        ship.tx+=0.15;ship.x+=ship.tx;
-        if(G.gilbert){G.gilbert.x+=2.5;}
-        if(G.stationCutsceneTimer>180){
+        // Smooth acceleration using ease-in curve
+        const dur=180;
+        const t=Math.min(1,G.stationCutsceneTimer/dur);
+        const spd=8*(t*t); // ease-in quadratic speed
+        n.x+=spd; n.vx=spd;
+        // Slight up-bank as ship flies off
+        n.bobOffset*=0.92;
+        n.y=n.targetY+n.bobOffset-t*20;
+        n.thrustLevel=0.4+t*0.6;
+        // Player ship follows with same smooth acceleration
+        const shipSpd=5*(t*t);
+        ship.tx=shipSpd; ship.x+=ship.tx;
+        if(G.gilbert){G.gilbert.x+=shipSpd*0.9;}
+        if(G.stationCutsceneTimer>=dur){
             G.stationCutscene=null;
             enterStation();
         }
     }
+
+    // Update engine trail for NPC ship (all phases)
+    if(n){
+        n.trail=n.trail||[];
+        // Add trail point at engine (ship is angle=PI so engine is at local -radius along -x world)
+        const engX=n.x-Math.cos(n.angle)*-14; // world engine position
+        const engY=n.y;
+        const intensity=n.thrustLevel||0.3;
+        if(G.stationCutsceneTimer%2===0 || intensity>0.5){
+            n.trail.push({
+                x:engX+(Math.random()-0.5)*2,
+                y:engY+(Math.random()-0.5)*2,
+                life:20+Math.random()*10, maxLife:30,
+                size:2+Math.random()*2,
+                intensity:intensity
+            });
+        }
+        for(let i=n.trail.length-1;i>=0;i--){
+            n.trail[i].life--;
+            if(n.trail[i].life<=0) n.trail.splice(i,1);
+        }
+        if(n.trail.length>80) n.trail.splice(0,n.trail.length-80);
+    }
 }
 function drawCutscene(){
     const T=performance.now();
+    const n=G.npcShip;
     // NPC ship
-    if(G.npcShip){
-        ctx.save();ctx.translate(G.npcShip.x,G.npcShip.y);ctx.rotate(G.npcShip.angle);
-        ctx.fillStyle='#1a1a2a';ctx.strokeStyle='#aaaaff';ctx.lineWidth=2;
-        ctx.shadowBlur=10;ctx.shadowColor='#8888ff';
-        ctx.beginPath();ctx.moveTo(18,0);ctx.lineTo(-12,10);ctx.lineTo(-6,0);ctx.lineTo(-12,-10);ctx.closePath();
-        ctx.fill();ctx.stroke();ctx.shadowBlur=0;
-        ctx.fillStyle='#8888ff';ctx.beginPath();ctx.arc(4,0,3,0,Math.PI*2);ctx.fill();
+    if(n){
+        // --- ENGINE TRAIL (draw first, behind ship) ---
+        for(const p of n.trail){
+            const a=p.life/p.maxLife;
+            const sz=p.size*(0.4+a*0.6);
+            // Outer glow
+            ctx.globalAlpha=a*0.35*p.intensity;
+            const tg=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,sz*3);
+            tg.addColorStop(0,'#88aaff');tg.addColorStop(0.4,'#4466cc');tg.addColorStop(1,'transparent');
+            ctx.fillStyle=tg;ctx.beginPath();ctx.arc(p.x,p.y,sz*3,0,Math.PI*2);ctx.fill();
+            // Core
+            ctx.globalAlpha=a*0.9*p.intensity;
+            ctx.fillStyle='#ccddff';
+            ctx.beginPath();ctx.arc(p.x,p.y,sz*0.7,0,Math.PI*2);ctx.fill();
+        }
+        ctx.globalAlpha=1;
+
+        // --- WARP STREAKS (fade out as ship arrives) ---
+        if(n.warpTrail>0.01){
+            ctx.globalAlpha=n.warpTrail*0.7;
+            ctx.strokeStyle='#aaccff';ctx.lineWidth=1.5;
+            ctx.shadowBlur=15;ctx.shadowColor='#88aaff';
+            for(let s=0;s<8;s++){
+                const sy=n.y+(s-4)*6+Math.sin(T/100+s)*2;
+                const len=120*n.warpTrail+Math.random()*40;
+                ctx.globalAlpha=n.warpTrail*0.4*(1-Math.abs(s-3.5)/4);
+                ctx.beginPath();ctx.moveTo(n.x+15,sy);ctx.lineTo(n.x+15+len,sy);ctx.stroke();
+            }
+            ctx.shadowBlur=0;ctx.globalAlpha=1;
+        }
+
+        // --- NPC SHIP BODY (detailed cruiser) ---
+        ctx.save();ctx.translate(n.x,n.y);ctx.rotate(n.angle);
+        const thrust=n.thrustLevel||0.3;
+        // Thrust flame out the back
+        const flLen=18+thrust*18+Math.random()*4;
+        ctx.shadowBlur=20;ctx.shadowColor='#88aaff';
+        // Outer flame cone
+        ctx.globalAlpha=0.45;
+        const flg=ctx.createLinearGradient(-10,0,-10-flLen,0);
+        flg.addColorStop(0,'#aaccff');flg.addColorStop(0.5,'#4477dd');flg.addColorStop(1,'transparent');
+        ctx.fillStyle=flg;
+        ctx.beginPath();ctx.moveTo(-10,5);ctx.lineTo(-10-flLen,(Math.random()-0.5)*3);ctx.lineTo(-10,-5);ctx.closePath();ctx.fill();
+        // Inner flame
+        ctx.globalAlpha=0.85;ctx.fillStyle='#fff';
+        ctx.beginPath();ctx.moveTo(-10,2);ctx.lineTo(-10-flLen*0.7,0);ctx.lineTo(-10,-2);ctx.closePath();ctx.fill();
+        ctx.shadowBlur=0;ctx.globalAlpha=1;
+
+        // --- HULL (larger, more detailed cruiser shape) ---
+        // Outer glow
+        ctx.shadowBlur=18;ctx.shadowColor='#8899ff';
+        // Main hull - angular cruiser
+        ctx.beginPath();
+        ctx.moveTo(22,0);           // nose
+        ctx.lineTo(12,-6);          // upper nose
+        ctx.lineTo(4,-9);           // upper wing attach
+        ctx.lineTo(-4,-13);         // upper wingtip back
+        ctx.lineTo(-14,-10);        // back upper
+        ctx.lineTo(-10,-4);         // engine shoulder
+        ctx.lineTo(-10,4);          // engine shoulder bottom
+        ctx.lineTo(-14,10);         // back lower
+        ctx.lineTo(-4,13);          // lower wingtip back
+        ctx.lineTo(4,9);            // lower wing attach
+        ctx.lineTo(12,6);           // lower nose
+        ctx.closePath();
+        // Gradient hull fill
+        const hg=ctx.createLinearGradient(0,-13,0,13);
+        hg.addColorStop(0,'#2a2a44');hg.addColorStop(0.5,'#1a1a2e');hg.addColorStop(1,'#0f0f1c');
+        ctx.fillStyle=hg;ctx.fill();
+        ctx.strokeStyle='#aaccff';ctx.lineWidth=1.8;ctx.stroke();
+        ctx.shadowBlur=0;
+
+        // Hull panel lines
+        ctx.strokeStyle='rgba(170,200,255,0.3)';ctx.lineWidth=0.8;
+        ctx.beginPath();ctx.moveTo(14,-5);ctx.lineTo(-6,-5);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(14,5);ctx.lineTo(-6,5);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(4,-9);ctx.lineTo(4,9);ctx.stroke();
+
+        // Cockpit (pulsing)
+        const cpPulse=0.8+Math.sin(T/500)*0.2;
+        const cpg=ctx.createRadialGradient(8,0,0,8,0,5);
+        cpg.addColorStop(0,'#ffffff');cpg.addColorStop(0.4,'#88bbff');cpg.addColorStop(1,'transparent');
+        ctx.globalAlpha=cpPulse;ctx.fillStyle=cpg;
+        ctx.beginPath();ctx.arc(8,0,5,0,Math.PI*2);ctx.fill();
+        ctx.globalAlpha=1;
+        // Cockpit core
+        ctx.fillStyle='#ccddff';
+        ctx.beginPath();ctx.arc(8,0,1.8,0,Math.PI*2);ctx.fill();
+
+        // Wing navigation lights (blinking)
+        const blink=Math.floor(T/600)%2===0;
+        if(blink){
+            ctx.shadowBlur=12;ctx.shadowColor='#ff3333';
+            ctx.fillStyle='#ff5555';ctx.beginPath();ctx.arc(-4,-13,1.5,0,Math.PI*2);ctx.fill();
+            ctx.shadowColor='#33ff33';
+            ctx.fillStyle='#55ff55';ctx.beginPath();ctx.arc(-4,13,1.5,0,Math.PI*2);ctx.fill();
+            ctx.shadowBlur=0;
+        }
+
+        // Engine ports (glow)
+        ctx.shadowBlur=15*thrust;ctx.shadowColor='#88aaff';
+        ctx.fillStyle='#aaccff';
+        ctx.fillRect(-11,-4,2,3);
+        ctx.fillRect(-11,1,2,3);
+        ctx.shadowBlur=0;
+
         ctx.restore();
     }
+
+    // Cinematic letterbox bars during all cutscene phases (smooth fade in)
+    // Bottom bar is thinner so it doesn't cover Gilbert's quip/dialogue box (which lives at H-58)
+    const barT=Math.min(1,G.stationCutsceneTimer/30);
+    const topH=Math.floor(40*_easeOut(barT));
+    const botH=Math.floor(24*_easeOut(barT));
+    ctx.fillStyle='rgba(0,0,0,0.85)';
+    ctx.fillRect(0,0,W,topH);
+    ctx.fillRect(0,H-botH,W,botH);
+
+    // Dialogue box helper (consistent styling)
+    const drawDialogueBox=(x,y,w,h,accent)=>{
+        // Shadow
+        ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(x+3,y+3,w,h);
+        // Glass background
+        const bg=ctx.createLinearGradient(0,y,0,y+h);
+        bg.addColorStop(0,'rgba(8,10,20,0.92)');bg.addColorStop(1,'rgba(3,3,8,0.95)');
+        ctx.fillStyle=bg;ctx.fillRect(x,y,w,h);
+        // Top accent bar
+        const accg=ctx.createLinearGradient(x,y,x+w,y);
+        accg.addColorStop(0,'transparent');accg.addColorStop(0.5,accent);accg.addColorStop(1,'transparent');
+        ctx.fillStyle=accg;ctx.fillRect(x,y,w,2);
+        // Border
+        ctx.strokeStyle=accent+'80';ctx.lineWidth=1;ctx.strokeRect(x+0.5,y+0.5,w-1,h-1);
+        // Inner highlight
+        ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.strokeRect(x+2.5,y+2.5,w-5,h-5);
+    };
+
     // Dialogue choice
     if(G.stationCutscene==='choice'){
-        ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(W/2-200,H/2-60,400,120);
-        ctx.strokeStyle='#aaaaff';ctx.lineWidth=2;ctx.strokeRect(W/2-200,H/2-60,400,120);
-        ctx.font='bold 14px Courier New';ctx.textAlign='left';ctx.fillStyle='#aaaaff';
-        ctx.fillText('"Woah, you\'re one of them, aren\'t ya!?"',W/2-185,H/2-35);
+        const boxT=Math.min(1,G.stationCutsceneTimer/20);
+        const eT=_easeOut(boxT);
+        ctx.save();ctx.globalAlpha=eT;
+        const bw=420,bh=130;
+        const bx=W/2-bw/2, by=H/2-bh/2-5+(1-eT)*10;
+        drawDialogueBox(bx,by,bw,bh,'#aaccff');
+        ctx.font='bold 14px Courier New';ctx.textAlign='left';
+        ctx.shadowBlur=8;ctx.shadowColor='rgba(170,200,255,0.4)';
+        ctx.fillStyle='#aaccff';
+        ctx.fillText('"Woah, you\'re one of them, aren\'t ya!?"',bx+18,by+30);
+        ctx.shadowBlur=0;
         ctx.font='13px Courier New';
         const c0=G.dialogueChoiceIndex===0;const c1=G.dialogueChoiceIndex===1;
-        ctx.fillStyle=c0?'#fff':'#666';ctx.fillText((c0?'> ':'  ')+'"Who are you?!"',W/2-185,H/2+5);
-        ctx.fillStyle=c1?'#fff':'#666';ctx.fillText((c1?'> ':'  ')+'"Can you help us?"',W/2-185,H/2+30);
-        ctx.font='10px Courier New';ctx.fillStyle='#555';ctx.fillText('[UP/DOWN] Select  [SPACE] Confirm',W/2-185,H/2+52);
+        // Selection pulse
+        const selPulse=0.7+Math.sin(T/200)*0.3;
+        if(c0){ctx.fillStyle=`rgba(0,220,255,${0.15*selPulse})`;ctx.fillRect(bx+10,by+50,bw-20,22);}
+        if(c1){ctx.fillStyle=`rgba(0,220,255,${0.15*selPulse})`;ctx.fillRect(bx+10,by+76,bw-20,22);}
+        ctx.fillStyle=c0?'#fff':'#777';
+        if(c0){ctx.shadowBlur=10;ctx.shadowColor='#88ccff';}
+        ctx.fillText((c0?'▶ ':'  ')+'"Who are you?!"',bx+18,by+66);
+        ctx.shadowBlur=0;
+        ctx.fillStyle=c1?'#fff':'#777';
+        if(c1){ctx.shadowBlur=10;ctx.shadowColor='#88ccff';}
+        ctx.fillText((c1?'▶ ':'  ')+'"Can you help us?"',bx+18,by+92);
+        ctx.shadowBlur=0;
+        ctx.font='10px Courier New';ctx.fillStyle='#556';
+        ctx.fillText('[↑/↓] Select    [SPACE] Confirm',bx+18,by+118);
+        ctx.restore();
     }
-    // Response text
-    if(G.stationCutscene==='who_response'){
-        ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,H*0.65,W,100);
-        ctx.font='bold 13px Courier New';ctx.textAlign='left';ctx.fillStyle='#aaaaff';
-        ctx.fillText('SECTOR A:',40,H*0.65+25);
+    // Response boxes (bottom caption style)
+    const drawCaption=(phaseT,speaker,speakerCol,lines)=>{
+        const eT=_easeOut(Math.min(1,phaseT/20));
+        ctx.save();ctx.globalAlpha=eT;
+        const bh=lines.length>1?90:70;
+        const by=H*0.72+(1-eT)*15;
+        drawDialogueBox(20,by,W-40,bh,speakerCol);
+        ctx.font='bold 13px Courier New';ctx.textAlign='left';
+        ctx.shadowBlur=10;ctx.shadowColor=speakerCol+'66';
+        ctx.fillStyle=speakerCol;
+        ctx.fillText(speaker,40,by+26);
+        ctx.shadowBlur=0;
         ctx.font='12px Courier New';ctx.fillStyle='#ddd';
-        ctx.fillText("We're Sector A enforcement. NOW why don't you tell me who YOU are?",40,H*0.65+50);
+        lines.forEach((line,i)=>ctx.fillText(line,40,by+48+i*18));
+        ctx.restore();
+    };
+    if(G.stationCutscene==='who_response'){
+        drawCaption(G.stationCutsceneTimer,'SECTOR A','#aaccff',
+            ["We're Sector A enforcement. NOW why don't you tell me who YOU are?"]);
     }
     if(G.stationCutscene==='gilbert_defend'){
-        ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,H*0.65,W,100);
-        ctx.font='bold 13px Courier New';ctx.textAlign='left';ctx.fillStyle='#44ff44';
-        ctx.fillText('GILBERT:',40,H*0.65+25);
-        ctx.font='12px Courier New';ctx.fillStyle='#ddd';
-        ctx.fillText("FINE, he IS one of them. But you saw what we did to that snake,",40,H*0.65+45);
-        ctx.fillText("now why don't you just help us before something happens?",40,H*0.65+62);
+        drawCaption(G.stationCutsceneTimer,'GILBERT','#44ff66',
+            ["FINE, he IS one of them. But you saw what we did to that snake,",
+             "now why don't you just help us before something happens?"]);
     }
     if(G.stationCutscene==='help_response'){
-        ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,H*0.65,W,100);
-        ctx.font='bold 13px Courier New';ctx.textAlign='left';ctx.fillStyle='#aaaaff';
-        ctx.fillText('SECTOR A:',40,H*0.65+25);
-        ctx.font='12px Courier New';ctx.fillStyle='#ddd';
-        ctx.fillText("Well, you did neutralize that threat, why not?",40,H*0.65+45);
-        ctx.fillText("Welcome to the station!",40,H*0.65+62);
+        drawCaption(G.stationCutsceneTimer,'SECTOR A','#aaccff',
+            ["Well, you did neutralize that threat, why not?",
+             "Welcome to the station!"]);
     }
 }
 

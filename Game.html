@@ -102,6 +102,12 @@
     <button onclick="spawnGilbertAlly()">SPAWN GILBERT ALLY (DLC)</button>
     <button onclick="enterStation()">ENTER STATION (DLC)</button>
     <button onclick="startStationCutscene()">STATION CUTSCENE (DLC)</button>
+    <div class="dev-hdr">LEVEL 6 (ROUGE WAR)</div>
+    <button onclick="spawnRouge()">SPAWN ROUGE</button>
+    <button onclick="devStartLevel6()">START ROUGE WAR</button>
+    <button onclick="devSkipToArena()">SKIP TO ARENA FIGHT</button>
+    <button onclick="devSkipToBattlefield()">SKIP TO BATTLEFIELD</button>
+    <button onclick="devSkipToGilbertSave()">SKIP TO SAVE GILBERT</button>
     <button onclick="G.mb+=500;updateUI();alert('Added 500 MB')">ADD 500 MB</button>
     <div class="dev-hdr">TESTING</div>
     <button onclick="toggleTestMode()" id="testModeBtn">ENABLE TEST MODE</button>
@@ -369,6 +375,7 @@
 <audio id="boss3Phase2Track" src="audio_keeper-boss-battle-500204.mp3" loop preload="auto"></audio>
 <audio id="boss4Track" src="bouncyrunner-boss-fight-one-400508.mp3" loop preload="auto"></audio>
 <audio id="boss5Track" src="dstechnician-halodrome-120606.mp3" loop preload="auto"></audio>
+<audio id="rougeTrack" src="meak363-stealth-battle-205902 (1).mp3" loop preload="auto"></audio>
 
 <div id="volumeBtn" onclick="Sound.toggleMute()">[ MUTE ]</div>
 
@@ -383,6 +390,7 @@
 <script src="js/gameplay.js"></script>
 <script src="js/dlc-gilbert.js"></script>
 <script src="js/station.js"></script>
+<script src="js/level6.js"></script>
 <script src="js/engine.js"></script>
 
 <!-- DLC auto-loader: if dlc.js exists, it loads and enables DLC features. If not, onerror fires silently. -->
