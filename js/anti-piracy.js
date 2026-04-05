@@ -2,16 +2,6 @@
 //  ANTI-PIRACY PROTECTIONS
 // ============================================================
 
-// Disable right-click
-document.addEventListener('contextmenu', e => e.preventDefault());
-
-// Block common devtools shortcuts (F12, Ctrl+Shift+I/J/C, Ctrl+U)
-document.addEventListener('keydown', function(e) {
-    if(e.key==='F12') { e.preventDefault(); return; }
-    if(e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key.toUpperCase())) { e.preventDefault(); return; }
-    if(e.ctrlKey && e.key.toUpperCase()==='U') { e.preventDefault(); return; }
-});
-
 // License key validation
 const LICENSE_STORAGE = 'ast_rem_license';
 const WATERMARK_STORAGE = 'ast_rem_wm_id';

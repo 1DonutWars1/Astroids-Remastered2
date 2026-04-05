@@ -670,7 +670,7 @@ function drawBattleBot(b){
         // Label
         ctx.font='bold 9px Courier New';ctx.fillStyle='#aaddff';ctx.textAlign='center';
         ctx.shadowBlur=6;ctx.shadowColor='#aaddff';
-        ctx.fillText('OFC. KRAIL',b.x,b.y-b.r-10);
+        ctx.fillText('OFC. KRAT',b.x,b.y-b.r-10);
         ctx.shadowBlur=0;
         return;
     }
