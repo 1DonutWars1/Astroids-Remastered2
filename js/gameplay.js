@@ -33,6 +33,10 @@ function startGame() {
     G.gilbertShootTimer=0;
     G.gilbertQuip=''; G.gilbertQuipTimer=0;
     G.gilbertSeen={};
+    // Reset inventory UI state (data itself is restored from save below)
+    G.inventoryOpen=false; G.inventorySelection=0;
+    G.dockingBay={open:false,selection:0,terminalPhase:null,terminalText:[],terminalTimer:0,
+                  mapOpen:false,mapSelection:5,teleport:null};
 
     ship={x:W/2,y:H/2,a:-Math.PI/2,r:14,tx:0,ty:0};
     asteroids=[]; bullets=[]; particles=[]; ammoBoxes=[]; powerups=[];
@@ -66,6 +70,18 @@ function startGame() {
         G.equippedModules=saves[G.slotId].equippedModules||[];
         G.mb=saves[G.slotId].mb||0;
         G.stationUnlocked=saves[G.slotId].stationUnlocked||false;
+        G.inventory=(saves[G.slotId].inventory||[]).slice();
+        G.kratGreeted=!!saves[G.slotId].kratGreeted;
+        G.itemTutorialShown=!!saves[G.slotId].itemTutorialShown;
+        // Migrate owned modules into inventory so they appear there
+        if(typeof MODULE_DEFS!=='undefined'){
+            for(const m of G.modules){
+                if(!G.inventory.some(it=>it && it.id===m)){
+                    const d=MODULE_DEFS[m];
+                    if(d) G.inventory.push({id:m,name:d.name,type:'module',desc:d.desc});
+                }
+            }
+        }
         // Apply class starting score bonus
         const cls=saves[G.slotId].playerClass;
         if(cls&&CLASS_DEFS[cls]) G.score+=CLASS_DEFS[cls].score;

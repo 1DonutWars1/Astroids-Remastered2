@@ -38,7 +38,7 @@ const STATION_NPCS=[
         lines:["This is the command center.","Your progress is saved when you dock.","Stay sharp out there, Fragment."]},
 ];
 const STATION_WIDTH=1800;
-const STATION_FLOORS=2; // 0=ground, 1=upper
+const STATION_FLOORS=3; // 0=ground, 1=upper, 2=docking bay (requires MODULE ACCESS key)
 
 function enterStation(){
     G.mode='station';
@@ -69,11 +69,16 @@ function enterStation(){
         s.gilbertUpgrades=Object.assign({},G.gilbertUpgrades);
         s.modules=G.modules.slice();s.equippedModules=G.equippedModules.slice();
         s.stationUnlocked=true;s.checkpoint=G.checkpoint||G.level;s.maxLvl=Math.max(s.maxLvl,G.level);
+        s.inventory=(G.inventory||[]).slice();
+        s.kratGreeted=!!G.kratGreeted;
+        s.itemTutorialShown=!!G.itemTutorialShown;
         saveToDisk();
     }
     canvas.width=900;W=900;
     Sound.playMusic('bgm');
     updateUI();
+    // Officer Krat auto-greet (first visit after rescue)
+    if(typeof checkKratGreeting==='function') checkKratGreeting();
 }
 function leaveStation(){
     G.mode='space';
@@ -100,6 +105,10 @@ function saveStation(){
     s.gilbertUpgrades=Object.assign({},G.gilbertUpgrades);
     s.modules=G.modules.slice();s.equippedModules=G.equippedModules.slice();
     s.stationUnlocked=true;s.checkpoint=G.level;s.maxLvl=Math.max(s.maxLvl||1,G.level);
+    // Persist inventory + flags
+    s.inventory=(G.inventory||[]).slice();
+    s.kratGreeted=!!G.kratGreeted;
+    s.itemTutorialShown=!!G.itemTutorialShown;
     // Persist level 6 progress
     if(G.level6){
         if(G.level6.bigShotUnlocked) s.bigShotUnlocked=true;
@@ -139,6 +148,8 @@ function buyModule(key){
     if(G.mb<def.cost) return;
     G.mb-=def.cost;G.modules.push(key);
     if(G.equippedModules.length<2) G.equippedModules.push(key);
+    // Also mirror the module into the inventory.
+    if(typeof awardModuleItem==='function') awardModuleItem(key,def.name,def.desc);
     Sound.powerup();saveStation();
 }
 
@@ -146,28 +157,39 @@ function updateStation(){
     if(!G.running||G.paused) return;
     const st=G.station;
     if(st.shopOpen) return;
+    if(G.inventoryOpen) return;
+    if(G.dockingBay && G.dockingBay.open){ if(typeof updateDockConsole==='function') updateDockConsole(); return; }
 
-    // Walking
+    // Walking (narrower world on floor 2 — docking bay)
+    const worldW = st.floor===2 ? (typeof DOCKING_BAY!=='undefined'?DOCKING_BAY.width:1600) : STATION_WIDTH;
     if(isAction('left')){st.playerVX-=0.5;st.playerFacing=-1;}
     if(isAction('right')){st.playerVX+=0.5;st.playerFacing=1;}
     st.playerVX*=0.85;
     st.playerX+=st.playerVX;
-    st.playerX=Math.max(30,Math.min(STATION_WIDTH-30,st.playerX));
+    st.playerX=Math.max(30,Math.min(worldW-30,st.playerX));
 
     // Camera follow
     const targetCam=st.playerX-W/2;
-    st.cameraX+=(Math.max(0,Math.min(STATION_WIDTH-W,targetCam))-st.cameraX)*0.1;
+    st.cameraX+=(Math.max(0,Math.min(worldW-W,targetCam))-st.cameraX)*0.1;
 
-    // NPC proximity (only on current floor)
+    // Interact targets
     st.interactTarget=null;
-    for(const npc of STATION_NPCS){
-        if(npc.floor===st.floor&&Math.abs(st.playerX-npc.x)<60){st.interactTarget=npc;break;}
+    if(st.floor===2){
+        // Docking bay: scanner console in middle + elevator on left
+        const cx=(typeof DOCKING_BAY!=='undefined')?DOCKING_BAY.consoleX:800;
+        if(Math.abs(st.playerX-cx)<80) st.interactTarget={id:'dockConsole',name:'SCANNER CONSOLE',role:'dockConsole'};
+        else if(st.playerX<120) st.interactTarget={id:'elevator',name:'ELEVATOR',role:'elevator'};
+    } else {
+        // NPC proximity (only on current floor)
+        for(const npc of STATION_NPCS){
+            if(npc.floor===st.floor&&Math.abs(st.playerX-npc.x)<60){st.interactTarget=npc;break;}
+        }
+        // Airlock proximity (floor 0 only, left side)
+        if(st.floor===0&&st.playerX<80) st.interactTarget={id:'airlock',name:'AIRLOCK',role:'airlock'};
+        // Elevator proximity (at x~1700 on floor 0, x~100 on floor 1)
+        const elevX=st.floor===0?STATION_WIDTH-100:100;
+        if(Math.abs(st.playerX-elevX)<50&&!st.interactTarget) st.interactTarget={id:'elevator',name:'ELEVATOR',role:'elevator'};
     }
-    // Airlock proximity (floor 0 only, left side)
-    if(st.floor===0&&st.playerX<80) st.interactTarget={id:'airlock',name:'AIRLOCK',role:'airlock'};
-    // Elevator proximity (at x~1700 on floor 0, x~100 on floor 1)
-    const elevX=st.floor===0?STATION_WIDTH-100:100;
-    if(Math.abs(st.playerX-elevX)<50&&!st.interactTarget) st.interactTarget={id:'elevator',name:'ELEVATOR',role:'elevator'};
 }
 
 function drawStation(){
@@ -175,6 +197,39 @@ function drawStation(){
     const st=G.station;
     const cx=st.cameraX;
     const flr=st.floor;
+    // Floor 2 uses the docking bay renderer (fully custom layout)
+    if(flr===2 && typeof drawDockingBay==='function'){
+        drawDockingBay();
+        drawStationPlayer(T);
+        // Draw MB currency readout on screen
+        ctx.fillStyle='rgba(5,5,15,0.78)';ctx.fillRect(W-130,10,120,40);
+        ctx.strokeStyle='rgba(255,215,0,0.25)';ctx.lineWidth=1;ctx.strokeRect(W-130,10,120,40);
+        ctx.font='bold 9px Courier New';ctx.textAlign='right';ctx.fillStyle='#554';
+        ctx.fillText('CURRENCY',W-18,27);
+        ctx.font='bold 18px Courier New';ctx.fillStyle='#ffdd00';
+        ctx.shadowBlur=8;ctx.shadowColor='rgba(255,215,0,0.3)';
+        ctx.fillText(G.mb+' MB',W-18,46);ctx.shadowBlur=0;
+        // Station dialogue (if still open when entering floor 2)
+        if(G.stationDialogue){
+            ctx.fillStyle='rgba(0,0,0,0.78)';
+            ctx.fillRect(20,H-110,W-40,100);
+            ctx.strokeStyle=G.stationDialogueColor||'#444';ctx.lineWidth=1.5;
+            ctx.strokeRect(20,H-110,W-40,100);
+            ctx.fillStyle=G.stationDialogueColor||'#fff';
+            ctx.font='bold 14px Courier New';ctx.textAlign='left';
+            ctx.fillText(G.stationDialogueName,40,H-88);
+            ctx.font='13px Courier New';ctx.fillStyle='#ddd';
+            ctx.fillText(G.stationDialogue,40,H-60);
+            ctx.font='10px Courier New';ctx.fillStyle='#555';ctx.textAlign='right';
+            ctx.fillText('[SPACE] Continue',W-40,H-20);
+        }
+        // Overlay for console/map/teleport
+        if(typeof drawDockConsoleOverlay==='function') drawDockConsoleOverlay();
+        // Inventory overlay
+        if(typeof drawInventoryOverlay==='function') drawInventoryOverlay();
+        if(typeof drawItemTutorialToast==='function') drawItemTutorialToast();
+        return;
+    }
     ctx.save();
 
     // === BACKGROUND — deep space visible through windows ===
@@ -415,19 +470,24 @@ function drawStation(){
     // Arrow indicator — animated when near
     const arrowY=nearElev?300+Math.sin(T/300)*5:300;
     ctx.fillStyle=elevCol;ctx.font='bold 18px Courier New';ctx.textAlign='center';
-    ctx.fillText(flr===0?'▲':'▼',elevX,arrowY);
-    // Floor indicator lights
-    ctx.fillStyle=flr===0?'#334':'#00ccff';ctx.beginPath();ctx.arc(elevX-15,ceilY+20,3,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle=flr===1?'#334':'#00ccff';ctx.beginPath();ctx.arc(elevX+15,ceilY+20,3,0,Math.PI*2);ctx.fill();
+    // Arrow direction: 0→1 up, 1→2 up (if key) else 1→0 down, 2→0 down
+    const _hasDockKey=(typeof hasItem==='function')&&hasItem('module_access');
+    const _arrowChar=(flr===0)?'▲':(flr===1?(_hasDockKey?'▲':'▼'):'▼');
+    ctx.fillText(_arrowChar,elevX,arrowY);
+    // Floor indicator lights (3 floors)
+    ctx.fillStyle=flr!==0?'#00ccff':'#334';ctx.beginPath();ctx.arc(elevX-18,ceilY+20,3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=flr!==1?'#00ccff':'#334';ctx.beginPath();ctx.arc(elevX,ceilY+20,3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=(flr!==2&&_hasDockKey)?'#00ccff':(_hasDockKey?'#334':'#331'); ctx.beginPath();ctx.arc(elevX+18,ceilY+20,3,0,Math.PI*2);ctx.fill();
     ctx.font='bold 7px Courier New';ctx.fillStyle='#334';
-    ctx.fillText('1',elevX-15,ceilY+30);ctx.fillText('2',elevX+15,ceilY+30);
+    ctx.fillText('1',elevX-18,ceilY+30);ctx.fillText('2',elevX,ceilY+30);ctx.fillText('3',elevX+18,ceilY+30);
     // Label
     ctx.font='bold 8px Courier New';ctx.fillStyle='#445';
     ctx.fillText('ELEVATOR',elevX,floorY-5);
     if(nearElev){
         ctx.font='bold 12px Courier New';ctx.fillStyle='#00ccff';
         ctx.shadowBlur=10;ctx.shadowColor='#00ccff';
-        ctx.fillText('[E] FLOOR '+(flr===0?'2':'1'),elevX,ceilY+3);ctx.shadowBlur=0;
+        const _nextLabel=(flr===0)?'2':(flr===1?(_hasDockKey?'3':'1'):'1');
+        ctx.fillText('[E] FLOOR '+_nextLabel,elevX,ceilY+3);ctx.shadowBlur=0;
     }
 
     // === SHOP STANDS ===
@@ -742,6 +802,10 @@ function drawStation(){
 
     // Shop overlay
     if(st.shopOpen) drawShop();
+
+    // Inventory / tutorial overlays
+    if(typeof drawItemTutorialToast==='function') drawItemTutorialToast();
+    if(typeof drawInventoryOverlay==='function') drawInventoryOverlay();
 
     // NPC dialogue overlay
     if(G.stationDialogue){
@@ -1146,5 +1210,81 @@ function advanceStationDialogue(){
     }
     G.stationDialogue=G.stationDialogueLines[G.stationDialogueIdx];
     return true;
+}
+
+// Standalone player hologram draw — used by docking bay (floor 2) which doesn't
+// go through the main station render path. Handles its own camera transform.
+function drawStationPlayer(T){
+    const st=G.station;
+    const floorY=500;
+    ctx.save();
+    ctx.translate(-st.cameraX,0);
+    ctx.save();ctx.translate(st.playerX,floorY-30);
+
+    // Projector beam
+    const beamG=ctx.createLinearGradient(0,22,0,-50);
+    beamG.addColorStop(0,'rgba(0,220,255,0.22)');
+    beamG.addColorStop(0.5,'rgba(0,180,255,0.08)');
+    beamG.addColorStop(1,'transparent');
+    ctx.fillStyle=beamG;
+    ctx.beginPath();
+    ctx.moveTo(-22,22);ctx.lineTo(22,22);ctx.lineTo(14,-46);ctx.lineTo(-14,-46);
+    ctx.closePath();ctx.fill();
+    // Ground disc
+    const discPulse=0.7+Math.sin(T/280)*0.3;
+    const discG=ctx.createRadialGradient(0,22,0,0,22,26);
+    discG.addColorStop(0,`rgba(0,240,255,${discPulse*0.55})`);
+    discG.addColorStop(0.6,`rgba(0,150,255,${discPulse*0.18})`);
+    discG.addColorStop(1,'transparent');
+    ctx.fillStyle=discG;
+    ctx.beginPath();ctx.ellipse(0,22,26,6,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=`rgba(0,240,255,${discPulse*0.8})`;ctx.lineWidth=1;
+    ctx.beginPath();ctx.ellipse(0,22,22,5,0,0,Math.PI*2);ctx.stroke();
+
+    const facing=st.playerFacing;
+    ctx.scale(facing,1);
+    const walking=Math.abs(st.playerVX)>0.3;
+    const walkPhase=walking?T/150:0;
+    const legSwing=Math.sin(walkPhase)*6;
+    const armSwing=Math.sin(walkPhase)*4;
+    const bodyBob=walking?Math.abs(Math.sin(walkPhase*2))*2:Math.sin(T/600)*0.8;
+    const idleFloat=walking?0:Math.sin(T/800)*1.5;
+    const totalBob=bodyBob+idleFloat;
+    const baseAlpha=(0.78+Math.sin(T/300)*0.08);
+
+    const drawFig=(off,col,alpha)=>{
+        ctx.save();ctx.translate(off,0);
+        ctx.globalAlpha=alpha;
+        ctx.shadowBlur=18;ctx.shadowColor=col;
+        ctx.fillStyle=col;
+        ctx.beginPath();ctx.arc(0,-28+totalBob,8,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,0.9)';
+        ctx.fillRect(2,-30+totalBob,5,3);
+        ctx.strokeStyle=col;ctx.lineWidth=1.5;
+        ctx.beginPath();ctx.moveTo(0,-36+totalBob);ctx.lineTo(0,-40+totalBob);ctx.stroke();
+        ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,-40+totalBob,1.6,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle=col;
+        ctx.beginPath();
+        ctx.moveTo(-7,-20+totalBob);ctx.lineTo(7,-20+totalBob);
+        ctx.lineTo(6,6+totalBob);ctx.lineTo(-6,6+totalBob);
+        ctx.closePath();ctx.fill();
+        ctx.save();ctx.translate(-8,-16+totalBob);ctx.rotate((-armSwing)*Math.PI/60);
+        ctx.fillRect(-2,0,4,14);ctx.restore();
+        ctx.save();ctx.translate(8,-16+totalBob);ctx.rotate((armSwing)*Math.PI/60);
+        ctx.fillRect(-2,0,4,14);ctx.restore();
+        ctx.save();ctx.translate(-3,6+totalBob);ctx.rotate((legSwing)*Math.PI/80);
+        ctx.fillRect(-2,0,4,14);ctx.fillRect(-3,13,5,3);ctx.restore();
+        ctx.save();ctx.translate(3,6+totalBob);ctx.rotate((-legSwing)*Math.PI/80);
+        ctx.fillRect(-2,0,4,14);ctx.fillRect(-3,13,5,3);ctx.restore();
+        ctx.shadowBlur=0;
+        ctx.restore();
+    };
+    drawFig(1,'rgba(255,80,140,0.55)',baseAlpha*0.65);
+    drawFig(-1,'rgba(0,220,255,0.65)',baseAlpha*0.75);
+    drawFig(0,'#00ddee',baseAlpha);
+
+    ctx.globalAlpha=1;ctx.shadowBlur=0;
+    ctx.restore(); // inner save (translate to player)
+    ctx.restore(); // outer save (camera translate)
 }
 

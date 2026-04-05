@@ -2,7 +2,7 @@
 //  UPDATE
 // ============================================================
 function update() {
-    if(!G.running||G.practicePaused||G.paused||G.fastTravelOpen) {
+    if(!G.running||G.practicePaused||G.paused||G.fastTravelOpen||G.inventoryOpen) {
         if(!G.practicePaused&&!G.paused){
             for(const a of asteroids){a.x+=a.dx;a.y+=a.dy;a.angle+=a.rot;
                 if(a.x<-a.r)a.x=W+a.r;if(a.x>W+a.r)a.x=-a.r;if(a.y<-a.r)a.y=H+a.r;if(a.y>H+a.r)a.y=-a.r;}
@@ -2503,6 +2503,9 @@ function draw() {
     }
 
     ctx.restore();
+    // Inventory / tutorial overlays (space mode — always on top, unaffected by shake)
+    if(typeof drawItemTutorialToast==='function') drawItemTutorialToast();
+    if(typeof drawInventoryOverlay==='function') drawInventoryOverlay();
 }
 
 // ============================================================
@@ -2519,6 +2522,29 @@ document.addEventListener('keydown', e => {
     keys[e.code]=true;
     // Prevent scroll on fire key
     if(settings.keybinds.fire.includes(e.code)) e.preventDefault();
+    // Tab toggles inventory (global, anywhere in game modes)
+    if(e.code==='Tab' && G.running && !G.paused && !G.stationCutscene
+        && !(G.dockingBay && G.dockingBay.open)
+        && !(G.station && G.station.shopOpen) && !G.stationDialogue){
+        e.preventDefault();
+        if(G.inventoryOpen){ if(typeof closeInventory==='function') closeInventory(); }
+        else { if(typeof openInventory==='function') openInventory(); }
+        return;
+    }
+    // When inventory is open, route keys to it
+    if(G.inventoryOpen){
+        if(e.code==='Escape'||e.code==='Tab'){e.preventDefault();if(typeof closeInventory==='function') closeInventory();return;}
+        const inv=G.inventory||[];
+        if(e.code==='ArrowUp'||e.code==='KeyW'){G.inventorySelection=Math.max(0,G.inventorySelection-1);try{Sound.ui();}catch(err){}return;}
+        if(e.code==='ArrowDown'||e.code==='KeyS'){G.inventorySelection=Math.min(inv.length-1,G.inventorySelection+1);try{Sound.ui();}catch(err){}return;}
+        if(e.code==='KeyZ'||e.code==='Enter'){if(typeof inventoryEquipSelected==='function') inventoryEquipSelected();return;}
+        return;
+    }
+    // When docking bay console is open, route keys
+    if(G.dockingBay && G.dockingBay.open){
+        if(typeof dockingBayKey==='function') dockingBayKey(e);
+        return;
+    }
 
     // Close fast travel menu with ESC (before pause toggle)
     if(e.code==='Escape'&&G.fastTravelOpen){G.fastTravelOpen=false;Sound.ui();return;}
@@ -2551,13 +2577,28 @@ document.addEventListener('keydown', e => {
                 }
                 Sound.ui();
             }
-        } else if(e.code==='KeyE'&&st.interactTarget){
+        } else if(e.code==='KeyE'&&st.interactTarget&&!e.repeat){
             if(st.interactTarget.id==='airlock'){leaveStation();Sound.ui();}
             else if(st.interactTarget.id==='elevator'){
-                st.floor=st.floor===0?1:0;
-                st.playerX=st.floor===0?STATION_WIDTH-100:100;
-                st.cameraX=Math.max(0,st.playerX-W/2);
-                st.interactTarget=null;Sound.ui();
+                // 3-floor cycle: 0 -> 1 -> 2 (if key) or 1 -> 0 (no key) -> 2 -> 0
+                const hasKey = (typeof hasItem==='function') && hasItem('module_access');
+                let next;
+                if(st.floor===0) next=1;
+                else if(st.floor===1) next=hasKey?2:0;
+                else next=0; // from floor 2 wrap back to 0
+                st.floor=next;
+                // Position player near the elevator on the new floor
+                if(next===0) st.playerX=STATION_WIDTH-100;
+                else if(next===1) st.playerX=100;
+                else st.playerX=160; // docking bay: a clear step right of the elevator
+                const worldW=(next===2&&typeof DOCKING_BAY!=='undefined')?DOCKING_BAY.width:STATION_WIDTH;
+                st.cameraX=Math.max(0,Math.min(worldW-W,st.playerX-W/2));
+                st.interactTarget=null;
+                // Defensive cleanup — make sure nothing stale blocks input on the new floor
+                st.playerVX=0;
+                if(G.dockingBay) G.dockingBay.open=false;
+                G.stationDialogue='';G.stationDialogueLines=[];G.stationDialogueIdx=0;
+                Sound.ui();
             }
             else if(st.interactTarget.role==='banker'){
                 // Convert score to MB
@@ -2570,6 +2611,8 @@ document.addEventListener('keydown', e => {
                 Sound.ui();
             }
             else if(st.interactTarget.lines){showStationDialogue(st.interactTarget);Sound.ui();}
+        } else if(e.code==='KeyZ'&&st.interactTarget&&st.interactTarget.id==='dockConsole'){
+            if(typeof openDockConsole==='function') openDockConsole();
         }
         if(e.code==='Escape'&&!st.shopOpen&&!G.stationDialogue){togglePause();return;}
         return;

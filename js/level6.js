@@ -561,6 +561,7 @@ function updateBattleBots(){
         for(let j=battleBots.length-1;j>=0;j--){
             const b=battleBots[j];
             if(b.team===bl.team) continue;
+            if(b.captor) continue; // captors are invulnerable until the rescue shockwave
             if(Math.hypot(b.x-bl.x,b.y-bl.y)<b.r+3){
                 b.hp-=(bl.damage||1);
                 const col=bl.gilbert?'#44ff66':(bl.team==='rouge'?'#ff6600':'#88ccff');
@@ -960,11 +961,12 @@ function updateLevel6(){
         }
     } else if(s.state==='battlefield'){
         updateBattlefield();
-        const killedEnough=(s.playerKillsInBattle||0)>=3;
-        // Battle can end EITHER when 60s is up OR player hits 3 kills (whichever comes first)
-        if(s.timer>60*60 || killedEnough){
+        // Battle runs for the full 60 seconds regardless of kills.
+        if(s.timer>60*60){
+            const killedEnough=(s.playerKillsInBattle||0)>=3;
             if(killedEnough){
-                // Player pulled their weight — Gilbert yells for help
+                // Player pulled their weight — Gilbert gets grabbed and taken off the field.
+                captureGilbertToTrappedArea();
                 s.state='gilbert_yell'; s.timer=0;
             } else {
                 // Timer ran out without 3 kills — alliance starts losing
@@ -1020,6 +1022,7 @@ function updateLevel6(){
         if(s.losingDialogueTimer>0) s.losingDialogueTimer--;
         // Player can still recover by killing 3 rouges
         if((s.playerKillsInBattle||0)>=3){
+            captureGilbertToTrappedArea();
             s.state='gilbert_yell'; s.timer=0;
         }
         // At 60s — retreat to space station
@@ -1061,61 +1064,17 @@ function updateLevel6(){
         const worldShipX=ship.x+s.camera.x, worldShipY=ship.y+s.camera.y;
         const dx=s.gilbertPos.x-worldShipX, dy=s.gilbertPos.y-worldShipY;
         const dist=Math.hypot(dx,dy);
-        if(dist<120){
+        if(dist<300){
             s.state='gilbert_found'; s.timer=0;
-            // Spawn 6 rouges that orbit Gilbert (captor circle)
-            for(let i=0;i<6;i++){
-                const a=(i/6)*Math.PI*2;
-                spawnBattleBot('rouge',s.gilbertPos.x+Math.cos(a)*90,s.gilbertPos.y+Math.sin(a)*90);
-                // Mark the last added bot as a Gilbert-captor
-                const bot=battleBots[battleBots.length-1];
-                bot.captor=true;
-                bot.orbitAngle=a;
-                bot.orbitRadius=90;
-            }
+            // Unlock the big shot so the player can charge and fire it to free Gilbert.
+            s.bigShotUnlocked=true;
+            // Captors were spawned when Gilbert was captured — they've been orbiting since.
         }
     } else if(s.state==='gilbert_found'){
         updateBattlefield();
-        G.invincibleTimer=60; // refreshed each frame
-        // Prompt: hold SPACE to charge
-        if(s.timer>60*2){
-            s.state='charging'; s.timer=0;
-            s.chargeHold=0;
-        }
-    } else if(s.state==='charging'){
-        updateBattlefield();
-        G.invincibleTimer=60; // can't die while charging
-        // Check if spacebar held. Use isAction('fire') as proxy
-        if(typeof isAction==='function' && isAction('fire')){
-            s.chargeHold++;
-            if(s.chargeHold>60*7){
-                // Ready to release
-                s.state='release_prompt'; s.timer=0;
-            }
-        } else if(s.chargeHold>60*2){
-            // Failed: released too early after holding a while — still OK, ask to re-hold
-            // Actually be lenient: reset
-            s.chargeHold=Math.max(0,s.chargeHold-30);
-        }
-        // Fail condition: 15 seconds elapsed without enough charge
-        if(s.timer>60*18 && s.chargeHold<60*7){
-            s.state='failed'; s.timer=0;
-        }
-    } else if(s.state==='release_prompt'){
-        updateBattlefield();
-        G.invincibleTimer=60;
-        // Now prompt release — wait for player to release
-        if(typeof isAction==='function' && !isAction('fire')){
-            s.state='released'; s.timer=0;
-            s.shockwaveRadius=0; s.shockwaveKilled={};
-            s.bigShotUnlocked=true;
-            s.shake=18;
-            if(typeof Sound!=='undefined' && Sound.explode) Sound.explode();
-        }
-        // Also fail if held too long past release window
-        if(s.timer>60*10){
-            s.state='failed'; s.timer=0;
-        }
+        G.invincibleTimer=60; // can't die while lining up the rescue shot
+        // Player must charge a big shot and hit Gilbert. The hit is detected in
+        // the player-bullet collision loop (updateBattlefield) and transitions to 'released'.
     } else if(s.state==='released'){
         updateBattlefield();
         G.invincibleTimer=60;
@@ -1137,6 +1096,29 @@ function updateLevel6(){
         }
         // Extended celebration (5s) for full animation
         if(s.timer>60*5){
+            // Rescue complete — Gilbert rejoins the fight as an autonomous alliance bot.
+            spawnBattleBot('alliance', s.gilbertPos.x, s.gilbertPos.y);
+            const gil=battleBots[battleBots.length-1];
+            gil.isGilbert=true;
+            gil.hp=999; gil.maxHp=999;
+            gil.r=16;
+            // Gilbert thanks the player + hands over the MODULE ACCESS key.
+            s.state='gilbert_thanks'; s.timer=0;
+            s.thanksLine="Heh, I guess I owe you somethin. After all you've saved me, TWICE!";
+            // Award the key (if not already owned) and trigger item tutorial
+            if(typeof awardKeyItem==='function') awardKeyItem('module_access','MODULE ACCESS','Grants elevator access to the Docking Bay (Floor 3).');
+        }
+    } else if(s.state==='gilbert_thanks'){
+        updateBattlefield();
+        G.invincibleTimer=60;
+        // 6-second beat then continue to regular post-rescue battle (or longer if player reads).
+        if(s.timer>60*6){
+            s.state='post_rescue_battle'; s.timer=0;
+        }
+    } else if(s.state==='post_rescue_battle'){
+        // Battle continues for 30 more seconds before the mission is declared won.
+        updateBattlefield();
+        if(s.timer>60*30){
             s.state='victory'; s.timer=0;
         }
     } else if(s.state==='victory'){
@@ -1180,6 +1162,29 @@ function updateLevel6(){
             G.shieldFuel=0; updateShieldUI();
             hurtPlayer(true);
         }
+    }
+}
+
+// Remove wandering Gilbert from the battlefield and plant a captor circle at gilbertPos.
+// Called when the 60s battle ends with 3+ player kills (or during losing_war recovery).
+function captureGilbertToTrappedArea(){
+    const s=G.level6;
+    // Remove the wandering Gilbert bot
+    for(let i=battleBots.length-1;i>=0;i--){
+        if(battleBots[i].isGilbert){
+            boom(battleBots[i].x,battleBots[i].y,'#44ff66',25);
+            battleBots.splice(i,1);
+            break;
+        }
+    }
+    // Spawn 6 captor rouges orbiting Gilbert at the trapped location
+    for(let i=0;i<6;i++){
+        const a=(i/6)*Math.PI*2;
+        spawnBattleBot('rouge',s.gilbertPos.x+Math.cos(a)*90,s.gilbertPos.y+Math.sin(a)*90);
+        const bot=battleBots[battleBots.length-1];
+        bot.captor=true;
+        bot.orbitAngle=a;
+        bot.orbitRadius=90;
     }
 }
 
@@ -1323,9 +1328,22 @@ function updateBattlefield(){
     for(let i=bullets.length-1;i>=0;i--){
         const b=bullets[i];
         const wx=b.x+s.camera.x, wy=b.y+s.camera.y;
+        // Big-shot rescue: during gilbert_found, a big shot that strikes Gilbert frees him.
+        if(b.big && s.state==='gilbert_found'){
+            const dg=Math.hypot(s.gilbertPos.x-wx, s.gilbertPos.y-wy);
+            if(dg<40){
+                bullets.splice(i,1);
+                s.state='released'; s.timer=0;
+                s.shockwaveRadius=0; s.shockwaveKilled={};
+                s.shake=18;
+                if(typeof Sound!=='undefined' && Sound.explode) Sound.explode();
+                continue;
+            }
+        }
         for(let j=battleBots.length-1;j>=0;j--){
             const bot=battleBots[j];
             if(bot.team==='alliance') continue; // only hit rouges
+            if(bot.captor) continue; // captors are invulnerable until the rescue shockwave
             if(Math.hypot(bot.x-wx,bot.y-wy)<bot.r+8){
                 const dmg=b.big?(b.damage||5):1;
                 bot.hp-=dmg;
@@ -1573,7 +1591,7 @@ function drawLevel6(){
     // BATTLEFIELD RENDERING
     if(s.state==='battlefield' || s.state==='gilbert_yell' ||
        s.state==='battlefield_hunt' || s.state==='gilbert_found' ||
-       s.state==='charging' || s.state==='release_prompt' || s.state==='released' ||
+       s.state==='released' || s.state==='gilbert_thanks' || s.state==='post_rescue_battle' ||
        s.state==='losing_war' || s.state==='retreat' ||
        s.state==='victory' || s.state==='failed'){
         drawBattlefield();
@@ -1606,9 +1624,9 @@ function drawBattlefield(){
     ctx.save();ctx.translate(-s.camera.x,-s.camera.y);
     for(const b of battleBots) drawBattleBot(b);
     for(const bl of battleBullets) drawBattleBullet(bl);
-    // Draw Gilbert marker if hunt phase or later
-    if(s.state==='battlefield_hunt' || s.state==='gilbert_found' ||
-       s.state==='charging' || s.state==='release_prompt' || s.state==='released'){
+    // Draw Gilbert marker once he's been captured and taken to the trapped area
+    if(s.state==='gilbert_yell' || s.state==='battlefield_hunt' || s.state==='gilbert_found' ||
+       s.state==='released'){
         const gp=s.gilbertPos;
         ctx.save();ctx.translate(gp.x,gp.y);
         // Large up-cast light beam (visible from far)
@@ -1692,6 +1710,15 @@ function drawBattlefield(){
         ctx.font='bold 18px Courier New';ctx.fillStyle='#fff';
         ctx.fillText('"HELP!! They\'ve got me cornered!"',bx+20,by+56);
         ctx.globalAlpha=1;
+    }
+
+    // Post-rescue battle timer (30s countdown to victory)
+    if(s.state==='post_rescue_battle'){
+        const remaining=Math.max(0,30-Math.floor(s.timer/60));
+        ctx.font='bold 16px Courier New';ctx.textAlign='center';ctx.fillStyle='#44ff66';
+        ctx.shadowBlur=12;ctx.shadowColor='#44ff44';
+        ctx.fillText(`FINISH THEM — ${remaining}s`,W/2,30);
+        ctx.shadowBlur=0;
     }
 
     // Battlefield timer (60s countdown in battlefield phase)
@@ -1811,43 +1838,36 @@ function drawBattlefield(){
         ctx.fillText('COLLAPSE IN — '+remaining+'s',W/2,114);
     }
 
-    // Charge prompt
+    // Gilbert thanks popup after rescue
+    if(s.state==='gilbert_thanks'){
+        const fade=Math.min(1,s.timer/20);
+        ctx.globalAlpha=fade;
+        const bx=60, by=H/2-70, bw=W-120, bh=110;
+        ctx.fillStyle='rgba(5,15,5,0.94)';ctx.fillRect(bx,by,bw,bh);
+        ctx.strokeStyle='#44ff44';ctx.lineWidth=2;ctx.strokeRect(bx+0.5,by+0.5,bw-1,bh-1);
+        ctx.font='bold 14px Courier New';ctx.textAlign='left';ctx.fillStyle='#44ff44';
+        ctx.shadowBlur=10;ctx.shadowColor='#44ff44';
+        ctx.fillText('GILBERT:',bx+20,by+30);
+        ctx.shadowBlur=0;
+        ctx.font='bold 17px Courier New';ctx.fillStyle='#fff';
+        ctx.fillText('"'+(s.thanksLine||'')+'"',bx+20,by+58);
+        // Key-awarded banner
+        ctx.font='bold 13px Courier New';ctx.fillStyle='#ffdd00';
+        ctx.shadowBlur=8;ctx.shadowColor='#ffdd00';
+        ctx.fillText('★ ITEM RECEIVED:  MODULE ACCESS  ★',bx+20,by+88);
+        ctx.shadowBlur=0;
+        ctx.font='11px Courier New';ctx.fillStyle='#888';
+        ctx.textAlign='right';
+        ctx.fillText('Press [TAB] to open your inventory',bx+bw-20,by+bh-8);
+        ctx.globalAlpha=1;
+    }
+    // Rescue prompt — charge a big shot and hit Gilbert with it to free him
     if(s.state==='gilbert_found'){
         const p=0.6+Math.sin(T/150)*0.4;
         ctx.globalAlpha=p;
         ctx.font='bold 22px Courier New';ctx.textAlign='center';ctx.fillStyle='#ffcc00';
         ctx.shadowBlur=20;ctx.shadowColor='#ffaa00';
-        ctx.fillText('HOLD [SPACE] TO CHARGE BIG SHOT',W/2,H-60);
-        ctx.shadowBlur=0;ctx.globalAlpha=1;
-    }
-    if(s.state==='charging'){
-        // Charge bar
-        const pct=Math.min(1,s.chargeHold/(60*7));
-        const bw=420, bh=28, bx=W/2-bw/2, by=H-70;
-        ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(bx,by,bw,bh);
-        ctx.strokeStyle='#ffcc00';ctx.lineWidth=2;ctx.strokeRect(bx,by,bw,bh);
-        const fg=ctx.createLinearGradient(bx,by,bx+bw,by);
-        fg.addColorStop(0,'#ff6600');fg.addColorStop(0.5,'#ffcc00');fg.addColorStop(1,'#ffff66');
-        ctx.fillStyle=fg;ctx.fillRect(bx+2,by+2,(bw-4)*pct,bh-4);
-        ctx.shadowBlur=12*pct;ctx.shadowColor='#ffcc00';
-        ctx.fillRect(bx+2,by+2,(bw-4)*pct,bh-4);
-        ctx.shadowBlur=0;
-        ctx.font='bold 13px Courier New';ctx.textAlign='center';ctx.fillStyle='#fff';
-        ctx.fillText(`CHARGING... ${Math.round(pct*100)}%  (HOLD SPACE)`,W/2,by-8);
-        // Pulse ship
-        const shipPulse=1+Math.sin(s.timer*0.5)*0.3*pct;
-        ctx.save();ctx.translate(ship.x,ship.y);ctx.scale(shipPulse,shipPulse);
-        ctx.globalAlpha=0.4*pct;
-        ctx.fillStyle='#ffcc00';ctx.beginPath();ctx.arc(0,0,40*pct,0,Math.PI*2);ctx.fill();
-        ctx.restore();
-        ctx.globalAlpha=1;
-    }
-    if(s.state==='release_prompt'){
-        const p=0.6+Math.sin(T/100)*0.4;
-        ctx.globalAlpha=p;
-        ctx.font='bold 28px Courier New';ctx.textAlign='center';ctx.fillStyle='#ffff66';
-        ctx.shadowBlur=30;ctx.shadowColor='#ffff00';
-        ctx.fillText('▶ RELEASE [SPACE] ◀',W/2,H-60);
+        ctx.fillText('HOLD [SPACE] TO CHARGE — HIT GILBERT WITH THE BIG SHOT',W/2,H-60);
         ctx.shadowBlur=0;ctx.globalAlpha=1;
     }
     if(s.state==='released'){
@@ -1977,7 +1997,8 @@ G.bigShotReady=false;
 function updateBigShot(){
     // Player holds space to charge big shot (only after unlocked + not during level 6)
     if(!G.level6 || !G.level6.bigShotUnlocked) return;
-    if(G.level6.state) return;  // only outside level 6
+    // Allow charging during the 'gilbert_found' rescue window, otherwise only outside level 6.
+    if(G.level6.state && G.level6.state!=='gilbert_found') return;
     if(!G.running || G.mode!=='space') return;
     // Hold for 2 seconds to charge
     if(typeof isAction==='function' && isAction('fire')){
@@ -2027,12 +2048,13 @@ function devSkipToBattlefield(){
 function devSkipToGilbertSave(){
     startLevel6();
     setupBattlefield();
+    captureGilbertToTrappedArea();
     G.level6.state='gilbert_yell'; G.level6.timer=60*2.9;
 }
 
 function drawBigShotUI(){
     if(!G.level6 || !G.level6.bigShotUnlocked) return;
-    if(G.level6.state) return;
+    if(G.level6.state && G.level6.state!=='gilbert_found') return;
     if(G.bigShotCharge<=0) return;
     const pct=Math.min(1,G.bigShotCharge/120);
     const bw=180, bh=10, bx=W/2-bw/2, by=H-45;

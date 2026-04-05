@@ -52,7 +52,17 @@ const G = {
     upgrades: {speed:0,agility:0,hull:0,ammoCap:0,reload:0},
     gilbertUpgrades: {fireRate:0,range:0,damage:0},
     modules: [], equippedModules: [], dashCooldown:0,
-    stationUnlocked: false
+    stationUnlocked: false,
+    // Inventory system (TAB to open, Z to use/equip)
+    inventory: [],           // [{id,name,type:'key'|'module',desc}, ...]
+    inventoryOpen: false,
+    inventorySelection: 0,
+    // Docking bay / scanner terminal state
+    dockingBay: { open:false, selection:0, terminalPhase:null, terminalText:[], terminalTimer:0,
+                   mapOpen:false, mapSelection:5, teleport:null },
+    // One-time flags
+    kratGreeted: false,
+    itemTutorialShown: false
 };
 
 let pSettings = { bulletSpeed: 8, ammo: 50, b1hp: 25, b2hp: 45, b3hp: 100 };
