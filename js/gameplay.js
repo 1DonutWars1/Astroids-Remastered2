@@ -33,6 +33,7 @@ function startGame() {
     G.gilbertShootTimer=0;
     G.gilbertQuip=''; G.gilbertQuipTimer=0;
     G.gilbertSeen={};
+    G.grimmSpawned=false; G.grimmDefeated=false;
     // Reset inventory UI state (data itself is restored from save below)
     G.inventoryOpen=false; G.inventorySelection=0;
     G.dataFragmentPopup=null;
@@ -310,6 +311,7 @@ function clearAll(){
     asteroids=[];bullets=[];miniBosses=[];enemyBullets=[];gasterBlasters=[];
     ammoBoxes=[];powerups=[];particles=[];shieldFlashes=[];
     G.cyborgScraps=[];
+    if(boss&&boss.type===6){boss.flamePillars=[];boss.batProjectiles=[];boss.fireTrail=[];}
 }
 function giveShield(){
     G.hasForceField=true;G.shieldFuel=getMaxShieldFuel();updateShieldUI();
@@ -418,7 +420,8 @@ function spawnBoss(type) {
     const isSans = (type===3||type===10);
     const diff=DIFFICULTY[currentDifficulty]||DIFFICULTY.normal;
     let hp;
-    if(type===5) hp=Math.round(10*diff.bossHp);
+    if(type===6) hp=Math.round(60*diff.bossHp);
+    else if(type===5) hp=Math.round(10*diff.bossHp);
     else if(type===4) hp=Math.round(30*diff.bossHp);
     else if(isSans) hp=G.practice?pSettings.b3hp:Math.round(100*diff.bossHp);
     else if(G.practice) hp=type===1?pSettings.b1hp:pSettings.b2hp;
@@ -448,6 +451,16 @@ function spawnBoss(type) {
                 verts,offsets,angle:Math.random()*Math.PI*2,rot:(Math.random()-0.5)*0.03});
         }
         boss.segmentsAlive=10;
+    } else if(type===6){
+        // --- NIGHTMARE KING GRIMM BOSS ---
+        boss={type:6,x:W/2,y:-80,r:40,hp,maxHp:hp,angle:Math.PI/2,dx:0,dy:2,
+            state:'enter',timer:0,phase2:false,phase3:false,
+            attackPattern:0, // cycles through attack patterns
+            teleportTimer:0, capeAngle:0,
+            flamePillars:[], batProjectiles:[], fireTrail:[],
+            ambientShootTimer:0, // constant pressure fireballs during target
+            rageMultiplier:1, // scales with missing HP
+            wallSide:null,wallTimer:0};
     } else {
         boss={type,x:W/2,y:-80,r:type===4?32:45,hp,maxHp:hp,angle:Math.PI/2,dx:0,dy:2,
             state:'enter',timer:0,phase2:false,
@@ -460,11 +473,13 @@ function spawnBoss(type) {
     else if(isSans){ Sound.playMusic('boss3'); G.checkpoint=G.level; }
     else if(type===4) Sound.playMusic('boss4');
     else if(type===5) Sound.playMusic('boss5');
+    else if(type===6) Sound.playMusic('grimm');
     Sound.bossWarn();
     // Gilbert intro for bosses
     if(window.DLC&&window.DLC.loaded){
         if(type===4) gilbertIntro('boss4',GILBERT_INTROS.boss4);
         if(type===5) gilbertIntro('boss5',GILBERT_INTROS.boss5);
+        if(type===6) gilbertIntro('boss6',GILBERT_INTROS.boss6);
         if(type===10) gilbertIntro('boss10',GILBERT_INTROS.boss10);
     }
 }

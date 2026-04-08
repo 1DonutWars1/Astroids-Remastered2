@@ -91,11 +91,18 @@ function update() {
             else if(G.level===4) spawnBoss(4);
             else if(G.level===5) spawnBoss(5);
             else if(G.level>=10) spawnBoss(10);
+            else if(G.level===7&&!G.grimmSpawned&&!G.grimmDefeated){ /* hold level 7 — Grimm incoming */ }
             else { G.level++;G.waveStart=performance.now();G.spawnTimer=0;asteroids=[];for(let k=0;k<8;k++)spawnAsteroid();updateUI(); }
         } else {
             // No DLC: 3 levels. Boss 1, Boss 2, Sans (boss 3).
             if(G.level<=3) spawnBoss(G.level);
         }
+    }
+
+    // GRIMM BOSS (optional) — spawns 60s into level 7 after rouge war, one-time encounter
+    if(window.DLC&&window.DLC.loaded&&!boss&&!G.noBoss&&!G.bossRush&&!_l6State&&G.level===7&&!G.grimmDefeated&&!G.grimmSpawned&&elapsed>60){
+        G.grimmSpawned=true;
+        spawnBoss(6);
     }
 
     // BOSS RUSH (DLC) — trigger 55s after boss 2 defeat
@@ -389,6 +396,421 @@ function update() {
             }
             else if(boss.state==='cooldown'){
                 if(boss.timer>90){boss.state='target';boss.timer=0;}
+            }
+        } else if(boss.type===6){
+            // --- NIGHTMARE KING GRIMM BOSS ---
+            // Rage multiplier — boss gets faster and meaner as HP drops
+            boss.rageMultiplier=1+(1-boss.hp/boss.maxHp)*0.5; // 1.0 at full → 1.5 at near-death
+            const rm=boss.rageMultiplier;
+            const grimmSpeed=(boss.phase3?3.5:boss.phase2?2.4:2.0)*rm;
+            const grimmFast=(boss.phase3?18:boss.phase2?14:13)*Math.min(rm,1.3);
+
+            // Fire resistance check — Grimm's Flame Charm gives 50% chance to resist fire hits
+            const _hasFlameCharm=(typeof hasItem==='function')&&hasItem('grimm_flame_charm');
+            function fireHurt(){
+                if(_hasFlameCharm&&Math.random()<0.5){
+                    // Resisted! Brief invincibility + visual feedback
+                    if(G.invincibleTimer<30) G.invincibleTimer=30;
+                    boom(ship.x,ship.y,'#ff8800',6);
+                    Sound.shieldSfx();
+                    return;
+                }
+                hurtPlayer();
+            }
+
+            // Update flame pillars
+            for(let fp=boss.flamePillars.length-1;fp>=0;fp--){
+                const p=boss.flamePillars[fp];
+                p.timer++;
+                if(p.timer>=130){boss.flamePillars.splice(fp,1);continue;}
+                if(p.timer>=40&&p.timer<100){
+                    if(Math.abs(ship.x-p.x)<22&&ship.y>p.y-p.h&&ship.y<p.y+10) fireHurt();
+                }
+            }
+            // Update bat projectiles (some can home in phase 3)
+            for(let bp=boss.batProjectiles.length-1;bp>=0;bp--){
+                const b=boss.batProjectiles[bp];
+                // Homing bats (phase 3) gently track player
+                if(b.homing){
+                    const toP=Math.atan2(ship.y-b.y,ship.x-b.x);
+                    const curA=Math.atan2(b.dy,b.dx);
+                    let diff2=toP-curA;while(diff2>Math.PI)diff2-=Math.PI*2;while(diff2<-Math.PI)diff2+=Math.PI*2;
+                    const turnRate=0.02;
+                    const newA=curA+Math.sign(diff2)*Math.min(Math.abs(diff2),turnRate);
+                    const spd=Math.hypot(b.dx,b.dy);
+                    b.dx=Math.cos(newA)*spd;b.dy=Math.sin(newA)*spd;
+                }
+                b.x+=b.dx;b.y+=b.dy;b.life--;
+                if(b.life<=0||b.x<-50||b.x>W+50||b.y<-50||b.y>H+50){boss.batProjectiles.splice(bp,1);continue;}
+                if(Math.hypot(ship.x-b.x,ship.y-b.y)<ship.r+8){fireHurt();boss.batProjectiles.splice(bp,1);continue;}
+            }
+            // Update fire trail (ground hazards left by movement)
+            for(let ft=boss.fireTrail.length-1;ft>=0;ft--){
+                const f=boss.fireTrail[ft];
+                f.life--;
+                if(f.life<=0){boss.fireTrail.splice(ft,1);continue;}
+                if(Math.hypot(ship.x-f.x,ship.y-f.y)<f.r+ship.r*0.5) fireHurt();
+            }
+
+            // --- Ambient pressure: boss shoots fireballs while targeting ---
+            if(boss.state==='target'){
+                boss.ambientShootTimer++;
+                const ambientRate=boss.phase3?25:boss.phase2?50:55;
+                if(boss.ambientShootTimer>=ambientRate){
+                    boss.ambientShootTimer=0;
+                    const toP=Math.atan2(ship.y-boss.y,ship.x-boss.x);
+                    boss.batProjectiles.push({x:boss.x,y:boss.y,dx:Math.cos(toP)*5,dy:Math.sin(toP)*5,life:90,homing:boss.phase3});
+                    Sound.hit();
+                }
+            }
+
+            if(boss.state==='target'){
+                boss.angle=Math.atan2(ship.y-boss.y,ship.x-boss.x);
+                boss.dx=Math.cos(boss.angle)*grimmSpeed;
+                boss.dy=Math.sin(boss.angle)*grimmSpeed;
+                // Phase 3: leave fire trail while moving
+                if(boss.phase3&&boss.timer%8===0){
+                    boss.fireTrail.push({x:boss.x,y:boss.y,r:10,life:120});
+                }
+                const nextAttack=boss.phase3?60:boss.phase2?110:120;
+                if(boss.timer>nextAttack){
+                    const attacks=boss.phase3?
+                        ['flame_pillars','bat_swarm','dive_telegraph','uppercut_telegraph','spiral_barrage','cape_dash_telegraph','pufferfish_telegraph','ground_pound_telegraph','bat_swarm','dive_telegraph','flame_trail_dash']:
+                        boss.phase2?
+                        ['flame_pillars','bat_swarm','dive_telegraph','cape_dash_telegraph','uppercut_telegraph','pufferfish_telegraph','spiral_barrage','ground_pound_telegraph','flame_pillars','bat_swarm','dive_telegraph']:
+                        ['flame_pillars','bat_swarm','dive_telegraph','cape_dash_telegraph','uppercut_telegraph','flame_pillars','bat_swarm','ground_pound_telegraph'];
+                    boss.state=attacks[boss.attackPattern%attacks.length];
+                    boss.attackPattern++;
+                    boss.timer=0;
+                }
+            }
+            else if(boss.state==='flame_pillars'){
+                boss.dx*=0.9;boss.dy*=0.9;
+                const spawnRate=boss.phase3?12:boss.phase2?20:22;
+                const duration=boss.phase3?100:boss.phase2?75:70;
+                if(boss.timer%spawnRate===0&&boss.timer<duration){
+                    const px=ship.x+(Math.random()-0.5)*(boss.phase3?80:boss.phase2?100:120);
+                    boss.flamePillars.push({x:px,y:H,h:H*(boss.phase3?0.85:0.7)+Math.random()*80,timer:0});
+                    // Phase 3 only: additional pillars at random positions
+                    if(boss.phase3&&boss.timer%(spawnRate*2)===0){
+                        boss.flamePillars.push({x:Math.random()*W,y:H,h:H*0.5,timer:0});
+                    }
+                    Sound.hit();
+                }
+                // Phase 3: boss dashes between pillar spawns
+                if(boss.phase3&&boss.timer===Math.floor(duration/2)){
+                    boom(boss.x,boss.y,'#ff2200',12);
+                    boss.x=ship.x>W/2?W*0.2:W*0.8;boss.y=150;
+                    boom(boss.x,boss.y,'#ff4400',10);
+                }
+                if(boss.timer>duration+30){boss.state='cooldown';boss.timer=0;}
+            }
+            else if(boss.state==='bat_swarm'){
+                if(boss.timer===1){
+                    boom(boss.x,boss.y,'#ff2200',20);
+                    boss.x=W*0.2+Math.random()*W*0.6;
+                    boss.y=60+Math.random()*100;
+                    boom(boss.x,boss.y,'#ff4400',15);
+                }
+                boss.dx=0;boss.dy=0;
+                const fireFrame=boss.phase3?15:boss.phase2?24:28;
+                const batCount=boss.phase3?12:boss.phase2?7:7;
+                if(boss.timer===fireFrame){
+                    const baseAngle=Math.atan2(ship.y-boss.y,ship.x-boss.x);
+                    const spread=boss.phase3?Math.PI*1.0:boss.phase2?Math.PI*0.7:Math.PI*0.6;
+                    for(let i=0;i<batCount;i++){
+                        const a=baseAngle-spread/2+spread*(i/(batCount-1));
+                        const spd=(boss.phase3?6.5:boss.phase2?5.0:4.5)*rm;
+                        boss.batProjectiles.push({x:boss.x,y:boss.y,dx:Math.cos(a)*spd,dy:Math.sin(a)*spd,life:120,homing:boss.phase3&&i%3===0});
+                    }
+                    Sound.blaster();
+                }
+                // Second wave
+                if((boss.phase2||boss.phase3)&&boss.timer===fireFrame+25){
+                    const baseAngle=Math.atan2(ship.y-boss.y,ship.x-boss.x);
+                    const cnt=boss.phase3?7:4;
+                    for(let i=0;i<cnt;i++){
+                        const a=baseAngle-Math.PI*0.4+Math.PI*0.8*(i/(cnt-1));
+                        boss.batProjectiles.push({x:boss.x,y:boss.y,dx:Math.cos(a)*6,dy:Math.sin(a)*6,life:100});
+                    }
+                    Sound.blaster();
+                }
+                // Phase 3: third wave from behind player
+                if(boss.phase3&&boss.timer===fireFrame+40){
+                    for(let i=0;i<5;i++){
+                        const sx=Math.random()*W,sy=Math.random()>0.5?-20:H+20;
+                        const a=Math.atan2(ship.y-sy,ship.x-sx);
+                        boss.batProjectiles.push({x:sx,y:sy,dx:Math.cos(a)*4.5,dy:Math.sin(a)*4.5,life:110,homing:true});
+                    }
+                    Sound.blaster();
+                }
+                if(boss.timer>(boss.phase3?65:boss.phase2?55:50)){boss.state='cooldown';boss.timer=0;}
+            }
+            else if(boss.state==='dive_telegraph'){
+                if(boss.timer===1){
+                    boom(boss.x,boss.y,'#ff2200',15);
+                    boss.x=ship.x;boss.y=30;
+                    boom(boss.x,boss.y,'#ff4400',10);
+                }
+                boss.dx=0;boss.dy=0;
+                boss.x+=((Math.random()-0.5)*8)*(boss.timer/35);
+                const teleDelay=boss.phase3?30:boss.phase2?42:45;
+                if(boss.timer>teleDelay){
+                    boss.state='dive';boss.timer=0;
+                    boss.dx=(ship.x-boss.x)*0.04;
+                    boss.dy=grimmFast;
+                }
+            }
+            else if(boss.state==='dive'){
+                if(boss.timer%3===0) boom(boss.x+(Math.random()-0.5)*15,boss.y-20,'#ff2200',4);
+                // Phase 3: scatter fireballs during dive
+                if(boss.phase3&&boss.timer%6===0){
+                    const a=Math.random()*Math.PI*2;
+                    boss.batProjectiles.push({x:boss.x,y:boss.y,dx:Math.cos(a)*3,dy:Math.sin(a)*3,life:70});
+                }
+                if(boss.y>H-40){
+                    boss.dy=-Math.abs(boss.dy)*0.3;boss.dx=0;
+                    shake(10,18);Sound.explode();
+                    // Shockwave pillars
+                    const pillarCount=boss.phase3?5:2;
+                    for(let i=0;i<pillarCount;i++){
+                        const offset=(i-Math.floor(pillarCount/2))*70;
+                        boss.flamePillars.push({x:boss.x+offset,y:H,h:H*(boss.phase3?0.6:0.4),timer:0});
+                    }
+                    // Phase 3: shockwave ring of bats
+                    if(boss.phase3){
+                        for(let i=0;i<8;i++){
+                            const a=(Math.PI*2/8)*i;
+                            boss.batProjectiles.push({x:boss.x,y:H-30,dx:Math.cos(a)*3.5,dy:Math.sin(a)*3.5,life:80});
+                        }
+                    }
+                    boss.state='cooldown';boss.timer=0;
+                }
+            }
+            else if(boss.state==='cape_dash_telegraph'){
+                if(boss.timer===1){
+                    boom(boss.x,boss.y,'#ff2200',15);
+                    boss.capeAngle=ship.x>W/2?0:Math.PI;
+                    boss.x=ship.x>W/2?-20:W+20;
+                    boss.y=ship.y;
+                    boom(boss.x,boss.y,'#ff4400',10);
+                }
+                boss.dx=0;boss.dy=0;
+                const tele=boss.phase3?22:boss.phase2?32:35;
+                if(boss.timer>tele){
+                    boss.state='cape_dash';boss.timer=0;
+                    boss.dx=Math.cos(boss.capeAngle)*grimmFast;
+                    boss.dy=(ship.y-boss.y)*0.025;
+                }
+            }
+            else if(boss.state==='cape_dash'){
+                if(boss.timer%2===0) boom(boss.x-(Math.sign(boss.dx)*25),boss.y,'#cc0000',3);
+                const trailRate=boss.phase3?4:8;
+                if(boss.timer%trailRate===0){
+                    const behind=boss.dx>0?boss.x-30:boss.x+30;
+                    boss.batProjectiles.push({x:behind,y:boss.y,dx:(Math.random()-0.5)*2,dy:2+Math.random()*3,life:80});
+                    if(boss.phase3) boss.batProjectiles.push({x:behind,y:boss.y,dx:(Math.random()-0.5)*2,dy:-2-Math.random()*3,life:80});
+                }
+                // Phase 3: leave fire trail on ground
+                if(boss.phase3&&boss.timer%4===0){
+                    boss.fireTrail.push({x:boss.x,y:boss.y,r:12,life:150});
+                }
+                if(boss.x<-60||boss.x>W+60||boss.timer>80){
+                    boom(boss.x,boss.y,'#ff2200',10);
+                    boss.x=W/2+(Math.random()-0.5)*200;boss.y=100;
+                    boss.dx=0;boss.dy=0;
+                    boom(boss.x,boss.y,'#ff4400',10);
+                    // Phase 3: immediately chain into another dash from opposite side
+                    if(boss.phase3&&boss.timer<=80){
+                        boss.state='cape_dash_telegraph';boss.timer=0;boss.attackPattern++; // skip to prevent infinite loop
+                    } else {
+                        boss.state='cooldown';boss.timer=0;
+                    }
+                }
+            }
+            else if(boss.state==='uppercut_telegraph'){
+                // NEW: Teleport below player, then slash upward with fire burst
+                if(boss.timer===1){
+                    boom(boss.x,boss.y,'#ff2200',15);
+                    boss.x=ship.x+(Math.random()-0.5)*60;
+                    boss.y=H-30;
+                    boom(boss.x,boss.y,'#ff4400',12);
+                }
+                boss.dx=0;boss.dy=0;
+                boss.y+=(Math.random()-0.5)*5;
+                const uDelay=boss.phase3?25:boss.phase2?36:40;
+                if(boss.timer>uDelay){
+                    boss.state='uppercut';boss.timer=0;
+                    boss.dx=(ship.x-boss.x)*0.03;
+                    boss.dy=-grimmFast*1.1;
+                }
+            }
+            else if(boss.state==='uppercut'){
+                // Rising slash — scatters fire in V pattern
+                if(boss.timer%3===0) boom(boss.x+(Math.random()-0.5)*10,boss.y+15,'#ff4400',4);
+                if(boss.timer%8===0){
+                    const spread=boss.phase3?3:2;
+                    for(let i=-spread;i<=spread;i++){
+                        boss.batProjectiles.push({x:boss.x,y:boss.y,dx:i*1.8,dy:2+Math.random()*2,life:90});
+                    }
+                    Sound.hit();
+                }
+                if(boss.y<-40||boss.timer>50){
+                    // Reappear at top
+                    boom(boss.x,boss.y,'#ff2200',12);
+                    boss.x=W*0.15+Math.random()*W*0.7;boss.y=60;
+                    boss.dx=0;boss.dy=0;
+                    boom(boss.x,boss.y,'#ff4400',10);
+                    boss.state='cooldown';boss.timer=0;
+                }
+            }
+            else if(boss.state==='spiral_barrage'){
+                // NEW: Phase 2+ — spin in place and emit spiral bullet pattern
+                boss.dx*=0.9;boss.dy*=0.9;
+                const spinSpeed=boss.phase3?0.18:0.10;
+                const fireRate=boss.phase3?3:6;
+                const bulletSpd=boss.phase3?5:3.5;
+                if(boss.timer%fireRate===0){
+                    const a=boss.timer*spinSpeed;
+                    boss.batProjectiles.push({x:boss.x,y:boss.y,dx:Math.cos(a)*bulletSpd,dy:Math.sin(a)*bulletSpd,life:120});
+                    // Double spiral
+                    boss.batProjectiles.push({x:boss.x,y:boss.y,dx:Math.cos(a+Math.PI)*bulletSpd,dy:Math.sin(a+Math.PI)*bulletSpd,life:120});
+                    if(boss.phase3){
+                        // Triple spiral
+                        boss.batProjectiles.push({x:boss.x,y:boss.y,dx:Math.cos(a+Math.PI*2/3)*bulletSpd,dy:Math.sin(a+Math.PI*2/3)*bulletSpd,life:120});
+                    }
+                }
+                const dur=boss.phase3?90:60;
+                if(boss.timer>dur){boss.state='cooldown';boss.timer=0;}
+            }
+            else if(boss.state==='ground_pound_telegraph'){
+                // NEW: Teleport to center-ish, hover, then slam creating AoE + tracking fire orbs
+                if(boss.timer===1){
+                    boom(boss.x,boss.y,'#ff2200',18);
+                    boss.x=W*0.3+Math.random()*W*0.4;boss.y=H*0.3;
+                    boom(boss.x,boss.y,'#ff4400',15);
+                }
+                boss.dx=0;boss.dy=0;
+                // Rise up slowly
+                boss.y-=0.8;
+                boss.x+=(Math.random()-0.5)*6;
+                const gpDelay=boss.phase3?30:boss.phase2?42:45;
+                if(boss.timer>gpDelay){boss.state='ground_pound';boss.timer=0;boss.dy=grimmFast*1.2;}
+            }
+            else if(boss.state==='ground_pound'){
+                if(boss.timer%2===0) boom(boss.x+(Math.random()-0.5)*20,boss.y-10,'#ff2200',5);
+                if(boss.y>H-50){
+                    boss.dy=0;boss.dx=0;boss.y=H-50;
+                    shake(15,25);Sound.explode();Sound.explode();
+                    // AoE shockwave — ring of flame pillars
+                    const pCount=boss.phase3?8:boss.phase2?4:4;
+                    for(let i=0;i<pCount;i++){
+                        const px=boss.x+(i-pCount/2)*90;
+                        if(px>10&&px<W-10) boss.flamePillars.push({x:px,y:H,h:H*0.55+Math.random()*60,timer:0});
+                    }
+                    // Tracking fire orbs — slow homing projectiles
+                    const orbCount=boss.phase3?6:boss.phase2?3:2;
+                    for(let i=0;i<orbCount;i++){
+                        const a=(Math.PI*2/orbCount)*i;
+                        boss.batProjectiles.push({x:boss.x,y:boss.y,dx:Math.cos(a)*2,dy:Math.sin(a)*2,life:180,homing:true});
+                    }
+                    // Phase 3: secondary explosion ring
+                    if(boss.phase3){
+                        for(let i=0;i<10;i++){
+                            const a=(Math.PI*2/10)*i+Math.PI/10;
+                            boss.batProjectiles.push({x:boss.x,y:boss.y,dx:Math.cos(a)*5,dy:Math.sin(a)*5,life:80});
+                        }
+                    }
+                    boss.state='cooldown';boss.timer=0;
+                }
+            }
+            else if(boss.state==='flame_trail_dash'){
+                // NEW: Phase 3 only — rapid zigzag dash leaving fire trail everywhere
+                if(boss.timer===1){
+                    boss._zigCount=0;boss._zigDir=ship.x>boss.x?1:-1;
+                }
+                // Zigzag movement
+                if(boss.timer%20===0&&boss._zigCount<5){
+                    boss._zigDir*=-1;boss._zigCount++;
+                    boss.dx=boss._zigDir*10;
+                    boss.dy=(ship.y-boss.y)*0.06+((Math.random()-0.5)*4);
+                    Sound.hit();
+                }
+                // Leave fire trail
+                if(boss.timer%3===0){
+                    boss.fireTrail.push({x:boss.x,y:boss.y,r:14,life:180});
+                    boom(boss.x,boss.y,'#ff2200',2);
+                }
+                // Bounce off walls
+                if(boss.x<boss.r){boss.x=boss.r;boss.dx=Math.abs(boss.dx);}
+                if(boss.x>W-boss.r){boss.x=W-boss.r;boss.dx=-Math.abs(boss.dx);}
+                if(boss.y<boss.r){boss.y=boss.r;boss.dy=Math.abs(boss.dy);}
+                if(boss.y>H-boss.r){boss.y=H-boss.r;boss.dy=-Math.abs(boss.dy);}
+                if(boss.timer>110){
+                    boss.dx*=0.1;boss.dy*=0.1;
+                    boss.state='cooldown';boss.timer=0;
+                }
+            }
+            else if(boss.state==='pufferfish_telegraph'){
+                if(boss.timer===1){
+                    boom(boss.x,boss.y,'#ff2200',20);
+                    boss.x=W/2;boss.y=H/2;
+                    boom(boss.x,boss.y,'#ff0000',25);
+                }
+                boss.dx=0;boss.dy=0;
+                boss.x+=(Math.random()-0.5)*5;boss.y+=(Math.random()-0.5)*5;
+                const pDelay=boss.phase3?35:45;
+                if(boss.timer>pDelay){boss.state='pufferfish';boss.timer=0;}
+            }
+            else if(boss.state==='pufferfish'){
+                boss.dx=0;boss.dy=0;
+                const ringFrames=boss.phase3?[1,14,28,42,56]:[1,20,40];
+                const count=boss.phase3?16:12;
+                for(const rf of ringFrames){
+                    if(boss.timer===rf){
+                        const offset=(rf/20)*Math.PI/count;
+                        for(let i=0;i<count;i++){
+                            const a=(Math.PI*2/count)*i+offset;
+                            const spd=boss.phase3?5:4;
+                            boss.batProjectiles.push({x:boss.x,y:boss.y,dx:Math.cos(a)*spd,dy:Math.sin(a)*spd,life:110});
+                        }
+                        Sound.blaster();shake(6,12);
+                    }
+                }
+                // Phase 3: also fire aimed shots between rings
+                if(boss.phase3&&boss.timer%10===5){
+                    const toP=Math.atan2(ship.y-boss.y,ship.x-boss.x);
+                    boss.batProjectiles.push({x:boss.x,y:boss.y,dx:Math.cos(toP)*6,dy:Math.sin(toP)*6,life:90,homing:true});
+                }
+                const pDur=boss.phase3?70:55;
+                if(boss.timer>pDur){boss.state='cooldown';boss.timer=0;}
+            }
+            else if(boss.state==='cooldown'){
+                boss.dx*=0.92;boss.dy*=0.92;
+                // Phase 3: even during cooldown, emit occasional fireballs
+                if(boss.phase3&&boss.timer%20===0){
+                    const a=Math.random()*Math.PI*2;
+                    boss.batProjectiles.push({x:boss.x,y:boss.y,dx:Math.cos(a)*3,dy:Math.sin(a)*3,life:70});
+                }
+                const cd=boss.phase3?30:boss.phase2?55:60;
+                if(boss.timer>cd){boss.state='target';boss.timer=0;boss.ambientShootTimer=0;}
+            }
+
+            // Phase 2 trigger at 50% HP
+            if(!boss.phase2&&boss.hp<=boss.maxHp*0.5){
+                boss.phase2=true;
+                boom(boss.x,boss.y,'#ff0000',40);boom(boss.x,boss.y,'#ffcc00',30);
+                shake(12,25);Sound.explode();
+                boss.batProjectiles=[];boss.flamePillars=[];boss.fireTrail=[];
+                boss.state='target';boss.timer=0;
+            }
+            // Phase 3 trigger at 25% HP — true nightmare mode
+            if(!boss.phase3&&boss.hp<=boss.maxHp*0.25){
+                boss.phase3=true;
+                boom(boss.x,boss.y,'#ff0000',60);boom(boss.x,boss.y,'#ff4400',50);boom(boss.x,boss.y,'#ffcc00',40);
+                shake(18,35);Sound.explode();Sound.explode();
+                boss.batProjectiles=[];boss.flamePillars=[];boss.fireTrail=[];
+                boss.state='target';boss.timer=0;
             }
         } else if(boss.type===5){
             // --- SNAKE BOSS (DLC Level 5) ---
@@ -706,8 +1128,8 @@ function update() {
                 if(boss.hp<=0){
                     boom(boss.x,boss.y,'orange',50);shake(12,25);Sound.explode();
                     const isSansBoss=(boss.type===3||boss.type===10);
-                    addScore(boss.type===1?1500:boss.type===2?3000:boss.type===4?2500:(isSansBoss?6000:2000));
-                    G.mb+=(boss.type===1?15:boss.type===2?30:boss.type===4?25:(isSansBoss?50:20));
+                    addScore(boss.type===6?5000:boss.type===1?1500:boss.type===2?3000:boss.type===4?2500:(isSansBoss?6000:2000));
+                    G.mb+=(boss.type===6?40:boss.type===1?15:boss.type===2?30:boss.type===4?25:(isSansBoss?50:20));
                     // Boss defeat achievements
                     if(boss.type===1){unlockAch('boss_slayer');}
                     if(boss.type===2){unlockAch('survivor');}
@@ -741,6 +1163,27 @@ function update() {
                             boss=null;G.level++;G.waveStart=performance.now();G.spawnTimer=0;
                             asteroids=[];for(let k=0;k<8;k++)spawnAsteroid();updateUI();break;
                         } else { boss=null;winGame();return; }
+                    } else if(boss.type===6){
+                        // Grimm defeated — optional boss, no level advance, just continue
+                        G.grimmDefeated=true;
+                        boom(boss.x,boss.y,'#ff0000',60);boom(boss.x,boss.y,'#ff4400',40);boom(boss.x,boss.y,'#ffcc00',30);
+                        // Clean up Grimm projectiles
+                        boss.flamePillars=[];boss.batProjectiles=[];boss.fireTrail=[];
+                        // --- REWARDS ---
+                        // Achievement
+                        unlockAch('dlc_nightmares_end');
+                        // Bonus MB
+                        G.mb+=200;
+                        // Key item trophy
+                        if(typeof awardKeyItem==='function'){
+                            awardKeyItem('grimm_flame_charm','GRIMM\'S FLAME CHARM','A smoldering crimson charm torn from the Nightmare King. Grants 50% resistance to fire damage.');
+                        }
+                        // Gilbert celebrates
+                        if(typeof gilbertQuip==='function'){
+                            gilbertQuip("YOU DID IT! That thing is TOAST! I can't believe we survived that...");
+                        }
+                        boss=null;G.waveStart=performance.now();G.spawnTimer=0;
+                        updateUI();break;
                     } else if(boss.type===4){
                         // Cyborg defeated — clear wall, continue
                         if(window.DLC&&window.DLC.loaded)unlockAch('dlc_short_circuit');
@@ -783,11 +1226,14 @@ function draw() {
     if(G.shakeTimer>0) ctx.translate((Math.random()-0.5)*G.shakeIntensity,(Math.random()-0.5)*G.shakeIntensity);
     const T=performance.now();
     const isP2=boss&&(boss.type===3||boss.type===10)&&boss.phase2;
+    const isGrimm=boss&&boss.type===6;
 
     // --- BACKGROUND ---
     // Deep space gradient with layered depth
     const bgGrad=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,W*0.9);
-    if(isP2){bgGrad.addColorStop(0,'#1a0028');bgGrad.addColorStop(0.4,'#0d0015');bgGrad.addColorStop(1,'#030003');}
+    if(isGrimm&&boss.phase3){bgGrad.addColorStop(0,'#2a0c04');bgGrad.addColorStop(0.4,'#140602');bgGrad.addColorStop(1,'#060201');}
+    else if(isGrimm){bgGrad.addColorStop(0,'#1a0808');bgGrad.addColorStop(0.4,'#0d0404');bgGrad.addColorStop(1,'#030101');}
+    else if(isP2){bgGrad.addColorStop(0,'#1a0028');bgGrad.addColorStop(0.4,'#0d0015');bgGrad.addColorStop(1,'#030003');}
     else{bgGrad.addColorStop(0,'#080c18');bgGrad.addColorStop(0.3,'#040810');bgGrad.addColorStop(0.7,'#020408');bgGrad.addColorStop(1,'#010103');}
     ctx.fillStyle=bgGrad;ctx.fillRect(-10,-10,W+20,H+20);
 
@@ -796,9 +1242,9 @@ function draw() {
         const nx=W*(0.08+i*0.15)+Math.sin(T/10000+i*1.7)*80;
         const ny=H*(0.12+i*0.14)+Math.cos(T/8000+i*2.3)*55;
         const nr=150+i*40+Math.sin(T/12000+i)*30;
-        ctx.globalAlpha=isP2?0.08:0.055;
+        ctx.globalAlpha=isGrimm?0.09:isP2?0.08:0.055;
         const ng=ctx.createRadialGradient(nx,ny,0,nx,ny,nr);
-        const nebColors=isP2?['#ff00ff','#cc00aa','#ff4488','#aa00ff','#ff0066','#dd22bb']:['#2266dd','#0088ee','#4466ff','#3355dd','#2244bb','#1144aa','#5500cc'];
+        const nebColors=isGrimm?['#ff2200','#cc1100','#ff4400','#aa0000','#ff0033','#dd2200']:isP2?['#ff00ff','#cc00aa','#ff4488','#aa00ff','#ff0066','#dd22bb']:['#2266dd','#0088ee','#4466ff','#3355dd','#2244bb','#1144aa','#5500cc'];
         ng.addColorStop(0,nebColors[i%nebColors.length]);ng.addColorStop(0.4,nebColors[(i+2)%nebColors.length]+'66');ng.addColorStop(0.75,nebColors[(i+3)%nebColors.length]+'22');ng.addColorStop(1,'transparent');
         ctx.fillStyle=ng;ctx.fillRect(0,0,W,H);
     }
@@ -824,7 +1270,7 @@ function draw() {
     ctx.globalAlpha=1;
 
     // Stars with color variety, twinkle, and depth layers
-    const starColors=isP2?['#ff88cc','#ff44aa','#ffaadd','#cc44ff','#ff66ee']:['#ffffff','#aaccff','#ffeecc','#88aaff','#ccddff','#ffccee'];
+    const starColors=isGrimm?['#ff8866','#ff4422','#ffaa88','#ff6644','#ffccaa']:isP2?['#ff88cc','#ff44aa','#ffaadd','#cc44ff','#ff66ee']:['#ffffff','#aaccff','#ffeecc','#88aaff','#ccddff','#ffccee'];
     for(const s of stars){
         const twinkle=Math.sin(T/600+s.x*3+s.y)*0.35+Math.sin(T/900+s.y*2)*0.15;
         ctx.globalAlpha=Math.max(0.05,s.alpha+twinkle);
@@ -1709,6 +2155,299 @@ function draw() {
                 ctx.lineTo(-boss.r*0.7,boss.r*0.3);ctx.closePath();ctx.fill();
                 ctx.globalAlpha=1;
             }
+        } else if(boss.type===6){
+            // === NIGHTMARE KING GRIMM — Red flame moth/bat entity ===
+            const isDive=boss.state==='dive';
+            const isDash=boss.state==='cape_dash'||boss.state==='flame_trail_dash';
+            const isPuffer=boss.state==='pufferfish';
+            const isUppercut=boss.state==='uppercut';
+            const isSpiral=boss.state==='spiral_barrage';
+            const isTele=boss.state==='dive_telegraph'||boss.state==='cape_dash_telegraph'||boss.state==='pufferfish_telegraph'||boss.state==='uppercut_telegraph'||boss.state==='ground_pound_telegraph';
+            const grimmP2=boss.phase2;
+            const grimmP3=boss.phase3;
+            const gPulse=0.6+Math.sin(T/(grimmP3?80:120))*0.4;
+
+            // --- Flame aura (intensifies in phase 2/3) ---
+            ctx.globalAlpha=grimmP3?0.18:grimmP2?0.12:0.07;
+            for(let fr=boss.r+5;fr<boss.r+(grimmP3?65:grimmP2?50:35);fr+=6){
+                const fWave=fr+Math.sin(T/150+fr*0.3)*6+Math.cos(T/120+fr*0.5)*4;
+                ctx.strokeStyle=grimmP3?'#ffaa00':grimmP2?'#ff2200':'#cc1100';ctx.lineWidth=1.5;
+                ctx.beginPath();ctx.arc(0,0,fWave,0,Math.PI*2);ctx.stroke();
+            }
+            const auraR=boss.r+(grimmP3?65:grimmP2?50:35);
+            const grimmAura=ctx.createRadialGradient(0,0,boss.r*0.2,0,0,auraR);
+            grimmAura.addColorStop(0,grimmP3?'rgba(255,100,0,0.3)':grimmP2?'rgba(255,50,0,0.2)':'rgba(200,0,0,0.12)');
+            grimmAura.addColorStop(0.5,grimmP3?'rgba(255,50,0,0.15)':grimmP2?'rgba(255,0,0,0.1)':'rgba(150,0,0,0.06)');
+            grimmAura.addColorStop(1,'transparent');
+            ctx.fillStyle=grimmAura;ctx.beginPath();ctx.arc(0,0,auraR,0,Math.PI*2);ctx.fill();
+            ctx.globalAlpha=1;
+
+            // --- Cape / Wings (drawn behind body) ---
+            ctx.save();
+            const capeSpread=isDash?0.2:(isPuffer?1.2:(isSpiral?0.9+Math.sin(T/60)*0.2:(isTele?0.4:0.7+Math.sin(T/300)*0.15)));
+            ctx.shadowBlur=grimmP3?40:grimmP2?30:18;ctx.shadowColor=grimmP3?'#ff4400':grimmP2?'#ff2200':'#990000';
+            // Left wing
+            ctx.fillStyle=grimmP3?'#3a0500':grimmP2?'#2a0000':'#1a0000';ctx.strokeStyle=grimmP3?'#ff6600':grimmP2?'#ff3300':'#cc1100';ctx.lineWidth=grimmP3?2.5:2;
+            ctx.beginPath();
+            ctx.moveTo(-5,0);
+            ctx.quadraticCurveTo(-boss.r*0.8*capeSpread,-boss.r*0.6,  -boss.r*1.4*capeSpread,-boss.r*0.2);
+            ctx.quadraticCurveTo(-boss.r*1.6*capeSpread,boss.r*0.3,  -boss.r*1.2*capeSpread,boss.r*0.9);
+            ctx.quadraticCurveTo(-boss.r*0.8*capeSpread,boss.r*1.1,  -boss.r*0.3,boss.r*0.7);
+            ctx.lineTo(-5,boss.r*0.3);
+            ctx.closePath();ctx.fill();ctx.stroke();
+            // Wing membrane veins
+            ctx.strokeStyle=grimmP3?'rgba(255,120,0,0.35)':grimmP2?'rgba(255,80,0,0.25)':'rgba(200,30,0,0.15)';ctx.lineWidth=grimmP3?1.5:1;
+            ctx.beginPath();ctx.moveTo(-8,0);ctx.lineTo(-boss.r*1.1*capeSpread,-boss.r*0.1);ctx.stroke();
+            ctx.beginPath();ctx.moveTo(-8,boss.r*0.1);ctx.lineTo(-boss.r*capeSpread,boss.r*0.5);ctx.stroke();
+            ctx.beginPath();ctx.moveTo(-6,boss.r*0.2);ctx.lineTo(-boss.r*0.7*capeSpread,boss.r*0.8);ctx.stroke();
+            // Phase 3: wing edge flame particles
+            if(grimmP3&&Math.random()<0.3){
+                ctx.fillStyle='#ff6600';ctx.globalAlpha=0.5;
+                ctx.beginPath();ctx.arc(-boss.r*capeSpread+(Math.random()-0.5)*10,boss.r*0.3+(Math.random()-0.5)*20,2+Math.random()*2,0,Math.PI*2);ctx.fill();
+                ctx.globalAlpha=1;
+            }
+            // Right wing
+            ctx.fillStyle=grimmP3?'#3a0500':grimmP2?'#2a0000':'#1a0000';ctx.strokeStyle=grimmP3?'#ff6600':grimmP2?'#ff3300':'#cc1100';ctx.lineWidth=grimmP3?2.5:2;
+            ctx.beginPath();
+            ctx.moveTo(5,0);
+            ctx.quadraticCurveTo(boss.r*0.8*capeSpread,-boss.r*0.6,  boss.r*1.4*capeSpread,-boss.r*0.2);
+            ctx.quadraticCurveTo(boss.r*1.6*capeSpread,boss.r*0.3,  boss.r*1.2*capeSpread,boss.r*0.9);
+            ctx.quadraticCurveTo(boss.r*0.8*capeSpread,boss.r*1.1,  boss.r*0.3,boss.r*0.7);
+            ctx.lineTo(5,boss.r*0.3);
+            ctx.closePath();ctx.fill();ctx.stroke();
+            // Right wing veins
+            ctx.strokeStyle=grimmP3?'rgba(255,120,0,0.35)':grimmP2?'rgba(255,80,0,0.25)':'rgba(200,30,0,0.15)';ctx.lineWidth=grimmP3?1.5:1;
+            ctx.beginPath();ctx.moveTo(8,0);ctx.lineTo(boss.r*1.1*capeSpread,-boss.r*0.1);ctx.stroke();
+            ctx.beginPath();ctx.moveTo(8,boss.r*0.1);ctx.lineTo(boss.r*capeSpread,boss.r*0.5);ctx.stroke();
+            ctx.beginPath();ctx.moveTo(6,boss.r*0.2);ctx.lineTo(boss.r*0.7*capeSpread,boss.r*0.8);ctx.stroke();
+            ctx.shadowBlur=0;
+            ctx.restore();
+
+            // --- Body (central tall form) ---
+            ctx.shadowBlur=grimmP3?35:25;ctx.shadowColor=grimmP3?'#ff4400':grimmP2?'#ff2200':'#aa0000';
+            const bodyG=ctx.createRadialGradient(0,-boss.r*0.1,0,0,0,boss.r*0.7);
+            bodyG.addColorStop(0,grimmP3?'#4a0a0a':grimmP2?'#3a0808':'#2a0505');bodyG.addColorStop(0.6,grimmP3?'#280404':grimmP2?'#1e0303':'#150202');bodyG.addColorStop(1,grimmP3?'#140101':grimmP2?'#0c0101':'#080000');
+            ctx.fillStyle=bodyG;ctx.strokeStyle=grimmP3?'#ff4400':grimmP2?'#ff2200':'#cc0000';ctx.lineWidth=grimmP3?3:2.5;
+            ctx.beginPath();
+            // Horned crown top
+            ctx.moveTo(0,-boss.r*1.2);
+            ctx.lineTo(-boss.r*0.15,-boss.r*0.7);
+            ctx.lineTo(-boss.r*0.35,-boss.r*1.05); // left horn
+            ctx.lineTo(-boss.r*0.25,-boss.r*0.5);
+            ctx.lineTo(-boss.r*0.45,-boss.r*0.6); // outer left horn
+            ctx.lineTo(-boss.r*0.3,-boss.r*0.2);
+            // Body sides
+            ctx.lineTo(-boss.r*0.4,0);
+            ctx.lineTo(-boss.r*0.35,boss.r*0.4);
+            ctx.lineTo(-boss.r*0.15,boss.r*0.7);
+            // Bottom cloak
+            ctx.lineTo(0,boss.r*0.8);
+            ctx.lineTo(boss.r*0.15,boss.r*0.7);
+            ctx.lineTo(boss.r*0.35,boss.r*0.4);
+            ctx.lineTo(boss.r*0.4,0);
+            // Right horns
+            ctx.lineTo(boss.r*0.3,-boss.r*0.2);
+            ctx.lineTo(boss.r*0.45,-boss.r*0.6); // outer right horn
+            ctx.lineTo(boss.r*0.25,-boss.r*0.5);
+            ctx.lineTo(boss.r*0.35,-boss.r*1.05); // right horn
+            ctx.lineTo(boss.r*0.15,-boss.r*0.7);
+            ctx.closePath();ctx.fill();ctx.stroke();
+            ctx.shadowBlur=0;
+
+            // --- Horn flame tips ---
+            const flameFlicker=Math.sin(T/(grimmP3?40:60))*3;
+            const hornSize=grimmP3?6:4;
+            ctx.fillStyle=grimmP3?'#ffaa00':grimmP2?'#ff6600':'#ff2200';ctx.shadowBlur=grimmP3?25:15;ctx.shadowColor=grimmP3?'#ffcc00':'#ff4400';
+            // Left outer horn flame
+            ctx.beginPath();ctx.arc(-boss.r*0.45,-boss.r*0.6+flameFlicker,hornSize+gPulse*2,0,Math.PI*2);ctx.fill();
+            // Right outer horn flame
+            ctx.beginPath();ctx.arc(boss.r*0.45,-boss.r*0.6+flameFlicker,hornSize+gPulse*2,0,Math.PI*2);ctx.fill();
+            // Center horn flame (larger)
+            ctx.fillStyle=grimmP3?'#ffffff':grimmP2?'#ffcc00':'#ff4400';
+            ctx.beginPath();ctx.arc(0,-boss.r*1.2+flameFlicker,(grimmP3?8:5)+gPulse*2,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,-boss.r*1.2+flameFlicker,grimmP3?3:2,0,Math.PI*2);ctx.fill();
+            // Phase 3: flame drips from horns
+            if(grimmP3&&Math.random()<0.4){
+                ctx.fillStyle='#ff4400';ctx.globalAlpha=0.6;
+                const hx=(Math.random()>0.5?-1:1)*boss.r*0.45;
+                ctx.beginPath();ctx.arc(hx+(Math.random()-0.5)*6,-boss.r*0.6+Math.random()*20,1.5+Math.random(),0,Math.PI*2);ctx.fill();
+                ctx.globalAlpha=1;
+            }
+            ctx.shadowBlur=0;
+
+            // --- Chest emblem (scarlet flame symbol) ---
+            ctx.strokeStyle=grimmP2?`rgba(255,100,0,${gPulse})`:`rgba(255,30,0,${gPulse*0.7})`;ctx.lineWidth=2;
+            ctx.shadowBlur=10;ctx.shadowColor=grimmP2?'#ff4400':'#cc0000';
+            ctx.beginPath();
+            ctx.moveTo(0,-boss.r*0.15);
+            ctx.quadraticCurveTo(-12,boss.r*0.05,-8,boss.r*0.25);
+            ctx.quadraticCurveTo(0,boss.r*0.4,8,boss.r*0.25);
+            ctx.quadraticCurveTo(12,boss.r*0.05,0,-boss.r*0.15);
+            ctx.stroke();
+            // Inner flame core
+            ctx.fillStyle=grimmP2?`rgba(255,80,0,${gPulse*0.5})`:`rgba(200,0,0,${gPulse*0.3})`;
+            ctx.fill();
+            ctx.shadowBlur=0;
+
+            // --- Eyes (fierce glowing red) ---
+            // Eye sockets
+            ctx.fillStyle='#000';
+            ctx.beginPath();ctx.ellipse(-10,-boss.r*0.35,7,9,0,0,Math.PI*2);ctx.fill();
+            ctx.beginPath();ctx.ellipse(10,-boss.r*0.35,7,9,0,0,Math.PI*2);ctx.fill();
+            // Glowing eyes — multi-layered fire
+            const eyeInt=grimmP3?(0.8+Math.sin(T/25)*0.2):grimmP2?(0.7+Math.sin(T/40)*0.3):(0.5+Math.sin(T/80)*0.5);
+            ctx.shadowBlur=grimmP3?35:grimmP2?25:15;ctx.shadowColor=grimmP3?'#ffaa00':grimmP2?'#ff4400':'#ff0000';
+            ctx.fillStyle=grimmP3?`rgba(255,100,0,${eyeInt})`:`rgba(255,0,0,${eyeInt})`;
+            ctx.beginPath();ctx.ellipse(-10,-boss.r*0.35,4+eyeInt,6+eyeInt,0,0,Math.PI*2);ctx.fill();
+            ctx.beginPath();ctx.ellipse(10,-boss.r*0.35,4+eyeInt,6+eyeInt,0,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle=grimmP3?'#ffcc00':grimmP2?'#ffaa00':'#ff4400';
+            ctx.beginPath();ctx.ellipse(-10,-boss.r*0.35,2.5,4,0,0,Math.PI*2);ctx.fill();
+            ctx.beginPath();ctx.ellipse(10,-boss.r*0.35,2.5,4,0,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle='#fff';
+            ctx.beginPath();ctx.arc(-10,-boss.r*0.35,1.5,0,Math.PI*2);ctx.fill();
+            ctx.beginPath();ctx.arc(10,-boss.r*0.35,1.5,0,Math.PI*2);ctx.fill();
+            ctx.shadowBlur=0;
+
+            // --- Dive/dash trail effects ---
+            if(isDive){
+                ctx.globalAlpha=grimmP3?0.25:0.15;ctx.fillStyle=grimmP3?'#ff4400':'#ff2200';
+                ctx.beginPath();ctx.moveTo(-boss.r*0.3,-boss.r*1.5);ctx.lineTo(boss.r*0.3,-boss.r*1.5);ctx.lineTo(0,-boss.r*0.5);ctx.closePath();ctx.fill();
+                ctx.globalAlpha=1;
+            }
+            if(isDash){
+                ctx.globalAlpha=grimmP3?0.2:0.12;ctx.fillStyle=grimmP3?'#ff4400':'#ff0000';
+                const trail=boss.dx>0?-1:1;
+                ctx.beginPath();ctx.moveTo(trail*boss.r*1.5,0);ctx.lineTo(trail*boss.r*0.5,-boss.r*0.4);ctx.lineTo(trail*boss.r*0.5,boss.r*0.4);ctx.closePath();ctx.fill();
+                ctx.globalAlpha=1;
+            }
+            // Uppercut rising trail
+            if(isUppercut){
+                ctx.globalAlpha=0.18;ctx.fillStyle='#ff4400';
+                ctx.beginPath();ctx.moveTo(-boss.r*0.3,boss.r*1.5);ctx.lineTo(boss.r*0.3,boss.r*1.5);ctx.lineTo(0,boss.r*0.3);ctx.closePath();ctx.fill();
+                ctx.globalAlpha=1;
+            }
+            // Spiral barrage rotation visual
+            if(isSpiral){
+                ctx.globalAlpha=0.1;
+                ctx.save();ctx.rotate(boss.timer*(grimmP3?0.18:0.12));
+                for(let arm=0;arm<(grimmP3?3:2);arm++){
+                    ctx.rotate(Math.PI*2/(grimmP3?3:2));
+                    ctx.strokeStyle='#ff6600';ctx.lineWidth=3;
+                    ctx.beginPath();ctx.moveTo(0,0);
+                    for(let d=0;d<boss.r*2;d+=5){
+                        const sa=d*0.08;
+                        ctx.lineTo(Math.cos(sa)*d,Math.sin(sa)*d);
+                    }
+                    ctx.stroke();
+                }
+                ctx.restore();
+                ctx.globalAlpha=1;
+            }
+            // Pufferfish expanding glow
+            if(isPuffer){
+                const puffR=boss.r+(grimmP3?30:20)+Math.sin(T/50)*(grimmP3?20:15);
+                ctx.globalAlpha=grimmP3?0.22:0.15;
+                const puffG=ctx.createRadialGradient(0,0,boss.r*0.5,0,0,puffR);
+                puffG.addColorStop(0,grimmP3?'#ff6600':'#ff4400');puffG.addColorStop(1,'transparent');
+                ctx.fillStyle=puffG;ctx.beginPath();ctx.arc(0,0,puffR,0,Math.PI*2);ctx.fill();
+                ctx.globalAlpha=1;
+            }
+            // Phase 3: constant ambient flame particles around boss
+            if(grimmP3){
+                for(let fp=0;fp<3;fp++){
+                    const fa=Math.random()*Math.PI*2;
+                    const fd=boss.r*0.5+Math.random()*boss.r*0.8;
+                    ctx.globalAlpha=0.3+Math.random()*0.3;
+                    ctx.fillStyle=Math.random()>0.5?'#ff4400':'#ffaa00';
+                    ctx.beginPath();ctx.arc(Math.cos(fa)*fd,Math.sin(fa)*fd,1.5+Math.random()*2,0,Math.PI*2);ctx.fill();
+                }
+                ctx.globalAlpha=1;
+            }
+
+            // --- Draw flame pillars (separate from boss translate) ---
+            ctx.restore(); // undo boss translate temporarily
+            for(const fp of boss.flamePillars){
+                const progress=fp.timer<40?(fp.timer/40):(fp.timer<100?1:1-(fp.timer-100)/30);
+                if(progress<=0) continue;
+                ctx.save();ctx.translate(fp.x,fp.y);
+                // Warning line before pillar activates
+                if(fp.timer<40){
+                    ctx.strokeStyle=`rgba(255,50,0,${(fp.timer/40)*0.6})`;ctx.lineWidth=2+fp.timer/20;
+                    ctx.setLineDash([8,8]);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-fp.h*progress);ctx.stroke();ctx.setLineDash([]);
+                } else {
+                    // Active flame pillar
+                    const intensity=progress;
+                    // Outer glow
+                    const pillarG=ctx.createLinearGradient(0,0,0,-fp.h);
+                    pillarG.addColorStop(0,`rgba(255,80,0,${intensity*0.6})`);
+                    pillarG.addColorStop(0.3,`rgba(255,30,0,${intensity*0.8})`);
+                    pillarG.addColorStop(0.7,`rgba(200,0,0,${intensity*0.5})`);
+                    pillarG.addColorStop(1,'transparent');
+                    ctx.fillStyle=pillarG;
+                    ctx.fillRect(-12,0,24,-fp.h);
+                    // Core
+                    const coreG=ctx.createLinearGradient(0,0,0,-fp.h);
+                    coreG.addColorStop(0,`rgba(255,200,50,${intensity})`);
+                    coreG.addColorStop(0.5,`rgba(255,100,0,${intensity*0.8})`);
+                    coreG.addColorStop(1,'transparent');
+                    ctx.fillStyle=coreG;ctx.fillRect(-5,0,10,-fp.h*0.9);
+                    // White-hot center
+                    ctx.fillStyle=`rgba(255,255,200,${intensity*0.7})`;ctx.fillRect(-2,0,4,-fp.h*0.7);
+                    // Sparks
+                    for(let s=0;s<3;s++){
+                        const sy=-Math.random()*fp.h*0.8;
+                        const sx=(Math.random()-0.5)*20;
+                        ctx.fillStyle=`rgba(255,${150+Math.random()*100},0,${intensity*Math.random()})`;
+                        ctx.beginPath();ctx.arc(sx,sy,1.5+Math.random(),0,Math.PI*2);ctx.fill();
+                    }
+                }
+                ctx.restore();
+            }
+
+            // --- Draw fire trail (ground hazards) ---
+            for(const ft of boss.fireTrail){
+                const ftAlpha=Math.min(1,ft.life/60)*0.6;
+                ctx.save();ctx.translate(ft.x,ft.y);
+                ctx.globalAlpha=ftAlpha;
+                const ftG=ctx.createRadialGradient(0,0,0,0,0,ft.r);
+                ftG.addColorStop(0,'rgba(255,200,50,0.8)');ftG.addColorStop(0.3,'rgba(255,80,0,0.6)');ftG.addColorStop(0.7,'rgba(200,0,0,0.3)');ftG.addColorStop(1,'transparent');
+                ctx.fillStyle=ftG;ctx.beginPath();ctx.arc(0,0,ft.r,0,Math.PI*2);ctx.fill();
+                // Flickering core
+                if(Math.random()<0.5){
+                    ctx.fillStyle=`rgba(255,255,150,${ftAlpha*0.5})`;
+                    ctx.beginPath();ctx.arc((Math.random()-0.5)*4,(Math.random()-0.5)*4,ft.r*0.3,0,Math.PI*2);ctx.fill();
+                }
+                ctx.globalAlpha=1;ctx.restore();
+            }
+
+            // --- Draw bat projectiles ---
+            for(const bp of boss.batProjectiles){
+                ctx.save();ctx.translate(bp.x,bp.y);
+                const batAngle=Math.atan2(bp.dy,bp.dx);
+                ctx.rotate(batAngle);
+                // Flame trail
+                ctx.globalAlpha=0.3;
+                const trailG=ctx.createRadialGradient(-6,0,1,-6,0,bp.homing?14:10);
+                trailG.addColorStop(0,bp.homing?'#ffaa00':'#ff4400');trailG.addColorStop(1,'transparent');
+                ctx.fillStyle=trailG;ctx.beginPath();ctx.arc(-6,0,bp.homing?14:10,0,Math.PI*2);ctx.fill();
+                ctx.globalAlpha=1;
+                // Bat body — homing bats glow orange/gold
+                ctx.fillStyle=bp.homing?'#ffaa00':(grimmP3?'#ff3300':grimmP2?'#ff2200':'#cc0000');
+                ctx.shadowBlur=bp.homing?12:8;ctx.shadowColor=bp.homing?'#ffcc00':'#ff4400';
+                ctx.beginPath();
+                ctx.moveTo(8,0);
+                ctx.lineTo(3,-3);ctx.lineTo(-2,-7);ctx.lineTo(-6,-5);
+                ctx.lineTo(-8,0);
+                ctx.lineTo(-6,5);ctx.lineTo(-2,7);ctx.lineTo(3,3);
+                ctx.closePath();ctx.fill();
+                // Eyes
+                ctx.fillStyle=bp.homing?'#fff':'#ffcc00';
+                ctx.beginPath();ctx.arc(4,-1.5,1.5,0,Math.PI*2);ctx.fill();
+                ctx.beginPath();ctx.arc(4,1.5,1.5,0,Math.PI*2);ctx.fill();
+                ctx.shadowBlur=0;
+                ctx.restore();
+            }
+            ctx.save();ctx.translate(boss.x,boss.y); // re-enter boss translate for the restore at end
         } else if(boss.type===5){
             // --- SNAKE BOSS --- (drawn from tail to head)
             ctx.restore(); // Undo the translate(boss.x, boss.y) — we draw each segment separately
@@ -2392,6 +3131,7 @@ function draw() {
             tl('Boss HP: '+boss.hp+'/'+boss.maxHp);
             tl('Boss timer: '+boss.timer);
             if(boss.type===5) tl('Segments: '+boss.segmentsAlive+' | Head vuln: '+boss.headVulnerable);
+            if(boss.type===6) tl('P2:'+boss.phase2+' P3:'+boss.phase3+' | Rage:'+boss.rageMultiplier.toFixed(2)+' | Pillars:'+boss.flamePillars.length+' Bats:'+boss.batProjectiles.length+' Fire:'+boss.fireTrail.length);
             if(boss.type===3||boss.type===10) tl('Phase2: '+boss.phase2);
         }
         if(G.gilbert){

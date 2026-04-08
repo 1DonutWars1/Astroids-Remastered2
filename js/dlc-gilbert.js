@@ -28,6 +28,7 @@ const GILBERT_INTROS = {
     boss4:    "That's... a Cyborg?! Watch out for the wall, it'll trap you on one side!",
     boss5:    "What IS that thing?! A snake?! Destroy the asteroids on its body first!",
     boss10:   "No way... that's Sans. This is the real deal. Stay sharp!",
+    boss6:    "What the — do you FEEL that heat?! That thing is radiating pure fire. I've never seen anything like it... be VERY careful!",
     // Pickups
     forcefield: "Ooh a shield! That'll absorb hits for you. Don't waste it!",
     tripleshot: "Triple shot! Now you're cookin! Chews through ammo though.",

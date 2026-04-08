@@ -27,7 +27,8 @@
         { id:'dlc_exterminator',   icon:'🗡️', name:'Exterminator',   desc:'Defeat 10 mini bosses in one game (DLC)' },
         { id:'dlc_short_circuit',  icon:'🤖', name:'Short Circuit',  desc:'Defeat the Cyborg boss (DLC)' },
         { id:'dlc_gilberts_friend', icon:'💚', name:"Gilbert's Friend", desc:'Rescue and repair Gilbert (DLC)' },
-        { id:'dlc_serpent_slayer', icon:'🐍', name:'Serpent Slayer', desc:'Defeat the Snake boss (DLC)' }
+        { id:'dlc_serpent_slayer', icon:'🐍', name:'Serpent Slayer', desc:'Defeat the Snake boss (DLC)' },
+        { id:'dlc_nightmares_end', icon:'🔥', name:"Nightmare's End", desc:'Defeat the Nightmare King Grimm (DLC)' }
     ];
 
     window.DLC.init = function() {

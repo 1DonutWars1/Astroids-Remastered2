@@ -65,7 +65,9 @@ const G = {
     itemTutorialShown: false,
     // Lore collectibles — seen fragment IDs
     dataFragmentsSeen: [],
-    dataFragmentPopup: null
+    dataFragmentPopup: null,
+    // Grimm boss (optional level 7)
+    grimmSpawned: false, grimmDefeated: false
 };
 
 let pSettings = { bulletSpeed: 8, ammo: 50, b1hp: 25, b2hp: 45, b3hp: 100 };
