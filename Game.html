@@ -97,6 +97,7 @@
     <button onclick="spawnBoss(4)">SPAWN BOSS 4 (CYBORG/DLC)</button>
     <button onclick="spawnBoss(5)">SPAWN BOSS 5 (SNAKE/DLC)</button>
     <button onclick="spawnBoss(6)">SPAWN BOSS 6 (GRIMM/DLC)</button>
+    <button onclick="spawnBoss(7)">SPAWN NEXUS-0 (SECRET)</button>
     <button onclick="spawnAsteroid(undefined,undefined,undefined,'fuel')">SPAWN FUEL</button>
     <button onclick="devSpawnLoreAsteroid()">SPAWN LORE ASTEROID</button>
     <button onclick="startBossRush()">START BOSS RUSH (DLC)</button>
@@ -120,6 +121,15 @@
     <button onclick="giveShield()">GIVE FULL SHIELD</button>
     <div class="dev-hdr">SYSTEM</div>
     <button onclick="addCheatScore(1000)">ADD 1000 PTS</button>
+    <div class="dev-hdr">CONSOLE</div>
+    <div style="display:flex;gap:4px;padding:0 8px;">
+        <input type="text" id="devConsoleInput" placeholder="> enter command..." style="flex:1;background:#0a0a0a;border:1px solid #00ff00;color:#00ff00;font-family:'Courier New',monospace;font-size:12px;padding:4px 8px;"
+            onkeydown="event.stopPropagation();if(event.key==='Enter'){event.preventDefault();devConsoleExec();}"
+            onkeyup="event.stopPropagation();"
+            onkeypress="event.stopPropagation();">
+        <button onclick="devConsoleExec()" style="font-size:11px;padding:4px 8px;">RUN</button>
+    </div>
+    <div id="devConsoleOutput" style="padding:4px 8px;color:#00ff00;font-family:'Courier New',monospace;font-size:11px;white-space:pre-wrap;max-height:100px;overflow-y:auto;"></div>
     <button onclick="toggleDebug()" style="border-color:red;color:red;">CLOSE</button>
 </div>
 
@@ -379,6 +389,7 @@
 <audio id="boss5Track" src="dstechnician-halodrome-120606.mp3" loop preload="auto"></audio>
 <audio id="rougeTrack" src="meak363-stealth-battle-205902 (1).mp3" loop preload="auto"></audio>
 <audio id="grimmTrack" src="04 The Grimm Troupe.mp3" loop preload="auto"></audio>
+<audio id="nexusTrack" src="undertale_079. Your Best Nightmare.mp3" loop preload="auto"></audio>
 
 <div id="volumeBtn" onclick="Sound.toggleMute()">[ MUTE ]</div>
 

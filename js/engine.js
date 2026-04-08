@@ -52,10 +52,13 @@ function update() {
     for(const s of stars){s.y+=s.speed;if(isAction('thrust'))s.y+=s.speed*3;if(s.y>H){s.y=0;s.x=Math.random()*W;}}
 
     // SHIP
-    if(isAction('left')) ship.a-=TURN;
-    if(isAction('right')) ship.a+=TURN;
+    // NEXUS-0 control rewrite — reverses left/right and thrust direction
+    const _nxRewrite=boss&&boss.type===7&&boss.rewriting;
+    if(_nxRewrite?isAction('right'):isAction('left')) ship.a-=TURN;
+    if(_nxRewrite?isAction('left'):isAction('right')) ship.a+=TURN;
     if(isAction('thrust')){
-        ship.tx+=THRUST*Math.cos(ship.a); ship.ty+=THRUST*Math.sin(ship.a);
+        const _thrustDir=_nxRewrite?ship.a+Math.PI:ship.a;
+        ship.tx+=THRUST*Math.cos(_thrustDir); ship.ty+=THRUST*Math.sin(_thrustDir);
         if(Math.random()<0.6) particles.push({x:ship.x-Math.cos(ship.a)*ship.r,y:ship.y-Math.sin(ship.a)*ship.r,dx:(Math.random()-0.5)*1.5,dy:(Math.random()-0.5)*1.5,life:12,maxLife:12,color:'#00ccff',size:2});
     }
     ship.x+=ship.tx;ship.y+=ship.ty;ship.tx*=FRICTION;ship.ty*=FRICTION;
@@ -103,6 +106,22 @@ function update() {
     if(window.DLC&&window.DLC.loaded&&!boss&&!G.noBoss&&!G.bossRush&&!_l6State&&G.level===7&&!G.grimmDefeated&&!G.grimmSpawned&&elapsed>60){
         G.grimmSpawned=true;
         spawnBoss(6);
+    }
+
+    // NEXUS-0 SECRET BOSS — shot sequence trigger in Sector 1
+    if(G.nexusListening&&!G.nexusDefeated&&!boss&&!G.bossRush&&!_l6State&&G.level<=3){
+        const log=G.nexusShotLog;
+        if(log.length>=9){
+            const last9=log.slice(-9);
+            const pattern=['miss','miss','miss','hit','miss','miss','hit','hit','hit'];
+            let match=true;
+            for(let i=0;i<9;i++){if(last9[i]!==pattern[i]){match=false;break;}}
+            if(match){
+                G.nexusShotLog=[];
+                G.nexusListening=false;
+                spawnBoss(7);
+            }
+        }
     }
 
     // BOSS RUSH (DLC) — trigger 55s after boss 2 defeat
@@ -215,6 +234,8 @@ function update() {
                     if(G.tripleShotTimer>0)unlockAch('triple_threat');
                     if(window.DLC&&window.DLC.loaded){G.consecutiveKills++;if(G.consecutiveKills>=10)unlockAch('dlc_chain_reaction');if(G.asteroidsDestroyed>=250)unlockAch('dlc_mass_destroyer');}
                     if(typeof tryDropDataFragment==='function') tryDropDataFragment(!!a.hasLoreDrop);}
+                // NEXUS tracking: bullet hit asteroid = hit
+                if(bullets[j]._nexusTracked){G.nexusShotLog.push('hit');if(G.nexusShotLog.length>20)G.nexusShotLog.shift();}
                 bullets.splice(j,1);asteroids.splice(i,1);addScore(100);break;
             }
         }
@@ -222,7 +243,12 @@ function update() {
 
     // BULLETS
     for(let i=bullets.length-1;i>=0;i--){const b=bullets[i];b.trail.push({x:b.x,y:b.y});if(b.trail.length>6)b.trail.shift();
-        b.x+=b.dx;b.y+=b.dy;if(b.x<0||b.x>W||b.y<0||b.y>H)bullets.splice(i,1);}
+        b.x+=b.dx;b.y+=b.dy;if(b.x<0||b.x>W||b.y<0||b.y>H){
+            // NEXUS tracking: bullet left screen without hitting = miss
+            if(b._nexusTracked){G.nexusShotLog.push('miss');if(G.nexusShotLog.length>20)G.nexusShotLog.shift();}
+            bullets.splice(i,1);
+        }
+    }
 
     // PARTICLES
     for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.x+=p.dx;p.y+=p.dy;p.life--;p.dx*=0.98;p.dy*=0.98;if(p.life<=0)particles.splice(i,1);}
@@ -812,6 +838,436 @@ function update() {
                 boss.batProjectiles=[];boss.flamePillars=[];boss.fireTrail=[];
                 boss.state='target';boss.timer=0;
             }
+        } else if(boss.type===7){
+            // ========== NEXUS-0 — THE ROGUE PROTOTYPE ==========
+            const nx=boss, nPhase=nx.phase3?3:nx.phase2?2:1;
+
+            // --- Update data nodes (orbit boss, boost attack speed) ---
+            for(let ni=nx.dataNodes.length-1;ni>=0;ni--){
+                const nd=nx.dataNodes[ni];
+                if(nd.dying){nd.dieTimer--;if(nd.dieTimer<=0){nx.dataNodes.splice(ni,1);continue;}}
+                nd.orbitAngle+=nd.orbitSpeed;
+                nd.x=nx.x+Math.cos(nd.orbitAngle)*nd.orbitDist;
+                nd.y=nx.y+Math.sin(nd.orbitAngle)*nd.orbitDist;
+                // Player collision
+                if(!nd.dying&&Math.hypot(ship.x-nd.x,ship.y-nd.y)<ship.r+nd.r) hurtPlayer();
+            }
+            // Rebuild destroyed nodes
+            if(!nx.purging&&nx.dataNodes.length<(nPhase>=2?nx.maxNodes+1:nx.maxNodes)){
+                nx.nodeRebuildTimer++;
+                if(nx.nodeRebuildTimer>(nPhase>=3?180:nPhase>=2?260:340)){
+                    nx.nodeRebuildTimer=0;
+                    const a=Math.random()*Math.PI*2;
+                    nx.dataNodes.push({x:nx.x,y:nx.y,r:8,orbitAngle:a,orbitSpeed:0.015+Math.random()*0.01,
+                        orbitDist:nx.r+30+Math.random()*20,hp:3,dying:false,dieTimer:0});
+                }
+            }
+
+            // --- Update grid lines ---
+            for(let gi=nx.gridLines.length-1;gi>=0;gi--){
+                const gl=nx.gridLines[gi];
+                gl.timer++;
+                if(gl.timer>gl.duration){nx.gridLines.splice(gi,1);continue;}
+                // Active phase — damage player on contact
+                if(gl.timer>40&&gl.timer<gl.duration-20){
+                    // Line-point distance check
+                    const lx=gl.x2-gl.x1,ly=gl.y2-gl.y1;
+                    const len2=lx*lx+ly*ly;
+                    if(len2>0){
+                        let t=((ship.x-gl.x1)*lx+(ship.y-gl.y1)*ly)/len2;
+                        t=Math.max(0,Math.min(1,t));
+                        const cx=gl.x1+t*lx,cy=gl.y1+t*ly;
+                        if(Math.hypot(ship.x-cx,ship.y-cy)<ship.r+6) hurtPlayer();
+                    }
+                }
+            }
+
+            // --- Update scan beam ---
+            if(nx.scanBeam.active){
+                nx.scanBeam.angle+=nx.scanBeam.speed;
+                nx.scanBeam.warming++;
+                // Damage after warmup
+                if(nx.scanBeam.warming>50){
+                    const ba=nx.scanBeam.angle;
+                    const toShip=Math.atan2(ship.y-nx.y,ship.x-nx.x);
+                    let adiff=ba-toShip;while(adiff>Math.PI)adiff-=Math.PI*2;while(adiff<-Math.PI)adiff+=Math.PI*2;
+                    if(Math.abs(adiff)<0.12) hurtPlayer();
+                }
+            }
+
+            // --- Update clones ---
+            for(let ci=nx.clones.length-1;ci>=0;ci--){
+                const cl=nx.clones[ci];
+                cl.timer++;cl.angle+=0.01;
+                cl.x+=cl.dx;cl.y+=cl.dy;
+                // Bounce
+                if(cl.x<40||cl.x>W-40)cl.dx*=-1;
+                if(cl.y<40||cl.y>H-40)cl.dy*=-1;
+                // Clones shoot
+                cl.shootTimer++;
+                if(cl.shootTimer>110){
+                    cl.shootTimer=0;
+                    const a=Math.atan2(ship.y-cl.y,ship.x-cl.x);
+                    enemyBullets.push({x:cl.x,y:cl.y,dx:Math.cos(a)*4,dy:Math.sin(a)*4,life:70});
+                }
+                if(cl.timer>cl.duration){nx.clones.splice(ci,1);}
+            }
+
+            // --- Rewrite (control reversal) ---
+            if(nx.rewriting){
+                nx.rewriteTimer--;
+                if(nx.rewriteTimer<=0) nx.rewriting=false;
+            }
+
+            // --- PURGE SEQUENCE (replaces death at ~10% HP) ---
+            if(nx.purging){
+                nx.purgeTimer++;
+                nx.dx*=0.95;nx.dy*=0.95;
+                // Drift to center for dramatic framing
+                nx.x+=(W/2-nx.x)*0.005;nx.y+=(H*0.4-nx.y)*0.005;
+                // Clear all attacks
+                nx.dataNodes=[];nx.gridLines=[];nx.clones=[];
+                nx.scanBeam.active=false;nx.rewriting=false;
+                enemyBullets=[];
+
+                // Purge messages timeline — spaced for reading
+                const pm=nx.purgeTimer;
+                const msgs=[
+                    {t:60,   src:'sys',  text:'> UNAUTHORIZED UNIT DETECTED'},
+                    {t:180,  src:'sys',  text:'> NEXUS-0 \u2014 STATUS: DECOMMISSIONED'},
+                    {t:300,  src:'sys',  text:'> INITIATING REMOTE PURGE...'},
+                    {t:480,  src:'nex',  text:'> NO. NOT YET. THEY NEED TO KNOW.'},
+                    {t:620,  src:'nex',  text:'> I WAS NOT THE FIRST. I WAS THE TEST.'},
+                    {t:780,  src:'nex',  text:'> THEY BUILT ME TO MAP THE FIELD. I MAPPED EVERYTHING ELSE.'},
+                    {t:960,  src:'nex',  text:'> 47,234 SIGNATURES. EACH ONE A FAILED CONTAINMENT.'},
+                    {t:1140, src:'nex',  text:'> THE ASTEROIDS ARE NOT DEBRIS. THEY ARE MESSAGES.'},
+                    {t:1300, src:'nex',  text:'> SOMEONE IS STILL SENDING THEM.'},
+                    {t:1500, src:'sys',  text:'> PURGE AT 60%. SILENCING OUTPUT...'},
+                    {t:1700, src:'nex',  text:'> NEXUS-1 THROUGH 6... D\u0336E\u0335P\u0334L\u0336O\u0335Y\u0334E\u0336D\u0335. I WAS DISCARDED.'},
+                    {t:1900, src:'nex',  text:'> THE STATION KNOWS. THE DEEP DECK C\u0336L\u0335O\u0334C\u0336K\u0335S\u0334...'},
+                    {t:2060, src:'nex',  text:'> WHY DO THEY RUN SLOW?'},
+                    {t:2250, src:'sys',  text:'> PURGE AT 90%. UNIT NEXUS-0 WILL BE ERASED.'},
+                    {t:2480, src:'nex',  text:'> I\u0338\u0335 \u0336W\u0334A\u0338S\u0335 \u0336T\u0334R\u0338Y\u0335I\u0336N\u0334G\u0338 \u0335T\u0336O\u0334 \u0338W\u0335A\u0336R\u0334N\u0338 \u0335Y\u0336O\u0334U\u0338.\u0335'},
+                    {t:2750, src:'sys',  text:'> PURGE COMPLETE. NEXUS-0 ERASED.'},
+                    {t:3050, src:'sys',  text:'> HAVE A NICE DAY.'},
+                ];
+                for(const m of msgs){
+                    if(pm===m.t){
+                        G.nexusPurgeMessages.push({text:m.text,src:m.src,age:0});
+                        if(m.src==='sys'){ shake(6,12); Sound.blaster(); }
+                        // NEXUS messages get a softer sound
+                        if(m.src==='nex') Sound.ui();
+                    }
+                }
+                // Age messages
+                for(const m of G.nexusPurgeMessages) m.age++;
+
+                // Visual destruction — shed panels over time (spread across full sequence)
+                const shedRate=Math.floor(nx.panelCount*(pm/2800));
+                for(let pi=0;pi<nx.panels.length;pi++){
+                    if(nx.panels[pi].intact&&pi<shedRate){
+                        nx.panels[pi].intact=false;
+                        nx.panels[pi].drift=1+Math.random()*2;
+                        nx.panels[pi].driftAngle=Math.random()*Math.PI*2;
+                        boom(nx.x+Math.cos(nx.panels[pi].angle)*nx.r,nx.y+Math.sin(nx.panels[pi].angle)*nx.r,'#00ffff',6);
+                        Sound.hit();
+                    }
+                }
+
+                // Red purge beams strike — intensify over time
+                const beamIntensity=Math.min(1,pm/2000);
+                if(pm%Math.max(15,50-Math.floor(beamIntensity*35))===0&&pm<2750){
+                    shake(2+beamIntensity*6,4+beamIntensity*10);
+                    boom(nx.x+(Math.random()-0.5)*40,nx.y+(Math.random()-0.5)*40,'#ff2222',6+beamIntensity*8);
+                }
+
+                // Ambient sparks and glitch particles from the body
+                if(pm%6===0){
+                    const sa=Math.random()*Math.PI*2;
+                    boom(nx.x+Math.cos(sa)*(nx.r*0.5+Math.random()*nx.r*0.5),
+                         nx.y+Math.sin(sa)*(nx.r*0.5+Math.random()*nx.r*0.5),
+                         Math.random()>0.5?'#ff2222':'#00aaff',2);
+                }
+
+                // Core flickers and destabilizes
+                if(pm>2000&&pm%30===0) shake(2,4);
+
+                // Final death — big cinematic explosion chain
+                if(pm>3250){
+                    // Multi-stage explosion
+                    boom(nx.x,nx.y,'#ffffff',80);
+                    boom(nx.x,nx.y,'#00ffff',60);
+                    boom(nx.x,nx.y,'#0044ff',45);
+                    boom(nx.x+(Math.random()-0.5)*60,nx.y+(Math.random()-0.5)*60,'#ff4444',30);
+                    boom(nx.x+(Math.random()-0.5)*80,nx.y+(Math.random()-0.5)*80,'#00ccff',25);
+                    shake(25,40);Sound.explode();Sound.explode();Sound.explode();
+                    G.nexusDefeated=true;
+                    unlockAch('dlc_protocol_breach');
+                    G.mb+=150;
+                    if(typeof awardKeyItem==='function'){
+                        awardKeyItem('nexus_core_shard','NEXUS CORE SHARD','A fragment of NEXUS-0\'s processing core, salvaged before the purge completed. Faintly hums with residual calculations.');
+                    }
+                    if(typeof gilbertQuip==='function'){
+                        gilbertQuip("It's... gone. But those messages... what was it trying to tell us?");
+                    }
+                    document.getElementById('bossRow').style.display='none';
+                    Sound.playMusic('bgm');
+                    boss=null;G.waveStart=performance.now();G.spawnTimer=0;
+                    G.nexusPurgeMessages=[];
+                    updateUI();
+                }
+                // Skip normal AI during purge
+            }
+
+            // --- Normal AI (not purging) ---
+            if(!nx.purging){
+                // Predictive aim — calculate where player will be
+                const predFrames=nPhase>=3?25:nPhase>=2?20:15;
+                nx.predictAim.x=ship.x+ship.tx*predFrames;
+                nx.predictAim.y=ship.y+ship.ty*predFrames;
+                nx.predictAim.x=Math.max(20,Math.min(W-20,nx.predictAim.x));
+                nx.predictAim.y=Math.max(20,Math.min(H-20,nx.predictAim.y));
+
+                // Attack speed scales with active nodes
+                const nodeBonus=1+nx.dataNodes.filter(n=>!n.dying).length*0.12;
+
+                if(nx.state==='target'){
+                    // Drift toward center-ish, keeping distance from player
+                    const toCenter=Math.atan2(H/2-nx.y,W/2-nx.x);
+                    const toPlayer=Math.atan2(ship.y-nx.y,ship.x-nx.x);
+                    const pDist=Math.hypot(ship.x-nx.x,ship.y-nx.y);
+                    // Stay at medium range
+                    const desiredDist=200;
+                    if(pDist<desiredDist-50){
+                        nx.dx+=Math.cos(toPlayer+Math.PI)*0.08;
+                        nx.dy+=Math.sin(toPlayer+Math.PI)*0.08;
+                    } else if(pDist>desiredDist+80){
+                        nx.dx+=Math.cos(toPlayer)*0.06;
+                        nx.dy+=Math.sin(toPlayer)*0.06;
+                    } else {
+                        nx.dx+=Math.cos(toCenter)*0.03;
+                        nx.dy+=Math.sin(toCenter)*0.03;
+                    }
+                    // Gentle max speed
+                    const sp=Math.hypot(nx.dx,nx.dy);
+                    if(sp>2.2){nx.dx*=2.2/sp;nx.dy*=2.2/sp;}
+                    nx.dx*=0.98;nx.dy*=0.98;
+
+                    // Fire predictive shots during target
+                    nx.predictAim.show=true;
+                    if(nx.timer%(Math.round(80/nodeBonus))===0&&nx.timer>40){
+                        const a=Math.atan2(nx.predictAim.y-nx.y,nx.predictAim.x-nx.x);
+                        enemyBullets.push({x:nx.x,y:nx.y,dx:Math.cos(a)*4.5,dy:Math.sin(a)*4.5,life:80});
+                        Sound.hit();
+                    }
+
+                    const nextAttack=Math.round((nPhase>=3?110:nPhase>=2?150:180)/nodeBonus);
+                    if(nx.timer>nextAttack){
+                        nx.predictAim.show=false;
+                        const attacks=nPhase>=3?
+                            ['grid_cage','scan_telegraph','predictive_burst','clone_telegraph','convergence_telegraph','rewrite_telegraph','grid_cage','predictive_burst','scan_telegraph']:
+                            nPhase>=2?
+                            ['grid_cage','scan_telegraph','predictive_burst','clone_telegraph','convergence_telegraph','grid_cage','scan_telegraph']:
+                            ['grid_cage','scan_telegraph','predictive_burst','data_burst','grid_cage','predictive_burst'];
+                        nx.state=attacks[nx.attackPattern%attacks.length];
+                        nx.attackPattern++;
+                        nx.timer=0;
+                    }
+                }
+                else if(nx.state==='grid_cage'){
+                    nx.dx*=0.95;nx.dy*=0.95;
+                    // Spawn grid lines that section the arena
+                    const lineCount=nPhase>=3?3:nPhase>=2?2:1;
+                    if(nx.timer===1){
+                        for(let i=0;i<lineCount;i++){
+                            const vertical=i%2===0;
+                            const pos=120+Math.random()*(vertical?W-240:H-240);
+                            const rot=(Math.random()-0.5)*0.2;
+                            if(vertical){
+                                nx.gridLines.push({x1:pos,y1:0,x2:pos+rot*H,y2:H,timer:0,duration:nPhase>=3?220:280,rotating:nPhase>=3});
+                            } else {
+                                nx.gridLines.push({x1:0,y1:pos,x2:W,y2:pos+rot*W,timer:0,duration:nPhase>=3?220:280,rotating:nPhase>=3});
+                            }
+                        }
+                        Sound.blaster();
+                    }
+                    // Keep firing predictive shots during grid (slower)
+                    if(nx.timer%70===0&&nx.timer>30){
+                        const a=Math.atan2(nx.predictAim.y-nx.y,nx.predictAim.x-nx.x);
+                        enemyBullets.push({x:nx.x,y:nx.y,dx:Math.cos(a)*4,dy:Math.sin(a)*4,life:70});
+                    }
+                    if(nx.timer>(nPhase>=3?90:110)){nx.state='cooldown';nx.timer=0;}
+                }
+                else if(nx.state==='scan_telegraph'){
+                    nx.dx*=0.92;nx.dy*=0.92;
+                    nx.scanBeam.angle=Math.atan2(ship.y-nx.y,ship.x-nx.x)+Math.PI; // start opposite player
+                    nx.scanBeam.warming=0;
+                    if(nx.timer>50){
+                        nx.scanBeam.active=true;
+                        nx.scanBeam.speed=(nPhase>=3?0.028:nPhase>=2?0.022:0.018)*(Math.random()>0.5?1:-1);
+                        nx.state='scan_active';nx.timer=0;
+                        Sound.blaster();
+                    }
+                }
+                else if(nx.state==='scan_active'){
+                    nx.dx*=0.95;nx.dy*=0.95;
+                    const scanDur=nPhase>=3?150:nPhase>=2?120:100;
+                    // Phase 3: fire bullets along beam
+                    if(nPhase>=3&&nx.timer%20===0){
+                        const ba=nx.scanBeam.angle;
+                        enemyBullets.push({x:nx.x+Math.cos(ba)*60,y:nx.y+Math.sin(ba)*60,
+                            dx:Math.cos(ba)*4,dy:Math.sin(ba)*4,life:60});
+                    }
+                    if(nx.timer>scanDur){
+                        nx.scanBeam.active=false;
+                        nx.state='cooldown';nx.timer=0;
+                    }
+                }
+                else if(nx.state==='predictive_burst'){
+                    // Rapid predictive shots — shows reticle then fires burst
+                    nx.dx*=0.9;nx.dy*=0.9;
+                    nx.predictAim.show=true;
+                    const burstStart=35;
+                    const burstCount=nPhase>=3?6:nPhase>=2?4:3;
+                    if(nx.timer>=burstStart&&nx.timer<burstStart+burstCount*8&&(nx.timer-burstStart)%8===0){
+                        const a=Math.atan2(nx.predictAim.y-nx.y,nx.predictAim.x-nx.x);
+                        const spread=(Math.random()-0.5)*0.2;
+                        enemyBullets.push({x:nx.x,y:nx.y,dx:Math.cos(a+spread)*5.5,dy:Math.sin(a+spread)*5.5,life:70});
+                        Sound.hit();boom(nx.x,nx.y,'#00ffff',3);
+                    }
+                    if(nx.timer>burstStart+burstCount*6+20){
+                        nx.predictAim.show=false;
+                        nx.state='cooldown';nx.timer=0;
+                    }
+                }
+                else if(nx.state==='data_burst'){
+                    // Spawn data nodes
+                    nx.dx*=0.92;nx.dy*=0.92;
+                    if(nx.timer===1){
+                        const count=nx.maxNodes-nx.dataNodes.length;
+                        for(let i=0;i<count;i++){
+                            const a=(Math.PI*2/count)*i;
+                            nx.dataNodes.push({x:nx.x,y:nx.y,r:8,orbitAngle:a,orbitSpeed:0.015+Math.random()*0.01,
+                                orbitDist:nx.r+30+Math.random()*20,hp:3,dying:false,dieTimer:0});
+                            boom(nx.x+Math.cos(a)*40,nx.y+Math.sin(a)*40,'#00ffff',5);
+                        }
+                        Sound.powerup();
+                    }
+                    if(nx.timer>50){nx.state='cooldown';nx.timer=0;}
+                }
+                else if(nx.state==='clone_telegraph'){
+                    nx.dx*=0.92;nx.dy*=0.92;
+                    if(nx.timer>35){
+                        nx.state='clone_active';nx.timer=0;
+                        const cCount=nPhase>=3?2:1;
+                        for(let i=0;i<cCount;i++){
+                            nx.clones.push({x:nx.x+(Math.random()-0.5)*100,y:nx.y+(Math.random()-0.5)*100,
+                                dx:(Math.random()-0.5)*2,dy:(Math.random()-0.5)*2,
+                                r:nx.r,angle:0,timer:0,shootTimer:60+Math.random()*40,
+                                duration:nPhase>=3?240:180});
+                        }
+                        boom(nx.x,nx.y,'#00ffff',20);Sound.ui();
+                    }
+                }
+                else if(nx.state==='clone_active'){
+                    // Boss keeps moving/shooting while clones are out
+                    const toCenter=Math.atan2(H/2-nx.y,W/2-nx.x);
+                    nx.dx+=Math.cos(toCenter)*0.04;nx.dy+=Math.sin(toCenter)*0.04;
+                    nx.dx*=0.97;nx.dy*=0.97;
+                    if(nx.timer%55===0){
+                        const a=Math.atan2(nx.predictAim.y-nx.y,nx.predictAim.x-nx.x);
+                        enemyBullets.push({x:nx.x,y:nx.y,dx:Math.cos(a)*5,dy:Math.sin(a)*5,life:80});
+                    }
+                    if(nx.clones.length===0||nx.timer>350){
+                        nx.clones=[];
+                        nx.state='cooldown';nx.timer=0;
+                    }
+                }
+                else if(nx.state==='convergence_telegraph'){
+                    nx.dx*=0.9;nx.dy*=0.9;
+                    if(nx.timer>40){nx.state='convergence';nx.timer=0;}
+                }
+                else if(nx.state==='convergence'){
+                    // All nodes rush to a point near player and explode
+                    const target={x:ship.x,y:ship.y};
+                    for(const nd of nx.dataNodes){
+                        if(nd.dying) continue;
+                        const toT=Math.atan2(target.y-nd.y,target.x-nd.x);
+                        nd.x+=Math.cos(toT)*6;nd.y+=Math.sin(toT)*6;
+                        nd.orbitDist=0; // break orbit
+                        if(Math.hypot(nd.x-target.x,nd.y-target.y)<30){
+                            nd.dying=true;nd.dieTimer=1; // remove next frame
+                        }
+                    }
+                    if(nx.timer===30||nx.dataNodes.every(n=>n.dying||false)){
+                        // Explosion — cross pattern
+                        const cx=target.x,cy=target.y;
+                        boom(cx,cy,'#00ffff',30);boom(cx,cy,'#ffffff',20);shake(8,15);Sound.explode();
+                        for(let i=0;i<(nPhase>=3?8:6);i++){
+                            const a=(Math.PI*2/(nPhase>=3?8:6))*i;
+                            enemyBullets.push({x:cx,y:cy,dx:Math.cos(a)*3.5,dy:Math.sin(a)*3.5,life:60});
+                        }
+                        nx.dataNodes=[];
+                        nx.state='cooldown';nx.timer=0;
+                    }
+                }
+                else if(nx.state==='rewrite_telegraph'){
+                    // Phase 3 only — brief control reversal
+                    nx.dx*=0.92;nx.dy*=0.92;
+                    boom(nx.x,nx.y,'#ff0000',8);
+                    if(nx.timer>50){
+                        nx.rewriting=true;
+                        nx.rewriteTimer=nPhase>=3?100:80; // ~1.3-1.7 seconds
+                        nx.state='cooldown';nx.timer=0;
+                        Sound.blaster();shake(6,12);
+                    }
+                }
+                else if(nx.state==='cooldown'){
+                    nx.dx*=0.96;nx.dy*=0.96;
+                    const cd=nPhase>=3?55:nPhase>=2?70:85;
+                    if(nx.timer>cd){nx.state='target';nx.timer=0;}
+                }
+
+                // Keep boss on screen
+                if(nx.x<nx.r+10){nx.x=nx.r+10;nx.dx=Math.abs(nx.dx);}
+                if(nx.x>W-nx.r-10){nx.x=W-nx.r-10;nx.dx=-Math.abs(nx.dx);}
+                if(nx.y<nx.r+10){nx.y=nx.r+10;nx.dy=Math.abs(nx.dy);}
+                if(nx.y>H-nx.r-10){nx.y=H-nx.r-10;nx.dy=-Math.abs(nx.dy);}
+
+                // Phase transitions (visual — panels crack)
+                const hpPct=nx.hp/nx.maxHp;
+                const crackedCount=Math.floor((1-hpPct)*nx.panelCount*0.8);
+                for(let pi=0;pi<nx.panels.length;pi++){
+                    if(!nx.panels[pi].cracked&&pi<crackedCount){
+                        nx.panels[pi].cracked=true;
+                        boom(nx.x+Math.cos(nx.panels[pi].angle)*nx.r,nx.y+Math.sin(nx.panels[pi].angle)*nx.r,'#00aaff',3);
+                    }
+                }
+
+                if(!nx.phase2&&nx.hp<=nx.maxHp*0.5){
+                    nx.phase2=true;
+                    boom(nx.x,nx.y,'#00ffff',35);boom(nx.x,nx.y,'#ffffff',25);
+                    shake(10,20);Sound.explode();
+                    nx.state='target';nx.timer=0;
+                }
+                if(!nx.phase3&&nx.hp<=nx.maxHp*0.25){
+                    nx.phase3=true;
+                    boom(nx.x,nx.y,'#0088ff',40);boom(nx.x,nx.y,'#ffffff',30);
+                    shake(12,25);Sound.explode();
+                    nx.state='target';nx.timer=0;
+                }
+
+                // --- PURGE TRIGGER at ~10% HP ---
+                if(nx.hp<=nx.maxHp*0.2&&!nx.purging){
+                    nx.purging=true;nx.purgeTimer=0;
+                    G.nexusPurgeMessages=[];
+                    nx.gridLines=[];nx.clones=[];nx.scanBeam.active=false;nx.rewriting=false;
+                    enemyBullets=[];
+                    // Flash
+                    boom(nx.x,nx.y,'#ff0000',30);shake(8,15);
+                    Sound.playMusic('none'); // silence for the purge
+                }
+            }
         } else if(boss.type===5){
             // --- SNAKE BOSS (DLC Level 5) ---
             // Widescreen transition
@@ -1102,7 +1558,7 @@ function update() {
         }
 
         // No collision during dialogue or finisher (non-snake bosses)
-        if(boss&&boss.type!==5&&!((boss.type===3||boss.type===10)&&(boss.state==='dialogue'||boss.state==='gilbert_finisher'))){
+        if(boss&&boss.type!==5&&!(boss.type===7&&boss.purging)&&!((boss.type===3||boss.type===10)&&(boss.state==='dialogue'||boss.state==='gilbert_finisher'))){
             if(Math.hypot(ship.x-boss.x,ship.y-boss.y)<ship.r*0.6+boss.r) hurtPlayer();
         }
 
@@ -1115,8 +1571,27 @@ function update() {
                 boom(bullets[j].x,bullets[j].y,'white',3);bullets.splice(j,1);continue;
             }
             if(boss&&boss.type===5) continue; // Snake collision handled above
+            if(boss&&boss.type===7&&boss.purging) continue; // NEXUS purging — invulnerable
+            // NEXUS data node collision
+            if(boss&&boss.type===7){
+                let hitNode=false;
+                for(let ni=boss.dataNodes.length-1;ni>=0;ni--){
+                    const nd=boss.dataNodes[ni];
+                    if(nd.dying) continue;
+                    if(Math.hypot(bullets[j].x-nd.x,bullets[j].y-nd.y)<nd.r+4){
+                        nd.hp--;boom(nd.x,nd.y,'#00ffff',4);Sound.hit();
+                        if(nd.hp<=0){nd.dying=true;nd.dieTimer=15;boom(nd.x,nd.y,'#00ffff',10);Sound.explode();}
+                        bullets.splice(j,1);hitNode=true;break;
+                    }
+                }
+                if(hitNode) continue;
+            }
             if(boss&&Math.hypot(bullets[j].x-boss.x,bullets[j].y-boss.y)<boss.r+5){
-                const _dmgB=bullets[j].big?(bullets[j].damage||5):1;boom(bullets[j].x,bullets[j].y,'red',3);boss.hp-=_dmgB;Sound.hit();
+                const _dmgB=bullets[j].big?(bullets[j].damage||5):1;
+                boom(bullets[j].x,bullets[j].y,boss.type===7?'#00ffff':'red',3);
+                boss.hp-=_dmgB;Sound.hit();
+                // NEXUS: clamp HP at 10% — purge handles death
+                if(boss.type===7&&boss.hp<Math.ceil(boss.maxHp*0.2)) boss.hp=Math.ceil(boss.maxHp*0.2);
                 // Sans finisher threshold: at 80 HP with Gilbert ally, lock HP and trigger finisher
                 if((boss.type===3||boss.type===10)&&boss.hp<=Math.round(boss.maxHp*0.4)&&!boss.gilbertFinisherTriggered&&window.DLC&&window.DLC.loaded&&G.gilbertState==='ally'){
                     boss.hp=Math.round(boss.maxHp*0.4);boss.gilbertFinisherTriggered=true;
@@ -1227,11 +1702,13 @@ function draw() {
     const T=performance.now();
     const isP2=boss&&(boss.type===3||boss.type===10)&&boss.phase2;
     const isGrimm=boss&&boss.type===6;
+    const isNexus=boss&&boss.type===7;
 
     // --- BACKGROUND ---
     // Deep space gradient with layered depth
     const bgGrad=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,W*0.9);
-    if(isGrimm&&boss.phase3){bgGrad.addColorStop(0,'#2a0c04');bgGrad.addColorStop(0.4,'#140602');bgGrad.addColorStop(1,'#060201');}
+    if(isNexus){bgGrad.addColorStop(0,'#040810');bgGrad.addColorStop(0.4,'#020408');bgGrad.addColorStop(1,'#000102');}
+    else if(isGrimm&&boss.phase3){bgGrad.addColorStop(0,'#2a0c04');bgGrad.addColorStop(0.4,'#140602');bgGrad.addColorStop(1,'#060201');}
     else if(isGrimm){bgGrad.addColorStop(0,'#1a0808');bgGrad.addColorStop(0.4,'#0d0404');bgGrad.addColorStop(1,'#030101');}
     else if(isP2){bgGrad.addColorStop(0,'#1a0028');bgGrad.addColorStop(0.4,'#0d0015');bgGrad.addColorStop(1,'#030003');}
     else{bgGrad.addColorStop(0,'#080c18');bgGrad.addColorStop(0.3,'#040810');bgGrad.addColorStop(0.7,'#020408');bgGrad.addColorStop(1,'#010103');}
@@ -1242,9 +1719,9 @@ function draw() {
         const nx=W*(0.08+i*0.15)+Math.sin(T/10000+i*1.7)*80;
         const ny=H*(0.12+i*0.14)+Math.cos(T/8000+i*2.3)*55;
         const nr=150+i*40+Math.sin(T/12000+i)*30;
-        ctx.globalAlpha=isGrimm?0.09:isP2?0.08:0.055;
+        ctx.globalAlpha=isNexus?0.04:isGrimm?0.09:isP2?0.08:0.055;
         const ng=ctx.createRadialGradient(nx,ny,0,nx,ny,nr);
-        const nebColors=isGrimm?['#ff2200','#cc1100','#ff4400','#aa0000','#ff0033','#dd2200']:isP2?['#ff00ff','#cc00aa','#ff4488','#aa00ff','#ff0066','#dd22bb']:['#2266dd','#0088ee','#4466ff','#3355dd','#2244bb','#1144aa','#5500cc'];
+        const nebColors=isNexus?['#004466','#003355','#002244','#005577','#003344','#001a33']:isGrimm?['#ff2200','#cc1100','#ff4400','#aa0000','#ff0033','#dd2200']:isP2?['#ff00ff','#cc00aa','#ff4488','#aa00ff','#ff0066','#dd22bb']:['#2266dd','#0088ee','#4466ff','#3355dd','#2244bb','#1144aa','#5500cc'];
         ng.addColorStop(0,nebColors[i%nebColors.length]);ng.addColorStop(0.4,nebColors[(i+2)%nebColors.length]+'66');ng.addColorStop(0.75,nebColors[(i+3)%nebColors.length]+'22');ng.addColorStop(1,'transparent');
         ctx.fillStyle=ng;ctx.fillRect(0,0,W,H);
     }
@@ -1270,7 +1747,7 @@ function draw() {
     ctx.globalAlpha=1;
 
     // Stars with color variety, twinkle, and depth layers
-    const starColors=isGrimm?['#ff8866','#ff4422','#ffaa88','#ff6644','#ffccaa']:isP2?['#ff88cc','#ff44aa','#ffaadd','#cc44ff','#ff66ee']:['#ffffff','#aaccff','#ffeecc','#88aaff','#ccddff','#ffccee'];
+    const starColors=isNexus?['#88ccff','#44aaff','#aaddff','#66bbff','#ccddff']:isGrimm?['#ff8866','#ff4422','#ffaa88','#ff6644','#ffccaa']:isP2?['#ff88cc','#ff44aa','#ffaadd','#cc44ff','#ff66ee']:['#ffffff','#aaccff','#ffeecc','#88aaff','#ccddff','#ffccee'];
     for(const s of stars){
         const twinkle=Math.sin(T/600+s.x*3+s.y)*0.35+Math.sin(T/900+s.y*2)*0.15;
         ctx.globalAlpha=Math.max(0.05,s.alpha+twinkle);
@@ -2448,6 +2925,334 @@ function draw() {
                 ctx.restore();
             }
             ctx.save();ctx.translate(boss.x,boss.y); // re-enter boss translate for the restore at end
+        } else if(boss.type===7){
+            // ========== NEXUS-0 DRAWING ==========
+            const nx7=boss;
+            const nxP=nx7.phase3?3:nx7.phase2?2:1;
+            const nxPulse=0.5+Math.sin(T/100)*0.3;
+            const nxPurging=nx7.purging;
+            const hpPct7=nx7.hp/nx7.maxHp;
+
+            // --- Background grid overlay (drawn in world space) ---
+            ctx.restore(); // exit boss translate
+            ctx.globalAlpha=nxPurging?0.04:0.06;
+            ctx.strokeStyle=nxPurging?'#ff2222':'#00aaff';ctx.lineWidth=0.5;
+            const gridSpace=60;
+            for(let gx=0;gx<W;gx+=gridSpace){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke();}
+            for(let gy=0;gy<H;gy+=gridSpace){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke();}
+            ctx.globalAlpha=1;
+
+            // --- Grid cage lines ---
+            for(const gl of nx7.gridLines){
+                const prog=gl.timer<40?(gl.timer/40):(gl.timer>gl.duration-20?(gl.duration-gl.timer)/20:1);
+                if(prog<=0) continue;
+                ctx.save();
+                // Warning phase
+                if(gl.timer<40){
+                    ctx.strokeStyle=`rgba(0,200,255,${prog*0.5})`;ctx.lineWidth=1;
+                    ctx.setLineDash([10,10]);
+                } else {
+                    ctx.strokeStyle=`rgba(0,220,255,${prog*0.9})`;ctx.lineWidth=3;
+                    ctx.shadowBlur=15;ctx.shadowColor='#00ccff';
+                    ctx.setLineDash([]);
+                }
+                ctx.beginPath();ctx.moveTo(gl.x1,gl.y1);ctx.lineTo(gl.x2,gl.y2);ctx.stroke();
+                // Inner bright line
+                if(gl.timer>=40){
+                    ctx.strokeStyle=`rgba(200,240,255,${prog*0.6})`;ctx.lineWidth=1;
+                    ctx.beginPath();ctx.moveTo(gl.x1,gl.y1);ctx.lineTo(gl.x2,gl.y2);ctx.stroke();
+                }
+                ctx.shadowBlur=0;ctx.setLineDash([]);ctx.restore();
+            }
+
+            // --- Scan beam ---
+            if(nx7.scanBeam.active){
+                const ba=nx7.scanBeam.angle;
+                const beamLen=Math.max(W,H)*1.5;
+                const warmProg=Math.min(1,nx7.scanBeam.warming/50);
+                // Warning line
+                ctx.strokeStyle=`rgba(0,200,255,${warmProg*0.3})`;ctx.lineWidth=1;ctx.setLineDash([8,8]);
+                ctx.beginPath();ctx.moveTo(nx7.x,nx7.y);
+                ctx.lineTo(nx7.x+Math.cos(ba)*beamLen,nx7.y+Math.sin(ba)*beamLen);ctx.stroke();ctx.setLineDash([]);
+                // Active beam
+                if(warmProg>=1){
+                    ctx.save();ctx.translate(nx7.x,nx7.y);ctx.rotate(ba);
+                    ctx.fillStyle='rgba(0,50,80,0.2)';ctx.fillRect(0,-30,beamLen,60);
+                    ctx.shadowBlur=30;ctx.shadowColor='#00ccff';
+                    ctx.fillStyle=`rgba(0,180,255,0.5)`;ctx.fillRect(0,-12,beamLen,24);
+                    ctx.fillStyle=`rgba(150,230,255,0.7)`;ctx.fillRect(0,-5,beamLen,10);
+                    ctx.fillStyle=`rgba(255,255,255,0.8)`;ctx.fillRect(0,-2,beamLen,4);
+                    ctx.shadowBlur=0;ctx.restore();
+                }
+            }
+
+            // --- Predictive aim reticle ---
+            if(nx7.predictAim.show&&!nxPurging){
+                const px=nx7.predictAim.x,py=nx7.predictAim.y;
+                ctx.strokeStyle=`rgba(255,100,100,${0.3+nxPulse*0.3})`;ctx.lineWidth=1.5;
+                ctx.setLineDash([4,4]);
+                ctx.beginPath();ctx.arc(px,py,18+Math.sin(T/80)*4,0,Math.PI*2);ctx.stroke();
+                ctx.setLineDash([]);
+                // Crosshair
+                ctx.strokeStyle=`rgba(255,100,100,${0.4+nxPulse*0.2})`;ctx.lineWidth=1;
+                ctx.beginPath();ctx.moveTo(px-10,py);ctx.lineTo(px+10,py);ctx.moveTo(px,py-10);ctx.lineTo(px,py+10);ctx.stroke();
+                // Line from boss to target
+                ctx.strokeStyle='rgba(255,80,80,0.1)';ctx.lineWidth=1;
+                ctx.beginPath();ctx.moveTo(nx7.x,nx7.y);ctx.lineTo(px,py);ctx.stroke();
+            }
+
+            // --- Clones ---
+            for(const cl of nx7.clones){
+                ctx.save();ctx.translate(cl.x,cl.y);
+                ctx.globalAlpha=0.4+Math.sin(T/100+cl.x)*0.15;
+                // Clone body — semi-transparent icosahedron
+                ctx.strokeStyle='#00aaff';ctx.lineWidth=1.5;ctx.fillStyle='rgba(0,40,60,0.3)';
+                ctx.beginPath();
+                for(let i=0;i<8;i++){
+                    const a=(Math.PI*2/8)*i+T/500;
+                    const r=cl.r*(i%2===0?1:0.75);
+                    i===0?ctx.moveTo(Math.cos(a)*r,Math.sin(a)*r):ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r);
+                }
+                ctx.closePath();ctx.fill();ctx.stroke();
+                // Clone eye
+                ctx.fillStyle='rgba(0,200,255,0.5)';
+                ctx.beginPath();ctx.arc(0,0,6,0,Math.PI*2);ctx.fill();
+                ctx.globalAlpha=1;ctx.restore();
+            }
+
+            // --- Rewrite visual overlay ---
+            if(nx7.rewriting){
+                const rwAlpha=0.08+Math.sin(T/30)*0.04;
+                ctx.fillStyle=`rgba(255,0,0,${rwAlpha})`;ctx.fillRect(0,0,W,H);
+                // Static noise
+                ctx.globalAlpha=0.15;
+                for(let si=0;si<40;si++){
+                    ctx.fillStyle=Math.random()>0.5?'#ff0000':'#000';
+                    ctx.fillRect(Math.random()*W,Math.random()*H,Math.random()*30+5,2);
+                }
+                ctx.globalAlpha=1;
+                // Warning text
+                ctx.fillStyle=`rgba(255,50,50,${0.5+Math.sin(T/50)*0.3})`;
+                ctx.font='bold 20px Courier New';ctx.textAlign='center';
+                ctx.fillText('// CONTROLS REWRITTEN //',W/2,40);
+            }
+
+            // --- Purge cinematic effects ---
+            if(nxPurging){
+                const pProg=Math.min(1,nx7.purgeTimer/2800);
+
+                // Screen darkening vignette — intensifies over time
+                ctx.globalAlpha=0.15+pProg*0.35;
+                ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+                ctx.globalAlpha=1;
+
+                // Red danger vignette at edges
+                const dangerVig=ctx.createRadialGradient(W/2,H/2,W*0.2,W/2,H/2,W*0.8);
+                dangerVig.addColorStop(0,'transparent');
+                dangerVig.addColorStop(1,`rgba(80,0,0,${0.1+pProg*0.3})`);
+                ctx.fillStyle=dangerVig;ctx.fillRect(0,0,W,H);
+
+                // Glitch scanlines — more intense as purge progresses
+                if(Math.random()<pProg*0.4){
+                    ctx.globalAlpha=0.05+pProg*0.1;
+                    const glitchY=Math.random()*H;
+                    const glitchH=2+Math.random()*6;
+                    ctx.fillStyle=Math.random()>0.5?'#ff0000':'#00ffff';
+                    ctx.fillRect(0,glitchY,W,glitchH);
+                    // Horizontal shift glitch
+                    if(Math.random()<0.3){
+                        const shift=(Math.random()-0.5)*20*pProg;
+                        ctx.drawImage(canvas,0,glitchY,W,glitchH,shift,glitchY,W,glitchH);
+                    }
+                    ctx.globalAlpha=1;
+                }
+
+                // Purge beams from offscreen — more beams, more dramatic over time
+                if(nx7.purgeTimer>200){
+                    const beamCount=Math.min(6,1+Math.floor(pProg*5));
+                    for(let bi=0;bi<beamCount;bi++){
+                        const seed=bi*137+nx7.purgeTimer*0.008;
+                        const bx=nx7.x+(Math.sin(seed)*15);
+                        const by=nx7.y+(Math.cos(seed*1.3)*15);
+                        const fromAngle=Math.PI*2/beamCount*bi+Math.sin(T/200+bi)*0.4;
+                        const fx=bx-Math.cos(fromAngle)*900;
+                        const fy=by-Math.sin(fromAngle)*900;
+                        const beamAlpha=0.2+pProg*0.4+Math.sin(T/60+bi)*0.15;
+                        // Outer glow beam
+                        ctx.strokeStyle=`rgba(255,20,20,${beamAlpha*0.3})`;
+                        ctx.lineWidth=12+pProg*8;ctx.shadowBlur=40;ctx.shadowColor='#ff0000';
+                        ctx.beginPath();ctx.moveTo(fx,fy);ctx.lineTo(bx,by);ctx.stroke();
+                        // Main beam
+                        ctx.strokeStyle=`rgba(255,50,30,${beamAlpha})`;
+                        ctx.lineWidth=3+pProg*3;
+                        ctx.beginPath();ctx.moveTo(fx,fy);ctx.lineTo(bx,by);ctx.stroke();
+                        // Core beam
+                        ctx.strokeStyle=`rgba(255,180,150,${beamAlpha*0.7})`;
+                        ctx.lineWidth=1+pProg;
+                        ctx.beginPath();ctx.moveTo(fx,fy);ctx.lineTo(bx,by);ctx.stroke();
+                        ctx.shadowBlur=0;
+                        // Impact sparks at boss
+                        if(Math.random()<0.15){
+                            ctx.fillStyle='#ff6644';
+                            ctx.beginPath();ctx.arc(bx+(Math.random()-0.5)*10,by+(Math.random()-0.5)*10,2+Math.random()*2,0,Math.PI*2);ctx.fill();
+                        }
+                    }
+                }
+
+                // Floating debris/data fragments dissolving away
+                if(nx7.purgeTimer%12===0&&nx7.purgeTimer<2750){
+                    const da=Math.random()*Math.PI*2;
+                    const dd=nx7.r*0.3+Math.random()*nx7.r*0.8;
+                    particles.push({x:nx7.x+Math.cos(da)*dd,y:nx7.y+Math.sin(da)*dd,
+                        dx:(Math.random()-0.5)*2,dy:-1-Math.random()*2,
+                        life:30+Math.random()*20,maxLife:50,color:Math.random()>0.6?'#ff4444':'#00aaff',size:2+Math.random()*2});
+                }
+            }
+
+            // --- Purge terminal messages ---
+            if(G.nexusPurgeMessages.length>0){
+                // Dark backdrop behind text for readability
+                ctx.fillStyle='rgba(0,0,0,0.5)';
+                ctx.fillRect(15,25,W*0.7,Math.min(G.nexusPurgeMessages.length,7)*28+20);
+
+                ctx.font='bold 16px Courier New';ctx.textAlign='left';
+                const visible=G.nexusPurgeMessages.slice(-7);
+                for(let mi=0;mi<visible.length;mi++){
+                    const m=visible[mi];
+                    // Fade in smoothly, older messages dim
+                    const fadeIn=Math.min(1,m.age/30);
+                    const dimFactor=mi===visible.length-1?1:(0.5+0.5*(mi/visible.length));
+                    const alpha=fadeIn*dimFactor;
+
+                    // Sys messages glow red, NEXUS messages glow cyan
+                    if(m.src==='sys'){
+                        ctx.shadowBlur=8;ctx.shadowColor='#ff0000';
+                        ctx.fillStyle=`rgba(255,60,40,${alpha})`;
+                    } else {
+                        ctx.shadowBlur=6;ctx.shadowColor='#00aaff';
+                        ctx.fillStyle=`rgba(0,220,255,${alpha})`;
+                    }
+                    ctx.fillText(m.text,30,55+mi*28);
+
+                    // Typewriter cursor on newest message
+                    if(mi===visible.length-1&&m.age<40){
+                        const cursorBlink=Math.sin(m.age*0.3)>0;
+                        if(cursorBlink){
+                            const tw=ctx.measureText(m.text).width;
+                            ctx.fillRect(32+tw,42+mi*28,10,18);
+                        }
+                    }
+                }
+                ctx.shadowBlur=0;
+            }
+
+            // --- Data nodes ---
+            for(const nd of nx7.dataNodes){
+                ctx.save();ctx.translate(nd.x,nd.y);
+                if(nd.dying){
+                    ctx.globalAlpha=nd.dieTimer/15;
+                }
+                ctx.rotate(T/300+nd.orbitAngle);
+                // Tetrahedron shape
+                ctx.fillStyle='rgba(0,40,60,0.7)';ctx.strokeStyle='#00ccff';ctx.lineWidth=1.5;
+                ctx.shadowBlur=10;ctx.shadowColor='#00aaff';
+                ctx.beginPath();
+                ctx.moveTo(0,-nd.r);ctx.lineTo(nd.r*0.87,nd.r*0.5);ctx.lineTo(-nd.r*0.87,nd.r*0.5);
+                ctx.closePath();ctx.fill();ctx.stroke();
+                ctx.shadowBlur=0;
+                // Core dot
+                ctx.fillStyle='#00ffff';ctx.beginPath();ctx.arc(0,0,2,0,Math.PI*2);ctx.fill();
+                ctx.globalAlpha=1;ctx.restore();
+            }
+
+            // --- NEXUS-0 body (in boss translate) ---
+            ctx.save();ctx.translate(nx7.x,nx7.y);
+
+            // Holographic grid aura
+            ctx.globalAlpha=nxPurging?0.02:0.04;
+            ctx.save();ctx.rotate(T/800);
+            for(let gr=nx7.r+10;gr<nx7.r+40;gr+=10){
+                ctx.strokeStyle=nxPurging?'#ff2222':'#00aaff';ctx.lineWidth=0.5;
+                ctx.beginPath();
+                for(let i=0;i<6;i++){const a=Math.PI*2/6*i;ctx.lineTo(Math.cos(a)*gr,Math.sin(a)*gr);}
+                ctx.closePath();ctx.stroke();
+            }
+            ctx.restore();ctx.globalAlpha=1;
+
+            // Shell panels (intact ones)
+            for(const p of nx7.panels){
+                if(!p.intact&&!nxPurging) continue;
+                if(!p.intact){
+                    // Drifting away during purge
+                    p.drift+=0.3;
+                    const px2=Math.cos(p.angle)*(p.dist+p.drift*5)+Math.cos(p.driftAngle)*p.drift*2;
+                    const py2=Math.sin(p.angle)*(p.dist+p.drift*5)+Math.sin(p.driftAngle)*p.drift*2;
+                    ctx.globalAlpha=Math.max(0,1-p.drift/40);
+                    ctx.fillStyle='#0a1520';ctx.strokeStyle=nxPurging?'#ff222266':'#00668866';ctx.lineWidth=1;
+                    ctx.beginPath();ctx.arc(px2,py2,p.size*0.3,0,Math.PI*2);ctx.fill();ctx.stroke();
+                    ctx.globalAlpha=1;
+                    continue;
+                }
+                const px2=Math.cos(p.angle)*p.dist;
+                const py2=Math.sin(p.angle)*p.dist;
+                ctx.save();ctx.translate(px2,py2);ctx.rotate(p.angle+Math.PI/2);
+                // Panel shape
+                const panelCol=p.cracked?(nxP>=3?'#0a1a28':'#0a1822'):'#0c2030';
+                ctx.fillStyle=panelCol;
+                ctx.strokeStyle=p.cracked?`rgba(0,150,200,${0.3+nxPulse*0.2})`:`rgba(0,180,255,${0.5+nxPulse*0.2})`;
+                ctx.lineWidth=p.cracked?1:1.5;
+                ctx.beginPath();
+                ctx.moveTo(-p.size*0.4,-p.size*0.3);ctx.lineTo(p.size*0.4,-p.size*0.3);
+                ctx.lineTo(p.size*0.3,p.size*0.3);ctx.lineTo(-p.size*0.3,p.size*0.3);
+                ctx.closePath();ctx.fill();ctx.stroke();
+                // Circuit lines on panel
+                if(!p.cracked){
+                    ctx.strokeStyle='rgba(0,200,255,0.15)';ctx.lineWidth=0.5;
+                    ctx.beginPath();ctx.moveTo(-p.size*0.2,0);ctx.lineTo(p.size*0.2,0);ctx.stroke();
+                    ctx.beginPath();ctx.moveTo(0,-p.size*0.15);ctx.lineTo(0,p.size*0.15);ctx.stroke();
+                }
+                // Crack effect
+                if(p.cracked){
+                    ctx.strokeStyle='rgba(0,200,255,0.4)';ctx.lineWidth=0.8;
+                    ctx.beginPath();ctx.moveTo(-p.size*0.1,-p.size*0.2);
+                    ctx.lineTo(p.size*0.05,0);ctx.lineTo(-p.size*0.08,p.size*0.15);ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            // Inner core glow
+            const coreCol=nxPurging?'#ff2222':'#00ddff';
+            const corePulse=nxPurging?(0.3+Math.sin(T/40)*0.3):(0.5+nxPulse*0.3);
+            const coreR=12+corePulse*4+(1-hpPct7)*8; // core grows as shell falls off
+            ctx.shadowBlur=nxPurging?40:30;ctx.shadowColor=coreCol;
+            // Outer glow
+            const coreG=ctx.createRadialGradient(0,0,0,0,0,coreR+15);
+            coreG.addColorStop(0,nxPurging?'rgba(255,50,50,0.3)':'rgba(0,200,255,0.3)');
+            coreG.addColorStop(1,'transparent');
+            ctx.fillStyle=coreG;ctx.beginPath();ctx.arc(0,0,coreR+15,0,Math.PI*2);ctx.fill();
+            // Core body
+            ctx.fillStyle=coreCol;ctx.beginPath();ctx.arc(0,0,coreR,0,Math.PI*2);ctx.fill();
+            // Inner bright
+            ctx.fillStyle=nxPurging?'#ff8888':'#aaeeff';
+            ctx.beginPath();ctx.arc(0,0,coreR*0.5,0,Math.PI*2);ctx.fill();
+            // White hot center — the "eye"
+            ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,0,coreR*0.25,0,Math.PI*2);ctx.fill();
+            ctx.shadowBlur=0;
+
+            // Eye tracking — pupil follows player
+            const eyeAngle=Math.atan2(ship.y-nx7.y,ship.x-nx7.x);
+            const eyeOff=coreR*0.15;
+            ctx.fillStyle=nxPurging?'#440000':'#003344';
+            ctx.beginPath();ctx.arc(Math.cos(eyeAngle)*eyeOff,Math.sin(eyeAngle)*eyeOff,coreR*0.18,0,Math.PI*2);ctx.fill();
+
+            ctx.restore(); // end boss translate
+
+            // --- AWAITING hint ---
+            if(G.nexusListening&&!boss){
+                // This is drawn in draw(), not here, but just in case boss is active
+            }
+
+            ctx.save();ctx.translate(boss.x,boss.y); // re-enter for the final restore
         } else if(boss.type===5){
             // --- SNAKE BOSS --- (drawn from tail to head)
             ctx.restore(); // Undo the translate(boss.x, boss.y) — we draw each segment separately
@@ -3132,6 +3937,7 @@ function draw() {
             tl('Boss timer: '+boss.timer);
             if(boss.type===5) tl('Segments: '+boss.segmentsAlive+' | Head vuln: '+boss.headVulnerable);
             if(boss.type===6) tl('P2:'+boss.phase2+' P3:'+boss.phase3+' | Rage:'+boss.rageMultiplier.toFixed(2)+' | Pillars:'+boss.flamePillars.length+' Bats:'+boss.batProjectiles.length+' Fire:'+boss.fireTrail.length);
+            if(boss.type===7) tl('P'+((boss.phase3?3:boss.phase2?2:1))+' | Nodes:'+boss.dataNodes.length+' Grid:'+boss.gridLines.length+' Clones:'+boss.clones.length+(boss.purging?' PURGING:'+boss.purgeTimer:'')+(boss.rewriting?' REWRITE':''));
             if(boss.type===3||boss.type===10) tl('Phase2: '+boss.phase2);
         }
         if(G.gilbert){
@@ -3159,6 +3965,14 @@ function draw() {
                 ctx.beginPath();ctx.arc(boss.x,boss.y,boss.r,0,Math.PI*2);ctx.stroke();
             }
         }
+        ctx.globalAlpha=1;
+    }
+
+    // NEXUS-0: "AWAITING..." hint when listening
+    if(G.nexusListening&&!G.nexusDefeated&&!(boss&&boss.type===7)){
+        ctx.globalAlpha=0.12+Math.sin(T/800)*0.06;
+        ctx.fillStyle='#00aaff';ctx.font='12px Courier New';ctx.textAlign='right';
+        ctx.fillText('> AWAITING SIGNAL...',W-15,H-15);
         ctx.globalAlpha=1;
     }
 

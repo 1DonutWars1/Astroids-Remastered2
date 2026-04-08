@@ -29,6 +29,7 @@ const GILBERT_INTROS = {
     boss5:    "What IS that thing?! A snake?! Destroy the asteroids on its body first!",
     boss10:   "No way... that's Sans. This is the real deal. Stay sharp!",
     boss6:    "What the — do you FEEL that heat?! That thing is radiating pure fire. I've never seen anything like it... be VERY careful!",
+    boss7:    "What is THAT?! It came out of nowhere — I don't think it's on any star chart!",
     // Pickups
     forcefield: "Ooh a shield! That'll absorb hits for you. Don't waste it!",
     tripleshot: "Triple shot! Now you're cookin! Chews through ammo though.",
@@ -297,6 +298,8 @@ function updateGilbert(){
             // Slow idle spin when no target
             G.gilbert.angle+=0.01;
         }
+        // Suppress Gilbert shooting while NEXUS sequence is being input
+        if(G.nexusListening&&!G.nexusDefeated&&G.level<=3){ return; }
         if(G.gilbertShootTimer>gFireRate&&aimTarget){
             const angle=Math.atan2(aimTarget.y-G.gilbert.y,aimTarget.x-G.gilbert.x);
             bullets.push({x:G.gilbert.x+Math.cos(angle)*G.gilbert.r,

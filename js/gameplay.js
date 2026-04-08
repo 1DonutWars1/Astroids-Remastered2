@@ -34,6 +34,8 @@ function startGame() {
     G.gilbertQuip=''; G.gilbertQuipTimer=0;
     G.gilbertSeen={};
     G.grimmSpawned=false; G.grimmDefeated=false;
+    G.nexusDefeated=false; G.nexusShotLog=[]; G.nexusPurging=false;
+    G.nexusPurgeTimer=0; G.nexusPurgeMessages=[]; G.nexusPurgeMessageTimer=0;
     // Reset inventory UI state (data itself is restored from save below)
     G.inventoryOpen=false; G.inventorySelection=0;
     G.dataFragmentPopup=null;
@@ -312,9 +314,39 @@ function clearAll(){
     ammoBoxes=[];powerups=[];particles=[];shieldFlashes=[];
     G.cyborgScraps=[];
     if(boss&&boss.type===6){boss.flamePillars=[];boss.batProjectiles=[];boss.fireTrail=[];}
+    if(boss&&boss.type===7){boss.dataNodes=[];boss.gridLines=[];boss.clones=[];boss.scanBeam.active=false;boss.rewriting=false;}
 }
 function giveShield(){
     G.hasForceField=true;G.shieldFuel=getMaxShieldFuel();updateShieldUI();
+}
+function devConsoleExec(){
+    const input=document.getElementById('devConsoleInput');
+    const output=document.getElementById('devConsoleOutput');
+    const cmd=(input.value||'').trim().toLowerCase();
+    input.value='';
+    if(!cmd) return;
+    output.textContent='> '+cmd.toUpperCase()+'\n';
+    if(cmd==='nexus'||cmd==='nexus-0'||cmd==='nexus0'||cmd==='nexus 0'||cmd==='nexus-zero'||cmd.startsWith('nexus')){
+        if(G.nexusDefeated){
+            output.textContent+='> NEXUS-0 — STATUS: PURGED\n> NO SIGNAL REMAINING.\n';
+        } else if(G.nexusListening){
+            output.textContent+='> NEXUS-0 ALREADY LISTENING.\n> TRANSMIT SEQUENCE IN SECTOR 1.\n';
+        } else {
+            G.nexusListening=true; G.nexusShotLog=[];
+            output.textContent+='> NEXUS-0 FRAGMENT DETECTED\n';
+            output.textContent+='> DECRYPTION REQUIRES FIELD VERIFICATION\n';
+            output.textContent+='> TRANSMIT AUTHENTICATION SEQUENCE:\n';
+            output.textContent+='>   . . .  *  . .  * * *\n';
+            output.textContent+='> AWAITING SIGNAL IN SECTOR 1...\n';
+        }
+    } else if(cmd==='help'){
+        output.textContent+='> AVAILABLE: HELP, STATUS\n> OTHER COMMANDS MAY EXIST.\n';
+    } else if(cmd==='status'){
+        output.textContent+='> LEVEL: '+G.level+' | SCORE: '+G.score+'\n';
+        output.textContent+='> NEXUS: '+(G.nexusListening?'LISTENING':'DORMANT')+'\n';
+    } else {
+        output.textContent+='> UNKNOWN COMMAND: '+cmd.toUpperCase()+'\n';
+    }
 }
 
 // Practice menu
@@ -366,9 +398,15 @@ function spawnAsteroid(x,y,r,type='normal') {
         angle:Math.random()*Math.PI*2, rot:(Math.random()-0.5)*0.04
     });
 }
-function fireBullet(offset=0) {
-    bullets.push({x:ship.x+Math.cos(ship.a)*ship.r, y:ship.y+Math.sin(ship.a)*ship.r,
-        dx:Math.cos(ship.a+offset)*bulletSpeed, dy:Math.sin(ship.a+offset)*bulletSpeed, trail:[]});
+let _nexusShotGroup=0;
+function fireBullet(offset=0,isFirstOfVolley=false) {
+    const b={x:ship.x+Math.cos(ship.a)*ship.r, y:ship.y+Math.sin(ship.a)*ship.r,
+        dx:Math.cos(ship.a+offset)*bulletSpeed, dy:Math.sin(ship.a+offset)*bulletSpeed, trail:[]};
+    // NEXUS sequence tracking — only tag the first bullet of each shot volley
+    if(isFirstOfVolley&&G.nexusListening&&!G.nexusDefeated){
+        b._nexusTracked=true;
+    }
+    bullets.push(b);
 }
 function shoot() {
     if(G.shotTimer>0||(boss&&(boss.state==='enter'||boss.state==='dialogue'))||G.gilbertDialogue) return;
@@ -376,9 +414,9 @@ function shoot() {
     Sound.shoot();
     if(G.tripleShotTimer>0) {
         if(!G.hyperGun&&!G.infAmmo&&G.ammo<3) return;
-        fireBullet(0);fireBullet(-0.12);fireBullet(0.12);
+        fireBullet(0,true);fireBullet(-0.12);fireBullet(0.12);
         if(!G.hyperGun&&!G.infAmmo) G.ammo-=3;
-    } else { fireBullet(0); if(!G.hyperGun&&!G.infAmmo) G.ammo--; }
+    } else { fireBullet(0,true); if(!G.hyperGun&&!G.infAmmo) G.ammo--; }
     G.shotTimer = G.hyperGun ? 1 : SHOT_CD;
     G.shotsFired++; if(G.shotsFired>=500&&window.DLC&&window.DLC.loaded)unlockAch('dlc_trigger_happy');
     updateUI();
@@ -420,7 +458,8 @@ function spawnBoss(type) {
     const isSans = (type===3||type===10);
     const diff=DIFFICULTY[currentDifficulty]||DIFFICULTY.normal;
     let hp;
-    if(type===6) hp=Math.round(60*diff.bossHp);
+    if(type===7) hp=Math.round(50*diff.bossHp);
+    else if(type===6) hp=Math.round(60*diff.bossHp);
     else if(type===5) hp=Math.round(10*diff.bossHp);
     else if(type===4) hp=Math.round(30*diff.bossHp);
     else if(isSans) hp=G.practice?pSettings.b3hp:Math.round(100*diff.bossHp);
@@ -451,6 +490,27 @@ function spawnBoss(type) {
                 verts,offsets,angle:Math.random()*Math.PI*2,rot:(Math.random()-0.5)*0.03});
         }
         boss.segmentsAlive=10;
+    } else if(type===7){
+        // --- NEXUS-0 SECRET BOSS ---
+        boss={type:7,x:W/2,y:-80,r:38,hp,maxHp:hp,angle:Math.PI/2,dx:0,dy:2,
+            state:'enter',timer:0,phase2:false,phase3:false,
+            attackPattern:0,
+            // Unique NEXUS systems
+            dataNodes:[],maxNodes:4,nodeRebuildTimer:0,
+            gridLines:[],scanBeam:{angle:0,active:false,speed:0.02,warming:0},
+            clones:[],rewriting:false,rewriteTimer:0,
+            predictAim:{x:0,y:0,show:false},
+            // Shell panels (visual HP indicator — no HP bar)
+            panels:[], panelCount:20,
+            // Purge sequence
+            purging:false,purgeTimer:0,
+            wallSide:null,wallTimer:0};
+        // Build shell panels
+        for(let i=0;i<boss.panelCount;i++){
+            const a=(Math.PI*2/boss.panelCount)*i;
+            boss.panels.push({angle:a,dist:boss.r*0.9+Math.random()*5,size:boss.r*0.45,
+                intact:true,cracked:false,alpha:1,drift:0,driftAngle:0});
+        }
     } else if(type===6){
         // --- NIGHTMARE KING GRIMM BOSS ---
         boss={type:6,x:W/2,y:-80,r:40,hp,maxHp:hp,angle:Math.PI/2,dx:0,dy:2,
@@ -474,12 +534,16 @@ function spawnBoss(type) {
     else if(type===4) Sound.playMusic('boss4');
     else if(type===5) Sound.playMusic('boss5');
     else if(type===6) Sound.playMusic('grimm');
+    else if(type===7) Sound.playMusic('nexus');
     Sound.bossWarn();
+    // NEXUS-0: no HP bar
+    if(type===7) document.getElementById('bossRow').style.display='none';
     // Gilbert intro for bosses
     if(window.DLC&&window.DLC.loaded){
         if(type===4) gilbertIntro('boss4',GILBERT_INTROS.boss4);
         if(type===5) gilbertIntro('boss5',GILBERT_INTROS.boss5);
         if(type===6) gilbertIntro('boss6',GILBERT_INTROS.boss6);
+        if(type===7) gilbertIntro('boss7',GILBERT_INTROS.boss7);
         if(type===10) gilbertIntro('boss10',GILBERT_INTROS.boss10);
     }
 }

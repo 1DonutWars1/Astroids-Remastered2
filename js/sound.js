@@ -11,7 +11,7 @@ const Sound = {
         this.master.connect(this.ctx.destination);
         this.initTracks();
     },
-    bgmAudio: null, boss3Audio: null, boss3P2Audio: null, boss4Audio: null, boss5Audio: null, rougeAudio: null, grimmAudio: null, currentTrack: 'none',
+    bgmAudio: null, boss3Audio: null, boss3P2Audio: null, boss4Audio: null, boss5Audio: null, rougeAudio: null, grimmAudio: null, nexusAudio: null, currentTrack: 'none',
     initTracks() {
         this.bgmAudio = document.getElementById('bgmTrack');
         this.boss3Audio = document.getElementById('boss3Track');
@@ -20,6 +20,7 @@ const Sound = {
         this.boss5Audio = document.getElementById('boss5Track');
         this.rougeAudio = document.getElementById('rougeTrack');
         this.grimmAudio = document.getElementById('grimmTrack');
+        this.nexusAudio = document.getElementById('nexusTrack');
         if(this.bgmAudio) this.bgmAudio.volume = 0.8;
         if(this.boss3Audio) this.boss3Audio.volume = 0.8;
         if(this.boss3P2Audio) this.boss3P2Audio.volume = 0.8;
@@ -27,6 +28,7 @@ const Sound = {
         if(this.boss5Audio) this.boss5Audio.volume = 0.8;
         if(this.rougeAudio) this.rougeAudio.volume = 0.8;
         if(this.grimmAudio) this.grimmAudio.volume = 0.8;
+        if(this.nexusAudio) this.nexusAudio.volume = 0.8;
     },
     toggleMute() {
         this.muted = !this.muted;
@@ -39,6 +41,7 @@ const Sound = {
         if(this.boss5Audio) this.boss5Audio.volume = vol;
         if(this.rougeAudio) this.rougeAudio.volume = vol;
         if(this.grimmAudio) this.grimmAudio.volume = vol;
+        if(this.nexusAudio) this.nexusAudio.volume = vol;
     },
     tone(freq, dur, type, vol, slide) {
         if (!this.ctx || this.muted) return;
@@ -69,6 +72,7 @@ const Sound = {
         if(this.boss5Audio){this.boss5Audio.pause();this.boss5Audio.currentTime=0;}
         if(this.rougeAudio){this.rougeAudio.pause();this.rougeAudio.currentTime=0;}
         if(this.grimmAudio){this.grimmAudio.pause();this.grimmAudio.currentTime=0;}
+        if(this.nexusAudio){this.nexusAudio.pause();this.nexusAudio.currentTime=0;}
     },
 
     // Synth fallbacks
@@ -105,6 +109,34 @@ const Sound = {
             if(this._step%4===0&&this._step>16){const mel=[12,14,16,14,12,9,7,9];this.tone(f(chord[0]+mel[(this._step/4)%8]),0.25,'sawtooth',0.15);}
             this._step++;
         },187);
+    },
+    _synthNexus() {
+        this._step=0;
+        this._musicTimer=setInterval(()=>{
+            if(!G.running||this.muted)return;
+            const f=m=>440*Math.pow(2,(m-69)/12);
+            // Cold digital pulse — low drone + metallic pings
+            const beat=this._step%32;
+            // Bass drone — alternating tritone
+            if(beat%8===0){
+                const bass=[28,28,34,28][Math.floor(this._step/32)%4];
+                this.tone(f(bass),0.4,'sawtooth',0.15);
+            }
+            // Metallic ping arpeggio
+            if(beat%4===0&&beat>8){
+                const pings=[72,75,79,84,79,75,72,68];
+                this.tone(f(pings[(this._step/4)%pings.length]),0.08,'sine',0.1);
+            }
+            // Glitch hit
+            if(beat===0||beat===12||beat===22){
+                this.tone(f(40+Math.random()*30),0.04,'square',0.2);
+            }
+            // High eerie whistle
+            if(this._step%16===0){
+                this.tone(f(90+Math.sin(this._step*0.1)*5),0.3,'sine',0.04);
+            }
+            this._step++;
+        },110);
     },
     _synthBoss3(phase2) {
         this._step=0;
@@ -156,6 +188,11 @@ const Sound = {
             if(this.rougeAudio&&!this.muted){
                 this.rougeAudio.play().catch(()=>{this._synthBoss1();});
             } else this._synthBoss1();
+        }
+        else if(track==='nexus'){
+            if(this.nexusAudio&&!this.muted){
+                this.nexusAudio.play().catch(()=>{this._synthNexus();});
+            } else this._synthNexus();
         }
         else if(track==='grimm'){
             if(this.grimmAudio&&!this.muted){

@@ -67,7 +67,10 @@ const G = {
     dataFragmentsSeen: [],
     dataFragmentPopup: null,
     // Grimm boss (optional level 7)
-    grimmSpawned: false, grimmDefeated: false
+    grimmSpawned: false, grimmDefeated: false,
+    // NEXUS-0 (secret boss)
+    nexusListening: false, nexusDefeated: false, nexusShotLog: [], nexusPurging: false,
+    nexusPurgeTimer: 0, nexusPurgeMessages: [], nexusPurgeMessageTimer: 0
 };
 
 let pSettings = { bulletSpeed: 8, ammo: 50, b1hp: 25, b2hp: 45, b3hp: 100 };

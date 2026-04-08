@@ -28,7 +28,8 @@
         { id:'dlc_short_circuit',  icon:'🤖', name:'Short Circuit',  desc:'Defeat the Cyborg boss (DLC)' },
         { id:'dlc_gilberts_friend', icon:'💚', name:"Gilbert's Friend", desc:'Rescue and repair Gilbert (DLC)' },
         { id:'dlc_serpent_slayer', icon:'🐍', name:'Serpent Slayer', desc:'Defeat the Snake boss (DLC)' },
-        { id:'dlc_nightmares_end', icon:'🔥', name:"Nightmare's End", desc:'Defeat the Nightmare King Grimm (DLC)' }
+        { id:'dlc_nightmares_end', icon:'🔥', name:"Nightmare's End", desc:'Defeat the Nightmare King Grimm (DLC)' },
+        { id:'dlc_protocol_breach', icon:'👁️', name:'Protocol Breach', desc:'Witness the deletion of NEXUS-0 (DLC)' }
     ];
 
     window.DLC.init = function() {

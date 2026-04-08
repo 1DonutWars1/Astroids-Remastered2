@@ -1302,6 +1302,38 @@ function _runTerminalCommand(raw){
         out.push("The system cannot find the file specified.","");
         return out;
     }
+    // NEXUS-0 secret command
+    if(cmd==='nexus'||cmd==='nexus-0'||cmd==='nexus0'||cmd==='nexus.exe'){
+        if(G.nexusDefeated){
+            out.push(
+                "Querying NEXUS registry...",
+                "",
+                "> NEXUS-0 — STATUS: PURGED",
+                "> UNIT ERASED. NO SIGNAL REMAINING.",
+                "");
+        } else if(G.nexusListening){
+            out.push(
+                "> NEXUS-0 ALREADY LISTENING.",
+                "> TRANSMIT AUTHENTICATION IN THE FIELD.",
+                ">   . . .  *  . .  * * *",
+                "");
+        } else {
+            G.nexusListening=true; G.nexusShotLog=[];
+            out.push(
+                "Querying NEXUS registry...",
+                "",
+                "WARNING: Accessing decommissioned unit archive.",
+                "",
+                "> NEXUS-0 FRAGMENT DETECTED",
+                "> DECRYPTION REQUIRES FIELD VERIFICATION",
+                "> TRANSMIT AUTHENTICATION SEQUENCE:",
+                ">   . . .  *  . .  * * *",
+                "",
+                "> AWAITING SIGNAL IN SECTOR 1...",
+                "");
+        }
+        return out;
+    }
     // Unknown command — Windows error message
     out.push("'"+parts[0]+"' is not recognized as an internal or external command,",
              "operable program or batch file.","");
