@@ -259,6 +259,7 @@ function pickClass(cls) {
         playerClass: cls,
         difficulty: difficulty
     };
+    saves[id]._newSave = true; // flag for intro cutscene
     saveToDisk();
     // Now select the slot normally
     selectSlot(id);

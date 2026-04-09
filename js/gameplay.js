@@ -98,6 +98,25 @@ function startGame() {
         }
     }
 
+    // Check for intro cutscene on new save
+    if (G.slotId && saves[G.slotId] && saves[G.slotId]._newSave) {
+        delete saves[G.slotId]._newSave;
+        saveToDisk();
+        G.running = true;
+        startIntroCutscene(function() {
+            // After cutscene ends, start actual gameplay
+            G.running = true;
+            $ui.style.display = 'block';
+            G.waveStart = performance.now(); // reset timers so boss doesn't spawn instantly
+            G.gameStartTime = performance.now();
+            G.spawnTimer = 0; G.ammoTimer = 0; G.powerTimer = 0; G.fuelTimer = 0;
+            for (let i = 0; i < 4; i++) spawnAsteroid();
+            updateUI();
+            Sound.playMusic('bgm');
+        });
+        return;
+    }
+
     if (!G.tutorial) for(let i=0;i<4;i++) spawnAsteroid();
     updateUI(); Sound.playMusic('bgm');
 }

@@ -2,6 +2,8 @@
 //  UPDATE
 // ============================================================
 function update() {
+    // Intro cutscene runs independently of game state
+    if(introCutscene){updateIntroCutscene();return;}
     if(!G.running||G.practicePaused||G.paused||G.fastTravelOpen||G.inventoryOpen) {
         if(!G.practicePaused&&!G.paused){
             for(const a of asteroids){a.x+=a.dx;a.y+=a.dy;a.angle+=a.rot;
@@ -1690,6 +1692,8 @@ function update() {
 //  DRAW (REMASTERED GRAPHICS)
 // ============================================================
 function draw() {
+    // Intro cutscene draws separately
+    if(introCutscene){drawIntroCutscene();return;}
     // Station mode draws separately
     if(G.mode==='station'){drawStation();return;}
     ctx.save();
