@@ -21,7 +21,22 @@ const ACH_DEFS = [
     { id:'rock_crusher',   icon:'🪨', name:'Rock Crusher',    desc:'Destroy 100 asteroids in one game' },
     { id:'bounty_hunter',  icon:'🎪', name:'Bounty Hunter',   desc:'Defeat 5 mini bosses in one game' },
     { id:'last_stand',     icon:'💎', name:'Last Stand',       desc:'Survive a hit with only 1 shield pip left' },
-    { id:'perfectionist',  icon:'🏅', name:'Perfectionist',   desc:'Unlock all other achievements' }
+    { id:'perfectionist',  icon:'🏅', name:'Perfectionist',   desc:'Unlock all other achievements' },
+    { id:'dlc_beyond',         icon:'🚀', name:'Beyond',          desc:'Reach Level 5' },
+    { id:'dlc_endless',        icon:'♾️', name:'Endless Voyager', desc:'Reach Level 7' },
+    { id:'dlc_galactic_hero',  icon:'🌌', name:'Galactic Hero',   desc:'Score 100,000 points' },
+    { id:'dlc_trigger_happy',  icon:'🔫', name:'Trigger Happy',   desc:'Fire 500 shots in one game' },
+    { id:'dlc_chain_reaction', icon:'⛓️', name:'Chain Reaction',  desc:'Destroy 10 enemies without breaking combo' },
+    { id:'dlc_mass_destroyer', icon:'☄️', name:'Mass Destroyer',  desc:'Destroy 250 asteroids in one game' },
+    { id:'dlc_untouchable',    icon:'👻', name:'Untouchable',     desc:'Beat Sans without taking any damage' },
+    { id:'dlc_naked_run',      icon:'🔥', name:'Naked Run',       desc:'Beat Sans without using the shield' },
+    { id:'dlc_hoarder',        icon:'🐿️', name:'Hoarder',        desc:'Have 200+ ammo at once' },
+    { id:'dlc_exterminator',   icon:'🗡️', name:'Exterminator',   desc:'Defeat 10 mini bosses in one game' },
+    { id:'dlc_short_circuit',  icon:'🤖', name:'Short Circuit',  desc:'Defeat the Cyborg boss' },
+    { id:'dlc_gilberts_friend', icon:'💚', name:"Gilbert's Friend", desc:'Rescue and repair Gilbert' },
+    { id:'dlc_serpent_slayer', icon:'🐍', name:'Serpent Slayer', desc:'Defeat the Snake boss' },
+    { id:'dlc_nightmares_end', icon:'🔥', name:"Nightmare's End", desc:'Defeat the Nightmare King Grimm' },
+    { id:'dlc_protocol_breach', icon:'👁️', name:'Protocol Breach', desc:'Witness the deletion of NEXUS-0' }
 ];
 
 let achUnlocked = {};

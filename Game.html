@@ -35,15 +35,6 @@
     <button class="ach-close" style="background:#ff4444;margin-top:15px;" onclick="closeBossPractice()">BACK</button>
 </div>
 
-<div id="licenseScreen">
-    <h2>ENTER LICENSE KEY</h2>
-    <p>A valid license key is required to play.</p>
-    <input type="text" id="licenseInput" placeholder="ASTR-XXXX-XXXX-XXXX" maxlength="19" autocomplete="off">
-    <div id="licenseError"></div>
-    <button id="licenseActivate" onclick="validateLicense()">ACTIVATE</button>
-</div>
-
-<div id="watermark"></div>
 
 <div id="splash">
     <h1>ASTEROIDS</h1>
@@ -240,7 +231,7 @@
     <div style="margin-top:10px;">
         <button class="btn" style="border-color:#888;color:#888;padding:10px 30px;font-size:16px;" onclick="openSettings()">SETTINGS</button>
         <button class="btn" style="border-color:#ffd700;color:#ffd700;padding:10px 30px;font-size:16px;" onclick="openAchievements()">TROPHIES</button>
-        <button class="btn" id="dlcBtn" style="display:none;border-color:#ff00de;color:#ff00de;padding:10px 30px;font-size:16px;text-shadow:0 0 10px #ff00de;" onclick="openDLC()">DLC</button>
+        <button class="btn" id="testBtn" style="border-color:#00ffaa;color:#00ffaa;padding:10px 30px;font-size:16px;text-shadow:0 0 10px #00ffaa;" onclick="toggleTestMode()">TEST</button>
     </div>
     <div class="controls-hint">Controls customizable in Settings</div>
 </div>
@@ -382,20 +373,19 @@
     </div>
 </div>
 
-<audio id="bgmTrack" src="white_records-8-bit-background-music-for-arcade-game-come-on-mario-164702.mp3" loop preload="auto"></audio>
-<audio id="boss3Track" src="nickpanekaiassets-chiptune-medium-boss-218095.mp3" loop preload="auto"></audio>
-<audio id="boss3Phase2Track" src="audio_keeper-boss-battle-500204.mp3" loop preload="auto"></audio>
-<audio id="boss4Track" src="bouncyrunner-boss-fight-one-400508.mp3" loop preload="auto"></audio>
-<audio id="boss5Track" src="dstechnician-halodrome-120606.mp3" loop preload="auto"></audio>
-<audio id="rougeTrack" src="meak363-stealth-battle-205902 (1).mp3" loop preload="auto"></audio>
-<audio id="grimmTrack" src="04 The Grimm Troupe.mp3" loop preload="auto"></audio>
-<audio id="nexusTrack" src="undertale_079. Your Best Nightmare.mp3" loop preload="auto"></audio>
+<audio id="bgmTrack" src="music/white_records-8-bit-background-music-for-arcade-game-come-on-mario-164702.mp3" loop preload="auto"></audio>
+<audio id="boss3Track" src="music/nickpanekaiassets-chiptune-medium-boss-218095.mp3" loop preload="auto"></audio>
+<audio id="boss3Phase2Track" src="music/audio_keeper-boss-battle-500204.mp3" loop preload="auto"></audio>
+<audio id="boss4Track" src="music/bouncyrunner-boss-fight-one-400508.mp3" loop preload="auto"></audio>
+<audio id="boss5Track" src="music/dstechnician-halodrome-120606.mp3" loop preload="auto"></audio>
+<audio id="rougeTrack" src="music/meak363-stealth-battle-205902 (1).mp3" loop preload="auto"></audio>
+<audio id="grimmTrack" src="music/04 The Grimm Troupe.mp3" loop preload="auto"></audio>
+<audio id="nexusTrack" src="music/undertale_079. Your Best Nightmare.mp3" loop preload="auto"></audio>
 
 <div id="volumeBtn" onclick="Sound.toggleMute()">[ MUTE ]</div>
 
 <div id="canvasWrap" style="position:relative;"><canvas id="c" width="900" height="650"></canvas><div class="crt-overlay"></div></div>
 
-<script src="js/anti-piracy.js"></script>
 <script src="js/sound.js"></script>
 <script src="js/globals.js"></script>
 <script src="js/saves.js"></script>
@@ -408,8 +398,8 @@
 <script src="js/docking-bay.js"></script>
 <script src="js/engine.js"></script>
 
-<!-- DLC auto-loader: if dlc.js exists, it loads and enables DLC features. If not, onerror fires silently. -->
-<script src="dlc.js" onload="checkDLC()" onerror="console.log('[GAME] No DLC found — base game only.')"></script>
+<!-- DLC auto-loader: if dlc.js exists, it loads additional assets. All content is accessible regardless. -->
+<script src="dlc.js" onload="checkDLC()" onerror="console.log('[GAME] No DLC file found — all content included in base game.')"></script>
 <script src="devkey.js" onload="verifyDevKey()" onerror="console.log('[GAME] No dev key found — cheat codes disabled.')"></script>
 
 </body>

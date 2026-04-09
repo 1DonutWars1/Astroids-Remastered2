@@ -34,7 +34,7 @@ G.level6 = {
 //  ENTRY POINT (called from leaveStation when level>=6 + DLC)
 // ============================================================
 function startLevel6(){
-    if(!(window.DLC && window.DLC.loaded)) return;
+    // All content now accessible without DLC
     G.level6.state='warning_pending';
     G.level6.timer=0;
     G.level6.clockStart=performance.now();

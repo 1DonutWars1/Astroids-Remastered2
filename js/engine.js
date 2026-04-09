@@ -88,22 +88,17 @@ function update() {
     // LEVEL TRIGGER (blocked during boss rush and Gilbert events)
     const _l6State=G.level6&&G.level6.state;
     if(!boss&&!G.tutorial&&!G.noBoss&&!G.bossRush&&!_l6State&&(G.gilbertState==='none'||G.gilbertState==='rope'||G.gilbertState==='ally'||G.gilbertState==='scrap_collect')&&elapsed>BOSS_TIME){
-        if(window.DLC&&window.DLC.loaded){
-            // DLC: 10 levels. Bosses at 1, 2, 4(cyborg), 10(sans). Others are wave-only.
-            if(G.level<=2) spawnBoss(G.level);
-            else if(G.level===4) spawnBoss(4);
-            else if(G.level===5) spawnBoss(5);
-            else if(G.level>=10) spawnBoss(10);
-            else if(G.level===7&&!G.grimmSpawned&&!G.grimmDefeated){ /* hold level 7 — Grimm incoming */ }
-            else { G.level++;G.waveStart=performance.now();G.spawnTimer=0;asteroids=[];for(let k=0;k<8;k++)spawnAsteroid();updateUI(); }
-        } else {
-            // No DLC: 3 levels. Boss 1, Boss 2, Sans (boss 3).
-            if(G.level<=3) spawnBoss(G.level);
-        }
+        // 10 levels. Bosses at 1, 2, 4(cyborg), 10(sans). Others are wave-only.
+        if(G.level<=2) spawnBoss(G.level);
+        else if(G.level===4) spawnBoss(4);
+        else if(G.level===5) spawnBoss(5);
+        else if(G.level>=10) spawnBoss(10);
+        else if(G.level===7&&!G.grimmSpawned&&!G.grimmDefeated){ /* hold level 7 — Grimm incoming */ }
+        else { G.level++;G.waveStart=performance.now();G.spawnTimer=0;asteroids=[];for(let k=0;k<8;k++)spawnAsteroid();updateUI(); }
     }
 
     // GRIMM BOSS (optional) — spawns 60s into level 7 after rouge war, one-time encounter
-    if(window.DLC&&window.DLC.loaded&&!boss&&!G.noBoss&&!G.bossRush&&!_l6State&&G.level===7&&!G.grimmDefeated&&!G.grimmSpawned&&elapsed>60){
+    if(!boss&&!G.noBoss&&!G.bossRush&&!_l6State&&G.level===7&&!G.grimmDefeated&&!G.grimmSpawned&&elapsed>60){
         G.grimmSpawned=true;
         spawnBoss(6);
     }
@@ -125,7 +120,7 @@ function update() {
     }
 
     // BOSS RUSH (DLC) — trigger 55s after boss 2 defeat
-    if(window.DLC&&window.DLC.loaded&&!G.bossRush&&G.bossRushStartTime>0&&G.gilbertState==='none'&&!boss){
+    if(!G.bossRush&&G.bossRushStartTime>0&&G.gilbertState==='none'&&!boss){
         const sinceB2=(performance.now()-G.bossRushStartTime)/1000;
         if(sinceB2>=55){
             G.bossRushStartTime=0;
@@ -141,7 +136,7 @@ function update() {
     if(typeof updateBigShot==='function') updateBigShot();
 
     // Gilbert update
-    if(window.DLC&&window.DLC.loaded) updateGilbert();
+    updateGilbert();
     // Gilbert quip timer
     if(G.gilbertQuipTimer>0) G.gilbertQuipTimer--; else G.gilbertQuip='';
 
@@ -181,7 +176,7 @@ function update() {
             G.hasForceField=true; G.shieldFuel=getMaxShieldFuel(); updateShieldUI();
             boom(ship.x,ship.y,'cyan',30); Sound.powerup(); G.forceFieldDrop=null;
             unlockAch('shield_up');
-            if(window.DLC&&window.DLC.loaded) gilbertIntro('forcefield',GILBERT_INTROS.forcefield);
+            if(1) gilbertIntro('forcefield',GILBERT_INTROS.forcefield);
         }
     }
 
@@ -190,13 +185,13 @@ function update() {
     for(let i=ammoBoxes.length-1;i>=0;i--){const b=ammoBoxes[i];b.y+=b.dy;
         // Magnet module
         if(G.equippedModules.includes('magnet')){const md=Math.hypot(ship.x-b.x,ship.y-b.y);if(md<200&&md>1){b.x+=(ship.x-b.x)/md*1.5;b.y+=(ship.y-b.y)/md*1.5;}}
-        if(Math.hypot(ship.x-b.x,ship.y-b.y)<ship.r+b.size){G.ammo+=25;if(G.ammo>=100)unlockAch('stockpile');if(G.ammo>G.peakAmmo)G.peakAmmo=G.ammo;if(window.DLC&&window.DLC.loaded&&G.peakAmmo>=200)unlockAch('dlc_hoarder');Sound.powerup();ammoBoxes.splice(i,1);if(window.DLC&&window.DLC.loaded)gilbertIntro('ammobox',GILBERT_INTROS.ammobox);updateUI();}
+        if(Math.hypot(ship.x-b.x,ship.y-b.y)<ship.r+b.size){G.ammo+=25;if(G.ammo>=100)unlockAch('stockpile');if(G.ammo>G.peakAmmo)G.peakAmmo=G.ammo;if(G.peakAmmo>=200)unlockAch('dlc_hoarder');Sound.powerup();ammoBoxes.splice(i,1);if(1)gilbertIntro('ammobox',GILBERT_INTROS.ammobox);updateUI();}
         else if(b.y>H+50)ammoBoxes.splice(i,1);}
 
     // POWERUPS
     G.powerTimer++; if(!G.tutorial&&G.powerTimer>2200){dropPowerup();G.powerTimer=0;}
     for(let i=powerups.length-1;i>=0;i--){const p=powerups[i];p.x+=p.dx;p.y+=p.dy;
-        if(Math.hypot(ship.x-p.x,ship.y-p.y)<ship.r+p.size){G.tripleShotTimer=480;Sound.powerup();powerups.splice(i,1);if(window.DLC&&window.DLC.loaded)gilbertIntro('tripleshot',GILBERT_INTROS.tripleshot);}
+        if(Math.hypot(ship.x-p.x,ship.y-p.y)<ship.r+p.size){G.tripleShotTimer=480;Sound.powerup();powerups.splice(i,1);if(1)gilbertIntro('tripleshot',GILBERT_INTROS.tripleshot);}
         else if(p.y>H+50)powerups.splice(i,1);}
 
     // ASTEROIDS
@@ -224,7 +219,7 @@ function update() {
                     Sound.shieldSfx();
                     continue;
                 }
-                if(a.type==='fuel'){boom(a.x,a.y,'#ffff00');Sound.powerup();if(G.hasForceField&&G.shieldFuel<3){G.shieldFuel++;updateShieldUI();}G.fuelCollected++;if(G.fuelCollected>=5)unlockAch('fuel_collector');if(window.DLC&&window.DLC.loaded)gilbertIntro('fuel',GILBERT_INTROS.fuel);}
+                if(a.type==='fuel'){boom(a.x,a.y,'#ffff00');Sound.powerup();if(G.hasForceField&&G.shieldFuel<3){G.shieldFuel++;updateShieldUI();}G.fuelCollected++;if(G.fuelCollected>=5)unlockAch('fuel_collector');if(1)gilbertIntro('fuel',GILBERT_INTROS.fuel);}
                 else{
                     const _isBig=bullets[j].big;
                     boom(a.x,a.y,_isBig?'#ffff00':'#888',_isBig?18:8);Sound.explode();
@@ -232,7 +227,7 @@ function update() {
                     if(!_isBig&&a.r>20&&!G.tutorial){spawnAsteroid(a.x,a.y,a.r/2);spawnAsteroid(a.x,a.y,a.r/2);}
                     G.asteroidsDestroyed++;unlockAch('first_blood');if(G.asteroidsDestroyed>=100)unlockAch('rock_crusher');
                     if(G.tripleShotTimer>0)unlockAch('triple_threat');
-                    if(window.DLC&&window.DLC.loaded){G.consecutiveKills++;if(G.consecutiveKills>=10)unlockAch('dlc_chain_reaction');if(G.asteroidsDestroyed>=250)unlockAch('dlc_mass_destroyer');}
+                    if(1){G.consecutiveKills++;if(G.consecutiveKills>=10)unlockAch('dlc_chain_reaction');if(G.asteroidsDestroyed>=250)unlockAch('dlc_mass_destroyer');}
                     if(typeof tryDropDataFragment==='function') tryDropDataFragment(!!a.hasLoreDrop);}
                 // NEXUS tracking: bullet hit asteroid = hit
                 if(bullets[j]._nexusTracked){G.nexusShotLog.push('hit');if(G.nexusShotLog.length>20)G.nexusShotLog.shift();}
@@ -318,7 +313,7 @@ function update() {
             if(Math.hypot(bullets[j].x-mb.x,bullets[j].y-mb.y)<mb.r+4){
                 const hitCol=mb.type==='blaster'?'cyan':mb.type==='spawner'?'#44ff44':(mb.type==='shooter'?'red':'violet');
                 const _dmgMB=bullets[j].big?(bullets[j].damage||5):1;boom(bullets[j].x,bullets[j].y,hitCol,4);mb.hp-=_dmgMB;Sound.hit();bullets.splice(j,1);
-                if(mb.hp<=0){boom(mb.x,mb.y,hitCol,25);Sound.explode();addScore(mb.type==='blaster'?1000:mb.type==='spawner'?600:(mb.type==='shooter'?800:400));G.mb+=(mb.type==='blaster'?8:mb.type==='spawner'?5:(mb.type==='shooter'?6:3));G.miniBossKills++;if(G.miniBossKills>=5)unlockAch('bounty_hunter');if(window.DLC&&window.DLC.loaded&&G.miniBossKills>=10)unlockAch('dlc_exterminator');miniBosses.splice(i,1);break;}
+                if(mb.hp<=0){boom(mb.x,mb.y,hitCol,25);Sound.explode();addScore(mb.type==='blaster'?1000:mb.type==='spawner'?600:(mb.type==='shooter'?800:400));G.mb+=(mb.type==='blaster'?8:mb.type==='spawner'?5:(mb.type==='shooter'?6:3));G.miniBossKills++;if(G.miniBossKills>=5)unlockAch('bounty_hunter');if(G.miniBossKills>=10)unlockAch('dlc_exterminator');miniBosses.splice(i,1);break;}
             }
         }
     }
@@ -1402,7 +1397,7 @@ function update() {
                 boss.dx=Math.cos(boss.angle)*0.8;
                 boss.dy=Math.sin(boss.angle)*0.8;
                 // Gilbert critical attack during breather
-                if(window.DLC&&window.DLC.loaded&&G.gilbertState==='ally'&&G.gilbert&&!boss.gilbertCritDone){
+                if(G.gilbertState==='ally'&&G.gilbert&&!boss.gilbertCritDone){
                     // Rush toward boss
                     const toBoss=Math.atan2(boss.y-G.gilbert.y,boss.x-G.gilbert.x);
                     const dist=Math.hypot(boss.x-G.gilbert.x,boss.y-G.gilbert.y);
@@ -1471,7 +1466,7 @@ function update() {
                         addScore(isSansBoss?6000:2000);
                         G.mb+=(isSansBoss?50:20);
                         if(isSansBoss) unlockAch('determination');
-                        if(window.DLC&&window.DLC.loaded){
+                        if(1){
                             G.totalBossesDefeated++;
                             if(isSansBoss&&!G.damageTakenThisBoss)unlockAch('dlc_untouchable');
                             if(isSansBoss&&G.noShieldBoss3)unlockAch('dlc_naked_run');
@@ -1509,7 +1504,7 @@ function update() {
                                     boom(boss.x,boss.y,'orange',50);shake(12,25);Sound.explode();
                                     addScore(4000);
                                     G.mb+=35;
-                                    if(window.DLC&&window.DLC.loaded){
+                                    if(1){
                                         G.totalBossesDefeated++;
                                         unlockAch('dlc_serpent_slayer');
                                     }
@@ -1520,7 +1515,7 @@ function update() {
                                     G.waveStart=performance.now();G.spawnTimer=0;
                                     G.checkpoint=G.level;updateUI();
                                     // DLC: Start station cutscene after snake boss
-                                    if(window.DLC&&window.DLC.loaded&&G.gilbertState==='ally'&&!G.stationUnlocked){
+                                    if(G.gilbertState==='ally'&&!G.stationUnlocked){
                                         startStationCutscene();
                                     } else {
                                         asteroids=[];for(let k=0;k<8;k++)spawnAsteroid();
@@ -1593,7 +1588,7 @@ function update() {
                 // NEXUS: clamp HP at 10% — purge handles death
                 if(boss.type===7&&boss.hp<Math.ceil(boss.maxHp*0.2)) boss.hp=Math.ceil(boss.maxHp*0.2);
                 // Sans finisher threshold: at 80 HP with Gilbert ally, lock HP and trigger finisher
-                if((boss.type===3||boss.type===10)&&boss.hp<=Math.round(boss.maxHp*0.4)&&!boss.gilbertFinisherTriggered&&window.DLC&&window.DLC.loaded&&G.gilbertState==='ally'){
+                if((boss.type===3||boss.type===10)&&boss.hp<=Math.round(boss.maxHp*0.4)&&!boss.gilbertFinisherTriggered&&G.gilbertState==='ally'){
                     boss.hp=Math.round(boss.maxHp*0.4);boss.gilbertFinisherTriggered=true;
                     boss.state='gilbert_finisher';boss.timer=0;boss.dx=0;boss.dy=0;
                     gasterBlasters=[];enemyBullets=[];asteroids=[];
@@ -1610,7 +1605,7 @@ function update() {
                     if(boss.type===2){unlockAch('survivor');}
                     if(boss.type===2)unlockAch('commander');
                     if(isSansBoss){unlockAch('determination');}
-                    if(window.DLC&&window.DLC.loaded){
+                    if(1){
                         G.totalBossesDefeated++;
                         if(isSansBoss&&!G.damageTakenThisBoss)unlockAch('dlc_untouchable');
                         if(isSansBoss&&G.noShieldBoss3)unlockAch('dlc_naked_run');
@@ -1624,7 +1619,7 @@ function update() {
                         boss=null;G.level=3;G.waveStart=performance.now();G.spawnTimer=0;asteroids=[];
                         spawnForceFieldDrop(W/2,H/2); G.checkpoint=3;
                         // DLC: trigger boss rush 55s after boss 2 defeat (timer will be paused during rush)
-                        if(window.DLC&&window.DLC.loaded&&G.gilbertState==='none'){
+                        if(G.gilbertState==='none'){
                             G.bossRushStartTime=performance.now();
                         }
                         updateUI();break;
@@ -1633,7 +1628,7 @@ function update() {
                         boss=null;winGame();return;
                     } else if(boss.type===3){
                         // Sans without DLC — win the game
-                        if(window.DLC&&window.DLC.loaded){
+                        if(1){
                             // Shouldn't happen with DLC (Sans is at level 10), but handle gracefully
                             boss=null;G.level++;G.waveStart=performance.now();G.spawnTimer=0;
                             asteroids=[];for(let k=0;k<8;k++)spawnAsteroid();updateUI();break;
@@ -1661,13 +1656,13 @@ function update() {
                         updateUI();break;
                     } else if(boss.type===4){
                         // Cyborg defeated — clear wall, continue
-                        if(window.DLC&&window.DLC.loaded)unlockAch('dlc_short_circuit');
+                        if(1)unlockAch('dlc_short_circuit');
                         const cybX=boss.x,cybY=boss.y;
                         boss=null;G.level++;G.levelsCleared++;G.waveStart=performance.now();G.spawnTimer=0;
                         asteroids=[];for(let k=0;k<8;k++)spawnAsteroid();
                         G.checkpoint=G.level;
                         // DLC: spawn cyborg scraps if Gilbert is on rope
-                        if(window.DLC&&window.DLC.loaded&&G.gilbertState==='rope'){
+                        if(G.gilbertState==='rope'){
                             spawnCyborgScraps(cybX,cybY);
                             G.gilbertState='scrap_collect';
                         }
@@ -4240,60 +4235,18 @@ function dismissSplash(){
         sp.style.display='none';
         // Don't show menu if a game is already running (user was fast)
         if(G.running) return;
-        if(!checkExistingLicense()){
-            document.getElementById('menuScreen').style.display='none';
-            document.getElementById('licenseScreen').style.display='flex';
-        } else {
-            document.getElementById('menuScreen').style.display='block';
-            applyWatermark();
-        }
+        document.getElementById('menuScreen').style.display='block';
     },1000);
 }
 document.getElementById('splash').addEventListener('click',dismissSplash);
 document.addEventListener('keydown',function splashKey(){dismissSplash();document.removeEventListener('keydown',splashKey);},{once:true});
 
 // ============================================================
-//  DLC LOADER — auto-detects dlc.js in the game folder
+//  DLC LOADER — optional, all content is now in the base game
 // ============================================================
 function checkDLC() {
     if (window.DLC && window.DLC.loaded) {
-        document.getElementById('dlcBtn').style.display = 'inline-block';
-        if (window.DLC.init) window.DLC.init();
-        console.log('[GAME] DLC detected and enabled: ' + (window.DLC.name || 'Unknown'));
-    }
-}
-function openDLC() {
-    try { Sound.ui(); } catch(e) {}
-    if (window.DLC && window.DLC.loaded) {
-        const checks = [];
-        // Check DLC core
-        checks.push(['DLC Module', !!window.DLC.loaded]);
-        checks.push(['DLC Version', !!window.DLC.version]);
-        checks.push(['DLC Achievements', !!(window.DLC.achievements && window.DLC.achievements.length > 0)]);
-        // Check achievement injection
-        const dlcAchInGame = ACH_DEFS.some(a => a.id.startsWith('dlc_'));
-        checks.push(['Achievement Injection', dlcAchInGame]);
-        // Check boss 4 audio
-        checks.push(['Boss 4 Audio Track', !!Sound.boss4Audio]);
-        // Check boss 4 spawnable
-        checks.push(['Cyborg Boss (Type 4)', typeof spawnBoss === 'function']);
-        // Check spawner mini boss
-        checks.push(['Spawner Mini Boss', typeof spawnMiniBoss === 'function']);
-        // Check blaster mini boss
-        checks.push(['Blaster Mini Boss', typeof spawnMiniBoss === 'function']);
-        // Check save system
-        checks.push(['Save System', !!localStorage.getItem('ast_rem_saves') || true]);
-        // Check sound system
-        checks.push(['Sound Engine', !!Sound.ctx]);
-
-        let status = 'DLC Installed. Systems Functional.\n\n--- DIAGNOSTIC REPORT ---\n';
-        let allGood = true;
-        for (const [name, ok] of checks) {
-            status += (ok ? '[OK] ' : '[FAIL] ') + name + '\n';
-            if (!ok) allGood = false;
-        }
-        status += '\n' + (allGood ? 'All systems operational. No bugs detected.' : 'WARNING: Some checks failed. See above.');
-        alert(status);
+        console.log('[GAME] DLC file detected: ' + (window.DLC.name || 'Unknown') + ' (all content already included in base game)');
     }
 }
 

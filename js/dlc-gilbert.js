@@ -135,7 +135,7 @@ function updateGilbert(){
         if(G.gilbertFlashTimer<=0){
             G.gilbertState='ally';
             G.rope=false;
-            if(window.DLC&&window.DLC.loaded)unlockAch('dlc_gilberts_friend');
+            if(true)unlockAch('dlc_gilberts_friend');
             showGilbertDialogue([
                 "Wow, I haven't felt like this in a WHILE!",
                 "I'll aid you on your journey from now on",

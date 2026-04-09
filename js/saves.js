@@ -46,7 +46,7 @@ function selectSlot(id) {
     saveToDisk();
     startGame();
     // If station is unlocked, start there and restore checkpoint level
-    if(s.stationUnlocked&&window.DLC&&window.DLC.loaded){
+    if(s.stationUnlocked){
         // Station is only reached after boss 5, so level must be at least 6
         G.level=Math.max(6,s.checkpoint||6);
         G.checkpoint=G.level;
@@ -285,7 +285,7 @@ function openBossPractice(){
     const list=document.getElementById('bossPracticeList');
     list.innerHTML='';
     for(const bd of BOSS_DEFS){
-        if(bd.dlc&&!(window.DLC&&window.DLC.loaded)) continue;
+        // All bosses accessible
         const btn=document.createElement('button');
         btn.style.cssText='display:flex;justify-content:space-between;align-items:center;background:rgba(20,20,30,0.8);border:1px solid '+bd.color+';border-radius:6px;padding:10px 15px;cursor:pointer;font-family:inherit;transition:0.2s;';
         btn.innerHTML='<div style="text-align:left;"><div style="color:'+bd.color+';font-weight:bold;font-size:14px;">'+bd.name+'</div><div style="color:#888;font-size:11px;margin-top:2px;">'+bd.desc+'</div></div><div style="color:'+bd.color+';font-size:20px;">▶</div>';

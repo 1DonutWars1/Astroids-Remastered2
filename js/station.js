@@ -99,7 +99,7 @@ function leaveStation(){
     // Trigger level 6 rouge war only the first time — persist across reloads via save
     const saveRec=G.slotId?saves[G.slotId]:null;
     const alreadyTriggered=saveRec&&saveRec.level6Triggered;
-    if(window.DLC&&window.DLC.loaded&&G.level>=6&&G.level<7
+    if(G.level>=6&&G.level<7
         &&typeof startLevel6==='function'
         &&!G.level6.state&&!G.level6.bigShotUnlocked
         &&!alreadyTriggered){

@@ -198,7 +198,7 @@ function returnToMenu() {
 function retryCheckpoint() {
     Sound.ui(); $over.style.display='none';
     // If station is unlocked, respawn there
-    if(G.stationUnlocked&&window.DLC&&window.DLC.loaded){
+    if(G.stationUnlocked){
         ship={x:W/2,y:H/2,a:-Math.PI/2,r:14,tx:0,ty:0};
         G.running=true;G.ammo=50;
         asteroids=[];bullets=[];particles=[];ammoBoxes=[];powerups=[];
@@ -220,14 +220,9 @@ function retryCheckpoint() {
     if (G.checkpoint>=3) {
         G.level=G.checkpoint; G.hasForceField=true; G.shieldFuel=3; updateShieldUI();
         if(G.checkpoint===3){
-            if(window.DLC&&window.DLC.loaded){
-                // DLC: replace the Sans fight with the Boss Rush (cyborg comes after, as usual)
                 for(let k=0;k<8;k++)spawnAsteroid();
                 G.bossRushStartTime=performance.now();
                 Sound.playMusic('bgm');
-            } else {
-                spawnBoss(3);
-            }
         } else Sound.playMusic('bgm');
     }
     updateUI();
@@ -418,7 +413,7 @@ function shoot() {
         if(!G.hyperGun&&!G.infAmmo) G.ammo-=3;
     } else { fireBullet(0,true); if(!G.hyperGun&&!G.infAmmo) G.ammo--; }
     G.shotTimer = G.hyperGun ? 1 : SHOT_CD;
-    G.shotsFired++; if(G.shotsFired>=500&&window.DLC&&window.DLC.loaded)unlockAch('dlc_trigger_happy');
+    G.shotsFired++; if(G.shotsFired>=500&&true)unlockAch('dlc_trigger_happy');
     updateUI();
 }
 function dropAmmo() { ammoBoxes.push({x:Math.random()*(W-100)+50,y:-30,dy:1.2,size:18}); }
@@ -432,7 +427,7 @@ function spawnMiniBoss(typeOverride,force) {
     else if(edge===2){sx=Math.random()*W;sy=H+40;}else{sx=-40;sy=Math.random()*H;}
     let type=typeOverride||(Math.random()<0.3?'shooter':'chaser');
     // DLC types only after level 4
-    if(!typeOverride && window.DLC&&window.DLC.loaded && G.level>=4){
+    if(!typeOverride && true && G.level>=4){
         const roll=Math.random();
         if(roll<0.2) type='blaster';
         else if(roll<0.4) type='spawner';
@@ -446,7 +441,7 @@ function spawnMiniBoss(typeOverride,force) {
         speed,rot:0,state:'move',timer:0,blasterLocked:false,blasterTarget:null,
         dashTarget:null});
     // Gilbert intro for mini-boss types
-    if(window.DLC&&window.DLC.loaded&&GILBERT_INTROS[type]) gilbertIntro(type,GILBERT_INTROS[type]);
+    if(GILBERT_INTROS[type]) gilbertIntro(type,GILBERT_INTROS[type]);
 }
 function spawnEnemyBullet(x,y,angle,speed=10) {
     enemyBullets.push({x,y,dx:Math.cos(angle)*speed,dy:Math.sin(angle)*speed,life:100});
@@ -539,13 +534,11 @@ function spawnBoss(type) {
     // NEXUS-0: no HP bar
     if(type===7) document.getElementById('bossRow').style.display='none';
     // Gilbert intro for bosses
-    if(window.DLC&&window.DLC.loaded){
-        if(type===4) gilbertIntro('boss4',GILBERT_INTROS.boss4);
-        if(type===5) gilbertIntro('boss5',GILBERT_INTROS.boss5);
-        if(type===6) gilbertIntro('boss6',GILBERT_INTROS.boss6);
-        if(type===7) gilbertIntro('boss7',GILBERT_INTROS.boss7);
-        if(type===10) gilbertIntro('boss10',GILBERT_INTROS.boss10);
-    }
+    if(type===4) gilbertIntro('boss4',GILBERT_INTROS.boss4);
+    if(type===5) gilbertIntro('boss5',GILBERT_INTROS.boss5);
+    if(type===6) gilbertIntro('boss6',GILBERT_INTROS.boss6);
+    if(type===7) gilbertIntro('boss7',GILBERT_INTROS.boss7);
+    if(type===10) gilbertIntro('boss10',GILBERT_INTROS.boss10);
 }
 
 // ============================================================
@@ -607,7 +600,7 @@ function addScore(pts) {
     if(G.score>=10000)unlockAch('marksman');
     if(G.score>=25000)unlockAch('high_roller');
     if(G.score>=50000)unlockAch('legend');
-    if(window.DLC&&window.DLC.loaded&&G.score>=100000)unlockAch('dlc_galactic_hero');
+    if(G.score>=100000)unlockAch('dlc_galactic_hero');
     if(mult>1){document.getElementById('comboRow').style.display='block';document.getElementById('comboVal').innerText=mult;}
     updateUI();
 }
