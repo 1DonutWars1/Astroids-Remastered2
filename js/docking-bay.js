@@ -507,6 +507,8 @@ function drawDockingBay(){
     drawCentralConsole(T, floorY);
     // Elevator on the left — interior (compact door in the left bulkhead area only)
     drawBayElevator(80, winBot-28, floorY, st);
+    // Hyperjump airlock door — appears next to the player's ship when armed
+    if(typeof drawHyperjumpAirlock==='function') drawHyperjumpAirlock();
     ctx.restore();
 
     // =========================================================
@@ -525,7 +527,12 @@ function drawDockingBay(){
     ctx.fillText('SALVAGE DRONE TOBY-01 \u00b7 RELAY STATION',W-14,34);
 
     // Prompts
-    if(st.interactTarget && st.interactTarget.id==='dockConsole'){
+    // Hyperjump airlock boarding prompt takes priority over any other docking bay hint.
+    const _airlockVisible = (G.hyperJump && G.hyperJump.armed
+        && Math.abs(st.playerX-DOCKING_BAY.pads[0].x)<70);
+    if(_airlockVisible){
+        if(typeof drawHyperjumpAirlockPrompt==='function') drawHyperjumpAirlockPrompt();
+    } else if(st.interactTarget && st.interactTarget.id==='dockConsole'){
         const p=0.65+Math.sin(T/200)*0.35;
         ctx.globalAlpha=p;
         ctx.font='bold 16px Courier New';ctx.textAlign='center';ctx.fillStyle='#00ffcc';
@@ -1430,12 +1437,26 @@ function updateDockConsole(){
         } else if(tp.phase==='flash'){
             if(tp.t>=60){tp.phase='done';tp.t=0;}
         } else if(tp.phase==='done'){
-            // End: close terminal, reset
+            // End of visual cutscene — arm the hyperjump and prompt player via terminal.
+            // Instead of just closing, switch the terminal to a Y/N prompt asking the
+            // player if they want to enter the ship's airlock now, and open the airlock
+            // door next to their ship so they can also walk to it manually.
             if(tp.t>=90){
+                const sid=(tp.sectorId||2);
                 db.teleport=null;
-                db.open=false;
-                db.terminalPhase=null;
+                db.terminalPhase='hyperjump_prompt';
+                db.terminalTimer=0;
                 db.mapOpen=false;
+                db.terminalText=db.terminalText.concat([
+                    "",
+                    "> HYPERSPACE JUMP READY — ENTER SHIP",
+                    "",
+                    "Target partition: SECTOR "+sid,
+                    "Airlock unsealed at DOCK 01. Boarding ramp extended.",
+                    "",
+                    "Initiate jump now? [Y/N]"
+                ]);
+                G.hyperJump={ armed:true, sectorId:sid };
                 try{if(Sound.ui) Sound.ui();}catch(e){}
             }
         }
@@ -1869,8 +1890,246 @@ function dockingBayKey(e){
             try{Sound.ui();}catch(err){}
             return true;
         }
+    } else if(db.terminalPhase==='hyperjump_prompt'){
+        // Waiting for Y/N on whether to enter the ship now.
+        if(e.code==='KeyY'){
+            db.terminalText=db.terminalText.concat(["> Y","","Boarding vessel TOBY-01..."]);
+            closeDockConsole();
+            startWarpCutscene();
+            return true;
+        }
+        if(e.code==='KeyN'||e.code==='Escape'){
+            db.terminalText=db.terminalText.concat(["> N","",
+                "Jump held in standby. Walk to the airlock and press [E] to board."]);
+            db.terminalPhase='cmd';
+            db.cmdInput='';
+            try{Sound.ui();}catch(err){}
+            return true;
+        }
+        return true; // swallow other keys
     }
     return true;
+}
+
+// ============================================================
+//  HYPERJUMP AIRLOCK + WARP CUTSCENE
+// ============================================================
+// The hyperjump flow is:
+//   1. Player uses the scanner terminal to target a sector. The existing
+//      teleport cutscene plays (scan/charge/flash), and its "done" phase
+//      now sets G.hyperJump={armed,sectorId} and prompts Y/N in the terminal.
+//   2. If Y: warp cutscene starts immediately.
+//      If N: terminal returns to cmd mode; the airlock door appears next to
+//      the player's ship (pads[0]) and the player can walk up and press [E].
+//   3. The warp cutscene plays a streaking-stars effect with a portal whoosh,
+//      then drops the player into space mode with an "ENTERING SECTOR N" banner.
+
+function drawHyperjumpAirlock(){
+    // Drawn during the docking bay render pass in world space.
+    // Only visible while G.hyperJump.armed is true.
+    if(!(G.hyperJump && G.hyperJump.armed)) return;
+    const T=performance.now();
+    const padX=DOCKING_BAY.pads[0].x;
+    const floorY=500;
+    // Airlock door frame: stands on the interior floor directly under the ship pad.
+    const dw=70, dh=110;
+    const dx=padX-dw/2, dy=floorY-dh;
+    // Door recess shadow
+    ctx.fillStyle='rgba(0,0,0,0.65)';ctx.fillRect(dx-4,dy-4,dw+8,dh+4);
+    // Outer frame
+    ctx.fillStyle='#1a1f2e';ctx.fillRect(dx,dy,dw,dh);
+    // Caution border (yellow/black stripes)
+    const stripeW=8;
+    for(let sx=0;sx<dw;sx+=stripeW*2){
+        ctx.fillStyle='rgba(255,180,0,0.35)';
+        ctx.fillRect(dx+sx,dy,stripeW,4);
+        ctx.fillRect(dx+sx,dy+dh-4,stripeW,4);
+    }
+    // Open doorway — portal glow inside
+    const inset=6;
+    const ix=dx+inset, iy=dy+inset, iw=dw-inset*2, ih=dh-inset*2;
+    const pulse=0.5+Math.sin(T/220)*0.5;
+    const grd=ctx.createLinearGradient(ix,iy,ix,iy+ih);
+    grd.addColorStop(0,`rgba(120,220,255,${0.55+pulse*0.2})`);
+    grd.addColorStop(0.5,`rgba(60,140,255,${0.35+pulse*0.25})`);
+    grd.addColorStop(1,`rgba(20,60,180,${0.45+pulse*0.2})`);
+    ctx.fillStyle=grd;ctx.fillRect(ix,iy,iw,ih);
+    // Swirl lines inside the doorway
+    ctx.strokeStyle=`rgba(200,240,255,${0.35+pulse*0.25})`;ctx.lineWidth=1.5;
+    for(let i=0;i<4;i++){
+        const off=((T/8)+i*20)%ih;
+        ctx.beginPath();
+        ctx.moveTo(ix+2,iy+off);
+        ctx.lineTo(ix+iw-2,iy+off+8);
+        ctx.stroke();
+    }
+    // Glow halo around the frame
+    ctx.shadowBlur=22;ctx.shadowColor='#66ccff';
+    ctx.strokeStyle=`rgba(120,220,255,${0.6+pulse*0.3})`;ctx.lineWidth=2;
+    ctx.strokeRect(dx+0.5,dy+0.5,dw-1,dh-1);
+    ctx.shadowBlur=0;
+    // Label above the frame
+    ctx.font='bold 10px Courier New';ctx.textAlign='center';
+    ctx.fillStyle=`rgba(180,240,255,${0.6+pulse*0.3})`;
+    ctx.fillText('◆ SHIP AIRLOCK',padX,dy-8);
+    ctx.font='8px Courier New';ctx.fillStyle='rgba(120,200,240,0.7)';
+    ctx.fillText('HYPERJUMP READY',padX,dy-20);
+}
+
+function drawHyperjumpAirlockPrompt(){
+    // Screen-space "[E] ENTER SHIP" prompt when player is standing near the airlock.
+    if(!(G.hyperJump && G.hyperJump.armed)) return;
+    const st=G.station; if(!st || st.floor!==2) return;
+    const padX=DOCKING_BAY.pads[0].x;
+    if(Math.abs(st.playerX-padX)>70) return;
+    const T=performance.now();
+    const p=0.65+Math.sin(T/200)*0.35;
+    ctx.save();
+    ctx.globalAlpha=p;
+    ctx.font='bold 16px Courier New';ctx.textAlign='center';ctx.fillStyle='#66ccff';
+    ctx.shadowBlur=14;ctx.shadowColor='#66ccff';
+    ctx.fillText('[E] ENTER SHIP',W/2,H-80);
+    ctx.shadowBlur=0;ctx.globalAlpha=1;
+    ctx.restore();
+}
+
+// Called from the engine key handler when player presses E in station mode and
+// is standing near the armed airlock at pads[0].
+function tryBoardHyperjumpAirlock(){
+    if(!(G.hyperJump && G.hyperJump.armed)) return false;
+    const st=G.station; if(!st || st.floor!==2) return false;
+    const padX=DOCKING_BAY.pads[0].x;
+    if(Math.abs(st.playerX-padX)>70) return false;
+    startWarpCutscene();
+    return true;
+}
+
+function startWarpCutscene(){
+    const sid=(G.hyperJump && G.hyperJump.sectorId)||2;
+    G.warpCutscene={
+        t:0,
+        phase:'warp', // 'warp' -> 'flash' -> 'done'
+        sectorId:sid,
+        stars: (function(){
+            const arr=[];
+            for(let i=0;i<160;i++){
+                arr.push({
+                    a: Math.random()*Math.PI*2,
+                    d: 20+Math.random()*40,   // starting distance from center
+                    v: 2+Math.random()*5,     // outward velocity factor
+                    len: 8+Math.random()*24,  // trail length
+                    col: ['#ffffff','#aaddff','#88ccff','#ffeecc'][Math.floor(Math.random()*4)]
+                });
+            }
+            return arr;
+        })()
+    };
+    G.hyperJump=null;
+    try{if(Sound.portal) Sound.portal();}catch(e){}
+}
+
+function updateWarpCutscene(){
+    const wc=G.warpCutscene; if(!wc) return;
+    wc.t++;
+    if(wc.phase==='warp'){
+        // Accelerate stars outward
+        for(const s of wc.stars){
+            s.d += s.v * (1 + wc.t/40);
+            s.len += 0.3;
+        }
+        if(wc.t>=170){ wc.phase='flash'; wc.t=0; }
+    } else if(wc.phase==='flash'){
+        if(wc.t>=40){
+            // Drop into space as sector two
+            wc.phase='done';
+            G.currentSector = wc.sectorId || 2;
+            if(typeof leaveStation==='function') leaveStation();
+            G.sectorBanner = { t:0, life:240, text:'ENTERING SECTOR '+_sectorWord(G.currentSector) };
+            G.warpCutscene=null;
+        }
+    }
+}
+
+function _sectorWord(n){
+    const words=['ZERO','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN','ELEVEN','TWELVE'];
+    return words[n]||String(n);
+}
+
+function drawWarpCutscene(){
+    const wc=G.warpCutscene; if(!wc) return;
+    // Pure black background — we're mid-jump.
+    ctx.save();
+    ctx.fillStyle='#000000';ctx.fillRect(0,0,W,H);
+    const cx=W/2, cy=H/2;
+    // Streaking stars from center outward, with motion-blur trails.
+    for(const s of wc.stars){
+        const dx=Math.cos(s.a), dy=Math.sin(s.a);
+        const x1=cx+dx*s.d, y1=cy+dy*s.d;
+        const x2=cx+dx*(s.d-s.len), y2=cy+dy*(s.d-s.len);
+        // Fade in based on distance so new streaks don't pop harshly
+        const a=Math.min(1,s.d/80);
+        ctx.strokeStyle=s.col.replace(/^#/,'rgba(').replace(/^rgba\(/,'rgba(')+''; // noop guard
+        // Build rgba from hex
+        const hex=s.col;
+        const r=parseInt(hex.substr(1,2),16), g=parseInt(hex.substr(3,2),16), b=parseInt(hex.substr(5,2),16);
+        ctx.strokeStyle=`rgba(${r},${g},${b},${a})`;
+        ctx.lineWidth=1.5;
+        ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(x1,y1);ctx.stroke();
+    }
+    // Central radial glow — like a portal mouth
+    const glowR=60+wc.t*2;
+    const gr=ctx.createRadialGradient(cx,cy,0,cx,cy,glowR);
+    gr.addColorStop(0,'rgba(180,230,255,0.9)');
+    gr.addColorStop(0.4,'rgba(80,160,255,0.4)');
+    gr.addColorStop(1,'rgba(20,40,120,0)');
+    ctx.fillStyle=gr;
+    ctx.beginPath();ctx.arc(cx,cy,glowR,0,Math.PI*2);ctx.fill();
+    // Vignette closing in
+    const vig=ctx.createRadialGradient(cx,cy,Math.max(0,W*0.35-wc.t*2),cx,cy,W*0.9);
+    vig.addColorStop(0,'rgba(0,0,0,0)');
+    vig.addColorStop(1,'rgba(0,0,0,0.95)');
+    ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
+    // Banner text
+    if(wc.phase==='warp'){
+        const pulse=0.6+Math.sin(wc.t/6)*0.4;
+        ctx.globalAlpha=pulse;
+        ctx.font='bold 28px Courier New';ctx.textAlign='center';
+        ctx.fillStyle='#88ccff';
+        ctx.shadowBlur=20;ctx.shadowColor='#66aaff';
+        ctx.fillText('HYPERSPACE JUMP',cx,H-60);
+        ctx.shadowBlur=0;ctx.globalAlpha=1;
+    }
+    // White flash on phase transition
+    if(wc.phase==='flash'){
+        const f=Math.max(0,1-wc.t/40);
+        ctx.globalAlpha=f;
+        ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
+        ctx.globalAlpha=1;
+    }
+    ctx.restore();
+}
+
+function drawSectorBanner(){
+    const b=G.sectorBanner; if(!b) return;
+    b.t++;
+    if(b.t>=b.life){ G.sectorBanner=null; return; }
+    const fadeIn=Math.min(1,b.t/30);
+    const fadeOut=Math.min(1,(b.life-b.t)/45);
+    const a=Math.min(fadeIn,fadeOut);
+    ctx.save();
+    ctx.globalAlpha=a;
+    ctx.fillStyle='rgba(0,10,25,0.75)';
+    ctx.fillRect(0,H/2-50,W,100);
+    ctx.strokeStyle='#66ccff';ctx.lineWidth=2;
+    ctx.strokeRect(0.5,H/2-49.5,W-1,99);
+    ctx.font='bold 34px Courier New';ctx.textAlign='center';
+    ctx.fillStyle='#88ccff';
+    ctx.shadowBlur=18;ctx.shadowColor='#66aaff';
+    ctx.fillText(b.text,W/2,H/2+4);
+    ctx.shadowBlur=0;
+    ctx.font='11px Courier New';ctx.fillStyle='#6699bb';
+    ctx.fillText('hyperspace jump complete',W/2,H/2+28);
+    ctx.restore();
 }
 
 // ---------- Dev helpers ----------

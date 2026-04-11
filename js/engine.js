@@ -4,6 +4,8 @@
 function update() {
     // Intro cutscene runs independently of game state
     if(introCutscene){updateIntroCutscene();return;}
+    // Warp cutscene (hyperspace jump) runs independently, freezes everything else
+    if(G.warpCutscene){ if(typeof updateWarpCutscene==='function') updateWarpCutscene(); return; }
     if(!G.running||G.practicePaused||G.paused||G.fastTravelOpen||G.inventoryOpen) {
         if(!G.practicePaused&&!G.paused){
             for(const a of asteroids){a.x+=a.dx;a.y+=a.dy;a.angle+=a.rot;
@@ -1694,6 +1696,8 @@ function update() {
 function draw() {
     // Intro cutscene draws separately
     if(introCutscene){drawIntroCutscene();return;}
+    // Warp cutscene draws full-screen over everything
+    if(G.warpCutscene){ if(typeof drawWarpCutscene==='function') drawWarpCutscene(); return; }
     // Station mode draws separately
     if(G.mode==='station'){drawStation();return;}
     ctx.save();
@@ -4061,6 +4065,8 @@ function draw() {
     if(typeof drawDataFragmentPopup==='function') drawDataFragmentPopup();
     if(typeof drawItemTutorialToast==='function') drawItemTutorialToast();
     if(typeof drawInventoryOverlay==='function') drawInventoryOverlay();
+    // Sector banner (after hyperspace jump completion)
+    if(typeof drawSectorBanner==='function') drawSectorBanner();
 }
 
 // ============================================================
@@ -4134,6 +4140,8 @@ document.addEventListener('keydown', e => {
                 }
                 Sound.ui();
             }
+        } else if(e.code==='KeyE'&&!e.repeat&&typeof tryBoardHyperjumpAirlock==='function'&&tryBoardHyperjumpAirlock()){
+            // Boarded the hyperjump airlock — warp cutscene now running
         } else if(e.code==='KeyE'&&st.interactTarget&&!e.repeat){
             if(st.interactTarget.id==='airlock'){leaveStation();Sound.ui();}
             else if(st.interactTarget.id==='elevator'){

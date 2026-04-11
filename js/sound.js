@@ -59,6 +59,42 @@ const Sound = {
     shieldSfx() { this.tone(300, 0.2, 'sine', 0.25, 800); },
     bossWarn() { this.tone(100, 0.5, 'sawtooth', 0.5, 50); },
     blaster() { this.tone(200, 0.6, 'sawtooth', 0.8, 10); },
+    portal() {
+        if (!this.ctx || this.muted) return;
+        const t = this.ctx.currentTime;
+        // Rising whoosh: sine sweep + sawtooth layer + noise burst
+        const o1 = this.ctx.createOscillator(), g1 = this.ctx.createGain();
+        o1.type = 'sine'; o1.frequency.setValueAtTime(120, t);
+        o1.frequency.exponentialRampToValueAtTime(1800, t + 1.8);
+        g1.gain.setValueAtTime(0.0001, t);
+        g1.gain.exponentialRampToValueAtTime(0.35, t + 0.3);
+        g1.gain.exponentialRampToValueAtTime(0.001, t + 2.0);
+        o1.connect(g1); g1.connect(this.master); o1.start(t); o1.stop(t + 2.05);
+        const o2 = this.ctx.createOscillator(), g2 = this.ctx.createGain();
+        o2.type = 'sawtooth'; o2.frequency.setValueAtTime(60, t);
+        o2.frequency.exponentialRampToValueAtTime(900, t + 1.8);
+        g2.gain.setValueAtTime(0.0001, t);
+        g2.gain.exponentialRampToValueAtTime(0.18, t + 0.4);
+        g2.gain.exponentialRampToValueAtTime(0.001, t + 2.0);
+        o2.connect(g2); g2.connect(this.master); o2.start(t); o2.stop(t + 2.05);
+        // Noise whoosh via buffer
+        try {
+            const bufLen = Math.floor(this.ctx.sampleRate * 1.8);
+            const buf = this.ctx.createBuffer(1, bufLen, this.ctx.sampleRate);
+            const data = buf.getChannelData(0);
+            for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufLen);
+            const src = this.ctx.createBufferSource(); src.buffer = buf;
+            const gn = this.ctx.createGain();
+            gn.gain.setValueAtTime(0.0001, t);
+            gn.gain.exponentialRampToValueAtTime(0.25, t + 0.4);
+            gn.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
+            const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass';
+            bp.frequency.setValueAtTime(400, t);
+            bp.frequency.exponentialRampToValueAtTime(3000, t + 1.8);
+            src.connect(bp); bp.connect(gn); gn.connect(this.master);
+            src.start(t); src.stop(t + 1.85);
+        } catch (e) {}
+    },
 
     // --- MUSIC SYSTEM: MP3 with synth fallback ---
     _musicTimer: null, _step: 0,
