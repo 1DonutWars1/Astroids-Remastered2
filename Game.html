@@ -124,6 +124,41 @@
     <button onclick="toggleDebug()" style="border-color:red;color:red;">CLOSE</button>
 </div>
 
+<div id="debugMenu2">
+    <h3>SECTOR 2 DEV CONSOLE</h3>
+    <div class="dev-hdr">CHEATS</div>
+    <button onclick="toggleGodMode()">TOGGLE GOD MODE</button>
+    <button onclick="toggleInfAmmo()">TOGGLE INF AMMO</button>
+    <button onclick="toggleHyperGun()">TOGGLE HYPER GUN</button>
+    <button onclick="nukeAll()">NUKE ENEMIES</button>
+    <div class="dev-hdr">FIRE ASTEROIDS</div>
+    <button onclick="devSpawnFireAsteroid()">SPAWN FIRE ASTEROID</button>
+    <button onclick="devSpawnFireAsteroidBig()">SPAWN BIG FIRE ASTEROID</button>
+    <button onclick="devFireWave()">FIRE WAVE (x8)</button>
+    <button onclick="asteroids=[];">CLEAR ASTEROIDS</button>
+    <button onclick="spawnAsteroid(undefined,undefined,undefined,'fuel')">SPAWN FUEL</button>
+    <div class="dev-hdr">GRIMM FLAME CHARM</div>
+    <button onclick="devGiveFlameCharm()">GIVE FLAME CHARM</button>
+    <button onclick="devToggleFireStreak()">TOGGLE FIRE STREAK</button>
+    <button onclick="alert('Streak: '+(G.grimmFireStreak?'ON (25% next roll)':'OFF (50% base roll)'))">SHOW STREAK STATUS</button>
+    <div class="dev-hdr">SCENERY</div>
+    <button onclick="if(typeof initSector2Wrecks==='function')initSector2Wrecks();">RESET WRECKS</button>
+    <button onclick="devMoreWrecks()">ADD 3 WRECKS</button>
+    <button onclick="sector2Wrecks=[];">CLEAR WRECKS</button>
+    <div class="dev-hdr">MUSIC</div>
+    <button onclick="Sound.playMusic('sector2')">PLAY SECTOR 2 MUSIC</button>
+    <button onclick="Sound.playMusic('none')">STOP MUSIC</button>
+    <div class="dev-hdr">SECTOR</div>
+    <button onclick="devReturnToStation()">RETURN TO STATION</button>
+    <button onclick="devLeaveSector2()">EXIT TO SECTOR 1</button>
+    <div class="dev-hdr">TESTING</div>
+    <button onclick="toggleTestMode()">TOGGLE TEST MODE</button>
+    <button onclick="teleportShip()">TELEPORT TO CENTER</button>
+    <button onclick="giveShield()">GIVE FULL SHIELD</button>
+    <button onclick="addCheatScore(1000)">ADD 1000 PTS</button>
+    <button onclick="toggleDebug2()" style="border-color:#ff3311;color:#ff3311;">CLOSE</button>
+</div>
+
 <div id="practiceMenu">
     <h2>PRACTICE CONFIG</h2>
     <div class="srow"><label>Bullet Speed</label><input type="number" id="ps_bspd" value="8"></div>

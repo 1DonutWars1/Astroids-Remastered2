@@ -4358,7 +4358,11 @@ document.addEventListener('keydown', e => {
     if(window._DEVKEY_VERIFIED&&G.running&&!G.practicePaused){
         cheatBuf+=e.key;
         if(cheatBuf.length>5) cheatBuf=cheatBuf.slice(-5);
-        if(cheatBuf==='13132'){toggleDebug();cheatBuf='';}
+        if(cheatBuf==='13132'){
+            // Sector 2 gets its own dedicated dev menu
+            if(G.currentSector===2) toggleDebug2(); else toggleDebug();
+            cheatBuf='';
+        }
     }
 });
 document.addEventListener('keyup', e => { keys[e.code]=false; });

@@ -3,7 +3,7 @@
 // ============================================================
 function startGame() {
     $menu.style.display='none'; $over.style.display='none'; $win.style.display='none';
-    $debug.style.display='none'; $practice.style.display='none';
+    $debug.style.display='none'; if($debug2)$debug2.style.display='none'; $practice.style.display='none';
     document.getElementById('pauseMenu').style.display='none';
     $ui.style.display='block';
 
@@ -204,7 +204,7 @@ function applyPauseDisplay(){
 function returnToMenu() {
     Sound.ui(); Sound.playMusic('none');
     G.running=false; G.paused=false; G.practice=false; G.tutorial=false; G.practicePaused=false;
-    $over.style.display='none'; $win.style.display='none'; $debug.style.display='none'; $practice.style.display='none';
+    $over.style.display='none'; $win.style.display='none'; $debug.style.display='none'; if($debug2)$debug2.style.display='none'; $practice.style.display='none';
     document.getElementById('pauseMenu').style.display='none';
     $ui.style.display='none'; $menu.style.display='block';
     asteroids=[]; miniBosses=[]; enemyBullets=[]; gasterBlasters=[]; boss=null;
@@ -272,6 +272,59 @@ function shake(i,d){
 //  DEBUG / CHEATS
 // ============================================================
 function toggleDebug() { $debug.style.display=$debug.style.display==='block'?'none':'block'; }
+function toggleDebug2() { if($debug2) $debug2.style.display=$debug2.style.display==='block'?'none':'block'; }
+
+// --- Sector 2 dev helpers ---
+function devSpawnFireAsteroid() {
+    const prev=G.currentSector; G.currentSector=2;
+    const sx=(typeof ship!=='undefined'&&ship)?ship.x+150:W/2+150;
+    const sy=(typeof ship!=='undefined'&&ship)?ship.y:H/2;
+    spawnAsteroid(sx,sy,28,'normal');
+    G.currentSector=prev;
+}
+function devSpawnFireAsteroidBig() {
+    const prev=G.currentSector; G.currentSector=2;
+    const sx=(typeof ship!=='undefined'&&ship)?ship.x+180:W/2+180;
+    const sy=(typeof ship!=='undefined'&&ship)?ship.y:H/2;
+    spawnAsteroid(sx,sy,55,'normal');
+    G.currentSector=prev;
+}
+function devFireWave() {
+    const prev=G.currentSector; G.currentSector=2;
+    for(let k=0;k<8;k++) spawnAsteroid();
+    G.currentSector=prev;
+}
+function devGiveFlameCharm() {
+    if(typeof awardKeyItem==='function'){
+        if(typeof hasItem==='function'&&hasItem('grimm_flame_charm')){alert('Already have Flame Charm');return;}
+        awardKeyItem('grimm_flame_charm','GRIMM\'S FLAME CHARM','A smoldering crimson charm torn from the Nightmare King. Grants 50% resistance to fire damage.');
+    }
+}
+function devToggleFireStreak() {
+    G.grimmFireStreak=!G.grimmFireStreak;
+    alert('Grimm fire streak: '+(G.grimmFireStreak?'ON (next ram rolls 25%)':'OFF (next ram rolls 50%)'));
+}
+function devMoreWrecks() {
+    if(!Array.isArray(sector2Wrecks)) return;
+    for(let i=0;i<3;i++){
+        sector2Wrecks.push({
+            x: Math.random()*W, y: Math.random()*H,
+            scale: 0.6+Math.random()*1.4, rot: Math.random()*Math.PI*2,
+            drift: (Math.random()-0.5)*0.08,
+            shape: Math.floor(Math.random()*3), dmg: Math.random()*Math.PI*2
+        });
+    }
+}
+function devReturnToStation() {
+    G.currentSector=1; G.grimmFireStreak=false; sector2Wrecks=[];
+    if(typeof enterStation==='function') enterStation();
+    try{Sound.playMusic('bgm');}catch(e){}
+}
+function devLeaveSector2() {
+    G.currentSector=1; G.grimmFireStreak=false; sector2Wrecks=[];
+    asteroids=[]; for(let k=0;k<6;k++) spawnAsteroid();
+    try{Sound.playMusic('bgm');}catch(e){}
+}
 function toggleGodMode() { G.godMode=!G.godMode; document.getElementById('godRow').style.display=G.godMode?'block':'none'; }
 function toggleInfAmmo() { G.infAmmo=!G.infAmmo; if(G.infAmmo)G.ammo=999; updateUI(); }
 function toggleHyperGun() { G.hyperGun=!G.hyperGun; document.getElementById('hyperRow').style.display=G.hyperGun?'block':'none'; }

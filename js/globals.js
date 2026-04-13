@@ -10,6 +10,7 @@ const $menu = document.getElementById('menuScreen');
 const $over = document.getElementById('overScreen');
 const $win = document.getElementById('winScreen');
 const $debug = document.getElementById('debugMenu');
+const $debug2 = document.getElementById('debugMenu2');
 const $practice = document.getElementById('practiceMenu');
 
 const G = {

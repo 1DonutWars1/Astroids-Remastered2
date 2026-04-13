@@ -516,6 +516,24 @@
         }
         #debugMenu button:hover { background: rgba(0,60,0,0.8); border-color: #00ff00; color: #fff; }
 
+        /* Sector 2 debug menu — hellish/fire themed twin of #debugMenu */
+        #debugMenu2 {
+            display: none; position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+            width: 220px; background: rgba(20,4,2,0.95); border: 1px solid rgba(255,80,20,0.5);
+            padding: 12px; z-index: 300; pointer-events: auto;
+            box-shadow: -5px 0 30px rgba(255,60,0,0.18); max-height: 90vh; overflow-y: auto;
+            border-radius: 8px; backdrop-filter: blur(8px);
+        }
+        #debugMenu2 h3 { color: #ff6622; border-bottom: 1px solid rgba(255,80,20,0.4); padding-bottom: 5px; margin: 0 0 8px 0; font-size: 13px; letter-spacing: 2px; text-shadow: 0 0 8px rgba(255,80,0,0.6); }
+        #debugMenu2 .dev-hdr { color: #ff8844; border-bottom: 1px solid rgba(180,60,10,0.5); padding-bottom: 3px; margin: 10px 0 5px; font-size: 11px; font-weight: bold; letter-spacing: 1px; }
+        #debugMenu2 button {
+            display: block; width: 100%; margin-bottom: 4px; background: rgba(40,8,2,0.7); color: #ff9955;
+            border: 1px solid rgba(200,60,10,0.4); padding: 5px; cursor: pointer; font-family: inherit;
+            text-transform: uppercase; font-size: 10px; transition: all 0.15s; border-radius: 3px;
+            letter-spacing: 1px;
+        }
+        #debugMenu2 button:hover { background: rgba(120,30,5,0.85); border-color: #ff5522; color: #ffddaa; text-shadow: 0 0 6px rgba(255,120,40,0.8); }
+
         /* Practice settings */
         #practiceMenu {
             display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
