@@ -406,10 +406,14 @@ function spawnAsteroid(x,y,r,type='normal') {
     const speed=(1.5+G.level*0.15)*(DIFFICULTY[currentDifficulty]||DIFFICULTY.normal).astSpeed;
     let dx=(Math.random()-0.5)*speed, dy=(Math.random()-0.5)*speed;
     if(G.tutorial){dx=0;dy=0;}
+    // Sector 2 asteroids are fire-based (except fuel drops)
+    const isFire = (G.currentSector===2) && type!=='fuel';
     asteroids.push({
         x:x??(Math.random()<0.5?-40:W+40), y:y??Math.random()*H,
         dx,dy, r:baseR, verts, offsets, type,
-        angle:Math.random()*Math.PI*2, rot:(Math.random()-0.5)*0.04
+        angle:Math.random()*Math.PI*2, rot:(Math.random()-0.5)*0.04,
+        fire: isFire,
+        emberSeed: Math.random()*Math.PI*2
     });
 }
 let _nexusShotGroup=0;

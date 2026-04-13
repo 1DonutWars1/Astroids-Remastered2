@@ -11,7 +11,7 @@ const Sound = {
         this.master.connect(this.ctx.destination);
         this.initTracks();
     },
-    bgmAudio: null, boss3Audio: null, boss3P2Audio: null, boss4Audio: null, boss5Audio: null, rougeAudio: null, grimmAudio: null, nexusAudio: null, currentTrack: 'none',
+    bgmAudio: null, boss3Audio: null, boss3P2Audio: null, boss4Audio: null, boss5Audio: null, rougeAudio: null, grimmAudio: null, nexusAudio: null, sector2Audio: null, currentTrack: 'none',
     initTracks() {
         this.bgmAudio = document.getElementById('bgmTrack');
         this.boss3Audio = document.getElementById('boss3Track');
@@ -21,6 +21,7 @@ const Sound = {
         this.rougeAudio = document.getElementById('rougeTrack');
         this.grimmAudio = document.getElementById('grimmTrack');
         this.nexusAudio = document.getElementById('nexusTrack');
+        this.sector2Audio = document.getElementById('sector2Track');
         if(this.bgmAudio) this.bgmAudio.volume = 0.8;
         if(this.boss3Audio) this.boss3Audio.volume = 0.8;
         if(this.boss3P2Audio) this.boss3P2Audio.volume = 0.8;
@@ -29,6 +30,7 @@ const Sound = {
         if(this.rougeAudio) this.rougeAudio.volume = 0.8;
         if(this.grimmAudio) this.grimmAudio.volume = 0.8;
         if(this.nexusAudio) this.nexusAudio.volume = 0.8;
+        if(this.sector2Audio) this.sector2Audio.volume = 0.8;
     },
     toggleMute() {
         this.muted = !this.muted;
@@ -42,6 +44,7 @@ const Sound = {
         if(this.rougeAudio) this.rougeAudio.volume = vol;
         if(this.grimmAudio) this.grimmAudio.volume = vol;
         if(this.nexusAudio) this.nexusAudio.volume = vol;
+        if(this.sector2Audio) this.sector2Audio.volume = vol;
     },
     tone(freq, dur, type, vol, slide) {
         if (!this.ctx || this.muted) return;
@@ -109,6 +112,7 @@ const Sound = {
         if(this.rougeAudio){this.rougeAudio.pause();this.rougeAudio.currentTime=0;}
         if(this.grimmAudio){this.grimmAudio.pause();this.grimmAudio.currentTime=0;}
         if(this.nexusAudio){this.nexusAudio.pause();this.nexusAudio.currentTime=0;}
+        if(this.sector2Audio){this.sector2Audio.pause();this.sector2Audio.currentTime=0;}
     },
 
     // Synth fallbacks
@@ -188,6 +192,10 @@ const Sound = {
 
     playMusic(track) {
         if(!this.ctx) return;
+        // In sector 2, the idle-space BGM is replaced by the hellish sector theme
+        // so existing playMusic('bgm') calls (respawn, boss-death cleanup, etc.)
+        // stay musically consistent without touching every call site.
+        if(track==='bgm' && typeof G!=='undefined' && G.currentSector===2) track='sector2';
         if(this.currentTrack===track) return;
         this._stopAllAudio();
         this.currentTrack=track;
@@ -234,6 +242,12 @@ const Sound = {
             if(this.grimmAudio&&!this.muted){
                 this.grimmAudio.play().catch(()=>{this._synthBoss1();});
             } else this._synthBoss1();
+        }
+        else if(track==='sector2'){
+            if(this.sector2Audio&&!this.muted){
+                this.sector2Audio.loop=true;
+                this.sector2Audio.play().catch(()=>{this._synthBGM();});
+            } else this._synthBGM();
         }
     },
 

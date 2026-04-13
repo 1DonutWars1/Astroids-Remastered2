@@ -204,7 +204,32 @@ function update() {
         if(!G.tutorial){a.x+=a.dx;a.y+=a.dy;} a.angle+=a.rot;
         if(a.x<-120||a.x>W+120||a.y<-120||a.y>H+120){asteroids.splice(i,1);continue;}
         const dist=Math.hypot(ship.x-a.x,ship.y-a.y);
-        if(dist<ship.r*0.6+a.r*0.7){hurtPlayer();boom(a.x,a.y,'#888');asteroids.splice(i,1);continue;}
+        if(dist<ship.r*0.6+a.r*0.7){
+            // Fire-based asteroid ram logic — Grimm's Flame Charm can save you, and gives a chain destroy streak.
+            if(a.fire && (typeof hasItem==='function') && hasItem('grimm_flame_charm')){
+                // First shot: use streak bonus if available (25% chain after a previous save),
+                // otherwise fall back to the base 50% save chance.
+                const chainRoll = G.grimmFireStreak && Math.random()<0.25;
+                const baseRoll  = !G.grimmFireStreak && Math.random()<0.5;
+                if(chainRoll || baseRoll){
+                    // You rammed the fire asteroid and smashed it, unharmed.
+                    boom(a.x,a.y,'#ff6622',14);
+                    Sound.shieldSfx();
+                    Sound.explode();
+                    if(a.r>20&&!G.tutorial){spawnAsteroid(a.x,a.y,a.r/2);spawnAsteroid(a.x,a.y,a.r/2);}
+                    G.asteroidsDestroyed++;
+                    if(G.invincibleTimer<20) G.invincibleTimer=20;
+                    addScore(100);
+                    // Streak: after any successful ram save, next one is the 25% chain roll.
+                    G.grimmFireStreak = true;
+                    asteroids.splice(i,1);continue;
+                } else {
+                    // Roll failed — streak resets and the fire asteroid hurts you normally.
+                    G.grimmFireStreak = false;
+                }
+            }
+            hurtPlayer();boom(a.x,a.y,a.fire?'#ff4400':'#888');asteroids.splice(i,1);continue;
+        }
         // Check if a spawner is alive (shields asteroids)
         const spawnerAlive=miniBosses.some(m=>m.type==='spawner');
         for(let j=bullets.length-1;j>=0;j--){
@@ -1706,6 +1731,7 @@ function draw() {
     const isP2=boss&&(boss.type===3||boss.type===10)&&boss.phase2;
     const isGrimm=boss&&boss.type===6;
     const isNexus=boss&&boss.type===7;
+    const isSector2=G.currentSector===2 && !isGrimm && !isNexus && !isP2;
 
     // --- BACKGROUND ---
     // Deep space gradient with layered depth
@@ -1714,6 +1740,7 @@ function draw() {
     else if(isGrimm&&boss.phase3){bgGrad.addColorStop(0,'#2a0c04');bgGrad.addColorStop(0.4,'#140602');bgGrad.addColorStop(1,'#060201');}
     else if(isGrimm){bgGrad.addColorStop(0,'#1a0808');bgGrad.addColorStop(0.4,'#0d0404');bgGrad.addColorStop(1,'#030101');}
     else if(isP2){bgGrad.addColorStop(0,'#1a0028');bgGrad.addColorStop(0.4,'#0d0015');bgGrad.addColorStop(1,'#030003');}
+    else if(isSector2){bgGrad.addColorStop(0,'#2a0a04');bgGrad.addColorStop(0.35,'#180402');bgGrad.addColorStop(0.7,'#0a0201');bgGrad.addColorStop(1,'#050000');}
     else{bgGrad.addColorStop(0,'#080c18');bgGrad.addColorStop(0.3,'#040810');bgGrad.addColorStop(0.7,'#020408');bgGrad.addColorStop(1,'#010103');}
     ctx.fillStyle=bgGrad;ctx.fillRect(-10,-10,W+20,H+20);
 
@@ -1722,9 +1749,9 @@ function draw() {
         const nx=W*(0.08+i*0.15)+Math.sin(T/10000+i*1.7)*80;
         const ny=H*(0.12+i*0.14)+Math.cos(T/8000+i*2.3)*55;
         const nr=150+i*40+Math.sin(T/12000+i)*30;
-        ctx.globalAlpha=isNexus?0.04:isGrimm?0.09:isP2?0.08:0.055;
+        ctx.globalAlpha=isNexus?0.04:isGrimm?0.09:isSector2?0.11:isP2?0.08:0.055;
         const ng=ctx.createRadialGradient(nx,ny,0,nx,ny,nr);
-        const nebColors=isNexus?['#004466','#003355','#002244','#005577','#003344','#001a33']:isGrimm?['#ff2200','#cc1100','#ff4400','#aa0000','#ff0033','#dd2200']:isP2?['#ff00ff','#cc00aa','#ff4488','#aa00ff','#ff0066','#dd22bb']:['#2266dd','#0088ee','#4466ff','#3355dd','#2244bb','#1144aa','#5500cc'];
+        const nebColors=isNexus?['#004466','#003355','#002244','#005577','#003344','#001a33']:isGrimm?['#ff2200','#cc1100','#ff4400','#aa0000','#ff0033','#dd2200']:isSector2?['#ff3300','#cc1100','#ff5500','#aa1100','#ff2200','#882200','#ff6600']:isP2?['#ff00ff','#cc00aa','#ff4488','#aa00ff','#ff0066','#dd22bb']:['#2266dd','#0088ee','#4466ff','#3355dd','#2244bb','#1144aa','#5500cc'];
         ng.addColorStop(0,nebColors[i%nebColors.length]);ng.addColorStop(0.4,nebColors[(i+2)%nebColors.length]+'66');ng.addColorStop(0.75,nebColors[(i+3)%nebColors.length]+'22');ng.addColorStop(1,'transparent');
         ctx.fillStyle=ng;ctx.fillRect(0,0,W,H);
     }
@@ -1749,8 +1776,65 @@ function draw() {
     ctx.fillStyle=dustG;ctx.fillRect(0,dustY-80,W,160);
     ctx.globalAlpha=1;
 
+    // --- SECTOR 2: destroyed spaceship wrecks drifting in the far background ---
+    // Drawn before stars so stars twinkle through them; blurred via a shadow pass
+    // and low alpha. Pure visual flavor, no gameplay interaction.
+    if(isSector2 && sector2Wrecks && sector2Wrecks.length){
+        ctx.save();
+        ctx.filter='blur(2.5px)';
+        for(const wr of sector2Wrecks){
+            wr.x += wr.drift;
+            wr.rot += wr.drift*0.002;
+            if(wr.x<-200) wr.x=W+200;
+            if(wr.x>W+200) wr.x=-200;
+            ctx.save();
+            ctx.translate(wr.x, wr.y);
+            ctx.rotate(wr.rot);
+            ctx.scale(wr.scale, wr.scale);
+            ctx.globalAlpha=0.28;
+            // Hull silhouette — dark metal
+            ctx.fillStyle='#1a0a08';
+            ctx.strokeStyle='#3a1a10';
+            ctx.lineWidth=2;
+            ctx.beginPath();
+            if(wr.shape===0){
+                // Long cruiser hull, broken in half
+                ctx.moveTo(-60,-8);ctx.lineTo(40,-12);ctx.lineTo(55,-4);
+                ctx.lineTo(50,6);ctx.lineTo(20,10);ctx.lineTo(-10,14);
+                ctx.lineTo(-40,12);ctx.lineTo(-65,4);ctx.closePath();
+            } else if(wr.shape===1){
+                // Wedge fighter, bent wing
+                ctx.moveTo(-45,0);ctx.lineTo(-15,-18);ctx.lineTo(25,-10);
+                ctx.lineTo(45,2);ctx.lineTo(20,14);ctx.lineTo(-20,12);ctx.closePath();
+            } else {
+                // Gnarled freighter chunk
+                ctx.moveTo(-50,-14);ctx.lineTo(-10,-20);ctx.lineTo(30,-16);
+                ctx.lineTo(50,-2);ctx.lineTo(45,10);ctx.lineTo(10,18);
+                ctx.lineTo(-25,16);ctx.lineTo(-55,8);ctx.lineTo(-60,-4);ctx.closePath();
+            }
+            ctx.fill();ctx.stroke();
+            // Hull plating / window rows
+            ctx.strokeStyle='#5a1f0a';ctx.lineWidth=0.8;
+            ctx.beginPath();ctx.moveTo(-40,-2);ctx.lineTo(30,-2);ctx.stroke();
+            // Glowing damage pockets
+            const flick=0.6+Math.sin(T/300+wr.dmg)*0.4;
+            ctx.fillStyle=`rgba(255,80,20,${0.35*flick})`;
+            ctx.beginPath();ctx.arc(-20,-2,6,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle=`rgba(255,140,40,${0.25*flick})`;
+            ctx.beginPath();ctx.arc(15,4,4,0,Math.PI*2);ctx.fill();
+            // Torn edge streaks
+            ctx.strokeStyle='rgba(80,20,10,0.6)';ctx.lineWidth=1;
+            ctx.beginPath();ctx.moveTo(-60,2);ctx.lineTo(-72,6);
+            ctx.moveTo(-62,-4);ctx.lineTo(-70,-8);ctx.stroke();
+            ctx.restore();
+        }
+        ctx.filter='none';
+        ctx.restore();
+        ctx.globalAlpha=1;
+    }
+
     // Stars with color variety, twinkle, and depth layers
-    const starColors=isNexus?['#88ccff','#44aaff','#aaddff','#66bbff','#ccddff']:isGrimm?['#ff8866','#ff4422','#ffaa88','#ff6644','#ffccaa']:isP2?['#ff88cc','#ff44aa','#ffaadd','#cc44ff','#ff66ee']:['#ffffff','#aaccff','#ffeecc','#88aaff','#ccddff','#ffccee'];
+    const starColors=isNexus?['#88ccff','#44aaff','#aaddff','#66bbff','#ccddff']:isGrimm?['#ff8866','#ff4422','#ffaa88','#ff6644','#ffccaa']:isSector2?['#ff8844','#ff5522','#ffaa66','#ff6633','#ffbb88','#cc4422']:isP2?['#ff88cc','#ff44aa','#ffaadd','#cc44ff','#ff66ee']:['#ffffff','#aaccff','#ffeecc','#88aaff','#ccddff','#ffccee'];
     for(const s of stars){
         const twinkle=Math.sin(T/600+s.x*3+s.y)*0.35+Math.sin(T/900+s.y*2)*0.15;
         ctx.globalAlpha=Math.max(0.05,s.alpha+twinkle);
@@ -1991,6 +2075,16 @@ function draw() {
         if(a.type==='fuel'){
             ctx.shadowBlur=28;ctx.shadowColor='#ffcc00';
             ctx.strokeStyle='#ffdd22';ctx.fillStyle='#2a2400';
+        } else if(a.fire){
+            // Fire asteroid — glowing molten core with charred rim
+            ctx.shadowBlur=24;ctx.shadowColor='#ff3300';
+            const fg=ctx.createRadialGradient(-a.r*0.2,-a.r*0.2,a.r*0.08,0,0,a.r*1.15);
+            fg.addColorStop(0,'#fff2aa');
+            fg.addColorStop(0.2,'#ffaa22');
+            fg.addColorStop(0.5,'#ff4400');
+            fg.addColorStop(0.85,'#441008');
+            fg.addColorStop(1,'#1a0402');
+            ctx.fillStyle=fg;ctx.strokeStyle='#ff5522';
         } else if(isP2){
             ctx.shadowBlur=16;ctx.shadowColor='#00ddff';
             ctx.strokeStyle='#00ddee';ctx.fillStyle='rgba(0,40,48,0.75)';
@@ -2016,6 +2110,40 @@ function draw() {
             const fg=ctx.createRadialGradient(0,0,0,0,0,a.r*0.4);
             fg.addColorStop(0,'rgba(255,255,100,0.3)');fg.addColorStop(1,'transparent');
             ctx.fillStyle=fg;ctx.beginPath();ctx.arc(0,0,a.r*0.4,0,Math.PI*2);ctx.fill();
+        } else if(a.fire){
+            // Lava cracks — bright molten fissures across the surface
+            const flick=0.7+Math.sin(T/120+a.emberSeed)*0.3;
+            ctx.strokeStyle=`rgba(255,200,60,${flick})`;ctx.lineWidth=1.6;
+            ctx.shadowBlur=10;ctx.shadowColor='#ff6600';
+            ctx.beginPath();
+            ctx.moveTo(-a.r*0.5,-a.r*0.3);ctx.lineTo(-a.r*0.1,a.r*0.1);ctx.lineTo(a.r*0.4,-a.r*0.2);
+            ctx.moveTo(-a.r*0.2,a.r*0.4);ctx.lineTo(a.r*0.2,a.r*0.3);
+            ctx.stroke();
+            // Inner molten glow pockets
+            ctx.fillStyle=`rgba(255,150,40,${0.5*flick})`;
+            ctx.beginPath();ctx.arc(-a.r*0.15,0,a.r*0.18,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle=`rgba(255,220,120,${0.6*flick})`;
+            ctx.beginPath();ctx.arc(-a.r*0.15,0,a.r*0.08,0,Math.PI*2);ctx.fill();
+            ctx.shadowBlur=0;
+            // Charred rim shadow
+            ctx.strokeStyle='rgba(20,4,2,0.9)';ctx.lineWidth=0.7;
+            ctx.beginPath();ctx.arc(0,0,a.r*0.95,0.4,2.3);ctx.stroke();
+            // Counter-rotate for screen-aligned embers
+            ctx.rotate(-a.angle);
+            // Rising embers around the asteroid
+            for(let em=0;em<5;em++){
+                const eang=a.emberSeed+em*1.25+T/600;
+                const er=a.r*(1.05+Math.sin(T/400+em)*0.15);
+                const ex=Math.cos(eang)*er;
+                const ey=Math.sin(eang)*er - (T/20+em*7)%(a.r*1.6);
+                const ea=Math.max(0,1-(Math.abs(ey)/(a.r*1.4)));
+                ctx.fillStyle=`rgba(255,${120+Math.floor(ea*120)},40,${ea*0.8})`;
+                ctx.shadowBlur=8;ctx.shadowColor='#ff6600';
+                ctx.beginPath();ctx.arc(ex,ey,1.2+ea*1.5,0,Math.PI*2);ctx.fill();
+            }
+            ctx.shadowBlur=0;
+            // Re-apply rotation so the spawner shield ring branch below still matches state
+            ctx.rotate(a.angle);
         } else {
             // Surface detail: craters with depth
             ctx.strokeStyle=isP2?'#004455':'#1c1c1c';ctx.lineWidth=0.8;

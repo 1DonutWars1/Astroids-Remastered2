@@ -2043,7 +2043,16 @@ function updateWarpCutscene(){
             // Drop into space as sector two
             wc.phase='done';
             G.currentSector = wc.sectorId || 2;
+            // Set sector BEFORE leaveStation so initial asteroid spawn sees the sector
             if(typeof leaveStation==='function') leaveStation();
+            // Sector-specific music + setup
+            if(G.currentSector===2){
+                try{Sound.playMusic('sector2');}catch(e){}
+                if(typeof initSector2Wrecks==='function') initSector2Wrecks();
+                G.grimmFireStreak=false;
+            } else {
+                try{Sound.playMusic('bgm');}catch(e){}
+            }
             G.sectorBanner = { t:0, life:240, text:'ENTERING SECTOR '+_sectorWord(G.currentSector) };
             G.warpCutscene=null;
         }

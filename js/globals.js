@@ -111,3 +111,21 @@ let shootingStars = [];
 // Engine trail particles (separate from boom particles for persistence)
 let engineTrail = [];
 
+// Sector 2 (hellish) background debris — destroyed spaceships drifting in the far background.
+// Populated lazily on sector entry. Each entry: {x,y,scale,rot,drift,shape,dmg}
+let sector2Wrecks = [];
+function initSector2Wrecks(){
+    sector2Wrecks = [];
+    for(let i=0;i<7;i++){
+        sector2Wrecks.push({
+            x: Math.random()*W,
+            y: Math.random()*H,
+            scale: 0.6+Math.random()*1.4,
+            rot: Math.random()*Math.PI*2,
+            drift: (Math.random()-0.5)*0.08,
+            shape: Math.floor(Math.random()*3),
+            dmg: Math.random()*Math.PI*2
+        });
+    }
+}
+
