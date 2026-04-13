@@ -8,6 +8,8 @@ function startGame() {
     $ui.style.display='block';
 
     G.running=true; G.paused=false; G.score=0; G.level=1; G.albertMode=false; G.fastTravelOpen=false;
+    // Reset sector on fresh run so sector-2 music doesn't carry over after death/restart
+    G.currentSector=1; G.grimmFireStreak=false;
     G.widescreenReturning=false; canvas.width=900; W=900;
     const diff = DIFFICULTY[currentDifficulty] || DIFFICULTY.normal;
     G.ammo = G.tutorial ? 999 : (G.practice ? pSettings.ammo : diff.ammo);

@@ -169,7 +169,7 @@ function update() {
         const maxAst=Math.round((5+G.level*3)*diff.astMax), rate=Math.max(30,Math.round((90-G.level*10)*diff.astRate));
         if(G.spawnTimer>rate&&asteroids.length<maxAst){spawnAsteroid();G.spawnTimer=0;}
         // Block mini-boss spawns during ANY active level 6 state (so rouges get the spotlight)
-        if(!G.noMiniBoss&&!_l6State&&Math.random()<0.0002*G.level*diff.mbChance) spawnMiniBoss();
+        if(!G.noMiniBoss&&!_l6State&&G.currentSector!==2&&Math.random()<0.0002*G.level*diff.mbChance) spawnMiniBoss();
         // fuel spawns after boss 2
         if(G.hasForceField){G.fuelTimer++;if(G.fuelTimer>Math.round(1500*diff.fuelRate)){spawnAsteroid(undefined,undefined,undefined,'fuel');G.fuelTimer=0;}}
     }
