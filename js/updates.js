@@ -5,6 +5,25 @@
 // ============================================================
 const UPDATES = [
     {
+        version: 'v1.0.6',
+        date: '2026-04-14',
+        title: 'Sector 2 Reality Glitch',
+        notes: [
+            'Added a rare Sector 2 "reality glitch" event. Occasionally while flying through Sector 2 the screen will tear, split horizontally into two shifted halves, and show chromatic aberration and scanline noise for about 7 seconds. Gameplay continues underneath — the effect is purely visual.',
+            'Added a TRIGGER GLITCH (7s) button to the Sector 2 dev menu so the effect can be forced immediately for testing.',
+            'Removed SPAWN CHAOS KING from the Sector 2 dev menu since Chaos King is not a Sector 2 boss.'
+        ]
+    },
+    {
+        version: 'v1.0.5',
+        date: '2026-04-14',
+        title: 'Sector 2 Dev Menu Parity',
+        notes: [
+            'Added the new dev buttons to the Sector 2 dev console so they\'re available in both sectors: DISABLE BIG SHOT, DISABLE MINI BOSS SPAWNS, DISABLE BOSS SPAWNS, and ENABLE PERMA TRIPLE SHOT.',
+            'Toggle button labels now sync across both dev menus when you flip a setting in either one.'
+        ]
+    },
+    {
         version: 'v1.0.4',
         date: '2026-04-14',
         title: 'Snake Boss Cutscene Fix',

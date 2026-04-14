@@ -28,6 +28,7 @@ function update() {
     if(G.invincibleTimer>0) G.invincibleTimer--;
     if(G.tripleShotTimer>0){if(!G.permaTripleShot)G.tripleShotTimer--;document.getElementById('powerupRow').style.display=G.tripleShotTimer>0?'block':'none';}
     if(G.shakeTimer>0) G.shakeTimer--;
+    if(G.sector2GlitchTimer>0) G.sector2GlitchTimer--;
     if(G.dashCooldown>0) G.dashCooldown--;
     // Tank repair timer
     if(G.tankRepairTimer>0){G.tankRepairTimer--;if(G.tankRepairTimer<=0){G.tankDamaged=false;}}
@@ -187,6 +188,10 @@ function update() {
         if(!G.noMiniBoss&&!_l6State&&G.currentSector===2
            &&miniBosses.filter(m=>m.type==='corruption').length<2
            &&Math.random()<0.0005*diff.mbChance) spawnMiniBoss('corruption',true);
+        // Rare sector-2 reality glitch — 7 seconds of screen splitting
+        if(G.currentSector===2 && G.sector2GlitchTimer<=0 && Math.random()<0.00012){
+            triggerSector2Glitch();
+        }
         // fuel spawns after boss 2
         if(G.hasForceField){G.fuelTimer++;if(G.fuelTimer>Math.round(1500*diff.fuelRate)){spawnAsteroid(undefined,undefined,undefined,'fuel');G.fuelTimer=0;}}
     }
@@ -5001,6 +5006,75 @@ function draw() {
     if(window._watermarkId){
         ctx.globalAlpha=0.03;ctx.fillStyle='#fff';ctx.font='9px monospace';ctx.textAlign='right';
         ctx.fillText('ID:'+window._watermarkId,W-5,H-5);ctx.globalAlpha=1;
+    }
+
+    // === SECTOR 2 REALITY GLITCH ===
+    // Splits the screen in two with chromatic tearing and scanline jitter.
+    if(G.sector2GlitchTimer>0){
+        // Reset transform so the effect ignores shake translation
+        ctx.save();
+        ctx.setTransform(1,0,0,1,0,0);
+        const gt=G.sector2GlitchTimer, gd=G.sector2GlitchDuration||420;
+        // Fade in/out at the edges of the effect
+        const edge=Math.min(gt, gd-gt, 30)/30;
+        const gstr=Math.max(0.2, edge);
+        // Offscreen buffer — allocate once
+        if(!window._glitchBuf || window._glitchBuf.width!==W || window._glitchBuf.height!==H){
+            window._glitchBuf = document.createElement('canvas');
+            window._glitchBuf.width = W; window._glitchBuf.height = H;
+        }
+        const gbuf = window._glitchBuf;
+        const gbCtx = gbuf.getContext('2d');
+        gbCtx.clearRect(0,0,W,H);
+        gbCtx.drawImage(canvas,0,0);
+        // Wipe the main canvas dark so the split is visible
+        ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+        // --- Split: upper half shifted left, lower half shifted right ---
+        const splitY = Math.round(H/2 + Math.sin(gt*0.25)*6);
+        const shiftAmp = 24*gstr + Math.sin(gt*0.6)*6;
+        // Top half
+        ctx.drawImage(gbuf, 0,0,W,splitY,  -shiftAmp,0, W,splitY);
+        // Bottom half
+        ctx.drawImage(gbuf, 0,splitY,W,H-splitY,  shiftAmp,splitY, W,H-splitY);
+        // Ghost doubles — screen-composited copies shifted further out
+        ctx.globalCompositeOperation='screen';
+        ctx.globalAlpha=0.35*gstr;
+        ctx.drawImage(gbuf,0,0,W,splitY, -shiftAmp-6,0, W,splitY);
+        ctx.drawImage(gbuf,0,splitY,W,H-splitY, shiftAmp+6,splitY, W,H-splitY);
+        ctx.globalAlpha=0.25*gstr;
+        ctx.drawImage(gbuf,0,0,W,splitY, -shiftAmp+6,0, W,splitY);
+        ctx.drawImage(gbuf,0,splitY,W,H-splitY, shiftAmp-6,splitY, W,H-splitY);
+        ctx.globalCompositeOperation='source-over';
+        ctx.globalAlpha=1;
+        // Tear slices — random horizontal bands yanked sideways
+        const tears = 4+Math.floor(Math.random()*4);
+        for(let k=0;k<tears;k++){
+            const ty = Math.floor(Math.random()*H);
+            const th = 3+Math.floor(Math.random()*12);
+            const tdx = (Math.random()-0.5)*70*gstr;
+            ctx.drawImage(gbuf, 0,ty,W,th, tdx,ty, W,th);
+        }
+        // Split seam line
+        ctx.globalAlpha=0.55*gstr;
+        ctx.fillStyle='#00ffcc';
+        ctx.fillRect(0,splitY-1,W,2);
+        ctx.globalAlpha=1;
+        // RGB noise lines
+        ctx.globalAlpha=0.4*gstr;
+        for(let k=0;k<20;k++){
+            const ny = Math.floor(Math.random()*H);
+            ctx.fillStyle = Math.random()<0.5?'#ff00ff':'#00ffcc';
+            ctx.fillRect(0,ny,W,1);
+        }
+        ctx.globalAlpha=1;
+        // Subtle text tag
+        if(gt%20<10){
+            ctx.fillStyle='#00ffcc'; ctx.font='bold 10px Courier New'; ctx.textAlign='left';
+            ctx.globalAlpha=0.6*gstr;
+            ctx.fillText('◆ SIGNAL UNSTABLE ◆', 14, 24);
+            ctx.globalAlpha=1;
+        }
+        ctx.restore();
     }
 
     ctx.restore();

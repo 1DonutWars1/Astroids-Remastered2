@@ -47,6 +47,7 @@ const G = {
     // Station
     mode: 'space', fastTravelOpen: false, // 'space' or 'station' or 'cutscene'
     mb: 0, stationCutscene: null, stationCutsceneTimer: 0,
+    sector2GlitchTimer: 0, sector2GlitchDuration: 0,
     npcShip: null, dialogueChoices: null, dialogueChoiceIndex: 0,
     station: {playerX:450,playerY:480,playerVX:0,playerFacing:1,cameraX:0,floor:0,
         interactTarget:null,shopOpen:false,shopCategory:null,shopSelection:0},

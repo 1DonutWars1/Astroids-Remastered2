@@ -332,8 +332,7 @@ function toggleHyperGun() { G.hyperGun=!G.hyperGun; document.getElementById('hyp
 function toggleBigShotDisable() {
     G.bigShotDisabled=!G.bigShotDisabled;
     if(G.bigShotDisabled){ G.bigShotCharge=0; G.bigShotReady=false; }
-    const btn=document.getElementById('bigShotDisableBtn');
-    if(btn) btn.innerText = G.bigShotDisabled ? 'ENABLE BIG SHOT' : 'DISABLE BIG SHOT';
+    _setBtnLabel('bigShotDisableBtn', G.bigShotDisabled ? 'ENABLE BIG SHOT' : 'DISABLE BIG SHOT');
 }
 function skipLevel() { if(boss) boss.hp=0; else { asteroids=[]; spawnBoss(G.level); } }
 function nukeAll() {
@@ -346,6 +345,16 @@ function nukeAll() {
     updateUI();
 }
 function addCheatScore(n){G.score+=n;updateUI();}
+function triggerSector2Glitch(){
+    G.sector2GlitchDuration = 420; // 7 seconds at 60fps
+    G.sector2GlitchTimer = G.sector2GlitchDuration;
+    try { Sound.bossWarn(); } catch(e) {}
+}
+function devTriggerGlitch(){ triggerSector2Glitch(); }
+function _setBtnLabel(cls, text){
+    const btns=document.querySelectorAll('.'+cls);
+    for(const b of btns) b.innerText=text;
+}
 function toggleMiniBossSpawns(){
     G.noMiniBoss=!G.noMiniBoss;
     if(G.noMiniBoss){
@@ -353,13 +362,11 @@ function toggleMiniBossSpawns(){
         for(const m of miniBosses) boom(m.x,m.y,'#aa00ff',15);
         miniBosses=[];
     }
-    const btn=document.getElementById('miniBossToggleBtn');
-    if(btn) btn.innerText = G.noMiniBoss ? 'ENABLE MINI BOSS SPAWNS' : 'DISABLE MINI BOSS SPAWNS';
+    _setBtnLabel('miniBossToggleBtn', G.noMiniBoss ? 'ENABLE MINI BOSS SPAWNS' : 'DISABLE MINI BOSS SPAWNS');
 }
 function toggleBossSpawns(){
     G.noBoss=!G.noBoss;
-    const btn=document.getElementById('bossToggleBtn');
-    if(btn) btn.innerText = G.noBoss ? 'ENABLE BOSS SPAWNS' : 'DISABLE BOSS SPAWNS';
+    _setBtnLabel('bossToggleBtn', G.noBoss ? 'ENABLE BOSS SPAWNS' : 'DISABLE BOSS SPAWNS');
 }
 function togglePermaTripleShot(){
     G.permaTripleShot=!G.permaTripleShot;
@@ -370,8 +377,7 @@ function togglePermaTripleShot(){
         G.tripleShotTimer=0;
         document.getElementById('powerupRow').style.display='none';
     }
-    const btn=document.getElementById('permaTripleBtn');
-    if(btn) btn.innerText = G.permaTripleShot ? 'DISABLE PERMA TRIPLE SHOT' : 'ENABLE PERMA TRIPLE SHOT';
+    _setBtnLabel('permaTripleBtn', G.permaTripleShot ? 'DISABLE PERMA TRIPLE SHOT' : 'ENABLE PERMA TRIPLE SHOT');
 }
 
 // ============================================================
