@@ -24,7 +24,7 @@ const G = {
     hasForceField: false, shieldFuel: 0,
     forceFieldDrop: null,
     tutStep: 0, tutTimer: 0, checkpoint: 1,
-    godMode: false, infAmmo: false, hyperGun: false, noMiniBoss: false, noBoss: false, testMode: false, albertMode: false,
+    godMode: false, infAmmo: false, hyperGun: false, noMiniBoss: false, noBoss: false, testMode: false, albertMode: false, bigShotDisabled: false, permaTripleShot: false,
     // achievement tracking (per-run)
     asteroidsDestroyed: 0, miniBossKills: 0, fuelCollected: 0,
     damageTakenThisBoss: false, gameStartTime: 0,
@@ -69,6 +69,8 @@ const G = {
     dataFragmentPopup: null,
     // Grimm boss (optional level 7)
     grimmSpawned: false, grimmDefeated: false,
+    // Chaos King — 3rd boss, spawns 60s after boss 2
+    chaosKingPending: false, chaosKingStartTime: 0, chaosKingDefeated: false,
     // NEXUS-0 (secret boss)
     nexusListening: false, nexusDefeated: false, nexusShotLog: [], nexusPurging: false,
     nexusPurgeTimer: 0, nexusPurgeMessages: [], nexusPurgeMessageTimer: 0

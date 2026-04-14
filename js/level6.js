@@ -2003,6 +2003,7 @@ G.bigShotReady=false;
 
 function updateBigShot(){
     // Player holds space to charge big shot (only after unlocked + not during level 6)
+    if(G.bigShotDisabled){ G.bigShotCharge=0; G.bigShotReady=false; return; }
     if(!G.level6 || !G.level6.bigShotUnlocked) return;
     // Allow charging during the 'gilbert_found' rescue window, otherwise only outside level 6.
     if(G.level6.state && G.level6.state!=='gilbert_found') return;

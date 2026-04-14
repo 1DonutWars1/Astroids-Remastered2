@@ -22,6 +22,7 @@ const Sound = {
         this.grimmAudio = document.getElementById('grimmTrack');
         this.nexusAudio = document.getElementById('nexusTrack');
         this.sector2Audio = document.getElementById('sector2Track');
+        this.chaosKingAudio = document.getElementById('chaosKingTrack');
         if(this.bgmAudio) this.bgmAudio.volume = 0.8;
         if(this.boss3Audio) this.boss3Audio.volume = 0.8;
         if(this.boss3P2Audio) this.boss3P2Audio.volume = 0.8;
@@ -31,6 +32,7 @@ const Sound = {
         if(this.grimmAudio) this.grimmAudio.volume = 0.8;
         if(this.nexusAudio) this.nexusAudio.volume = 0.8;
         if(this.sector2Audio) this.sector2Audio.volume = 0.8;
+        if(this.chaosKingAudio) this.chaosKingAudio.volume = 0.85;
     },
     toggleMute() {
         this.muted = !this.muted;
@@ -45,6 +47,7 @@ const Sound = {
         if(this.grimmAudio) this.grimmAudio.volume = vol;
         if(this.nexusAudio) this.nexusAudio.volume = vol;
         if(this.sector2Audio) this.sector2Audio.volume = vol;
+        if(this.chaosKingAudio) this.chaosKingAudio.volume = vol;
     },
     tone(freq, dur, type, vol, slide) {
         if (!this.ctx || this.muted) return;
@@ -113,6 +116,7 @@ const Sound = {
         if(this.grimmAudio){this.grimmAudio.pause();this.grimmAudio.currentTime=0;}
         if(this.nexusAudio){this.nexusAudio.pause();this.nexusAudio.currentTime=0;}
         if(this.sector2Audio){this.sector2Audio.pause();this.sector2Audio.currentTime=0;}
+        if(this.chaosKingAudio){this.chaosKingAudio.pause();this.chaosKingAudio.currentTime=0;}
     },
 
     // Synth fallbacks
@@ -248,6 +252,12 @@ const Sound = {
                 this.sector2Audio.loop=true;
                 this.sector2Audio.play().catch(()=>{this._synthBGM();});
             } else this._synthBGM();
+        }
+        else if(track==='chaosking'){
+            if(this.chaosKingAudio&&!this.muted){
+                this.chaosKingAudio.loop=true;
+                this.chaosKingAudio.play().catch(()=>{this._synthBoss2();});
+            } else this._synthBoss2();
         }
     },
 

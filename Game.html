@@ -72,10 +72,12 @@
     <button onclick="toggleGodMode()">TOGGLE GOD MODE</button>
     <button onclick="toggleInfAmmo()">TOGGLE INF AMMO</button>
     <button onclick="toggleHyperGun()">TOGGLE HYPER GUN</button>
+    <button id="bigShotDisableBtn" onclick="toggleBigShotDisable()">DISABLE BIG SHOT</button>
     <button onclick="skipLevel()">SKIP LEVEL</button>
     <button onclick="nukeAll()">NUKE ENEMIES</button>
-    <button onclick="toggleMiniBossSpawns()">TOGGLE MINI BOSS SPAWNS</button>
-    <button onclick="toggleBossSpawns()">TOGGLE BOSS SPAWNS</button>
+    <button id="miniBossToggleBtn" onclick="toggleMiniBossSpawns()">DISABLE MINI BOSS SPAWNS</button>
+    <button id="bossToggleBtn" onclick="toggleBossSpawns()">DISABLE BOSS SPAWNS</button>
+    <button id="permaTripleBtn" onclick="togglePermaTripleShot()">ENABLE PERMA TRIPLE SHOT</button>
     <div class="dev-hdr">SPAWN</div>
     <button onclick="dropPowerup()">SPAWN TRIPLE SHOT</button>
     <button onclick="spawnMiniBoss('chaser',true)">SPAWN CHASER</button>
@@ -84,7 +86,7 @@
     <button onclick="spawnMiniBoss('spawner',true)">SPAWN SPAWNER (DLC)</button>
     <button onclick="spawnBoss(1)">SPAWN BOSS 1</button>
     <button onclick="spawnBoss(2)">SPAWN BOSS 2</button>
-    <button onclick="spawnBoss(3)">SPAWN BOSS 3 (SANS)</button>
+    <button onclick="spawnBoss(11)">SPAWN CHAOS KING (BOSS 3)</button>
     <button onclick="spawnBoss(4)">SPAWN BOSS 4 (CYBORG/DLC)</button>
     <button onclick="spawnBoss(5)">SPAWN BOSS 5 (SNAKE/DLC)</button>
     <button onclick="spawnBoss(6)">SPAWN BOSS 6 (GRIMM/DLC)</button>
@@ -130,10 +132,13 @@
     <button onclick="toggleGodMode()">TOGGLE GOD MODE</button>
     <button onclick="toggleInfAmmo()">TOGGLE INF AMMO</button>
     <button onclick="toggleHyperGun()">TOGGLE HYPER GUN</button>
+    <button onclick="toggleBigShotDisable()">DISABLE BIG SHOT</button>
     <button onclick="nukeAll()">NUKE ENEMIES</button>
     <div class="dev-hdr">MINI-BOSSES</div>
     <button onclick="spawnMiniBoss('corruption',true)">SPAWN CORRUPTION</button>
     <button onclick="miniBosses=miniBosses.filter(m=>m.type!=='corruption')">CLEAR CORRUPTIONS</button>
+    <div class="dev-hdr">BOSSES</div>
+    <button onclick="spawnBoss(11)">SPAWN CHAOS KING</button>
     <div class="dev-hdr">FIRE ASTEROIDS</div>
     <button onclick="devSpawnFireAsteroid()">SPAWN FIRE ASTEROID</button>
     <button onclick="devSpawnFireAsteroidBig()">SPAWN BIG FIRE ASTEROID</button>
@@ -253,6 +258,12 @@
     <button class="set-reset" onclick="resetSettings()">RESET TO DEFAULTS</button>
 </div>
 
+<div id="updatesMenu">
+    <h2>UPDATES &amp; PATCH NOTES</h2>
+    <div id="updatesList"></div>
+    <button class="set-close" onclick="closeUpdates()">DONE</button>
+</div>
+
 <div id="menuScreen" class="screen">
     <h1 style="color:#00ccff; text-shadow: 0 0 20px #00ccff;">ASTEROIDS</h1>
     <h2>REMASTERED EDITION</h2>
@@ -269,6 +280,7 @@
     <div style="margin-top:10px;">
         <button class="btn" style="border-color:#888;color:#888;padding:10px 30px;font-size:16px;" onclick="openSettings()">SETTINGS</button>
         <button class="btn" style="border-color:#ffd700;color:#ffd700;padding:10px 30px;font-size:16px;" onclick="openAchievements()">TROPHIES</button>
+        <button class="btn" style="border-color:#00ff88;color:#00ff88;padding:10px 30px;font-size:16px;" onclick="openUpdates()">UPDATES</button>
         <button class="btn" id="testBtn" style="border-color:#00ffaa;color:#00ffaa;padding:10px 30px;font-size:16px;text-shadow:0 0 10px #00ffaa;" onclick="toggleTestMode()">TEST</button>
     </div>
     <div class="controls-hint">Controls customizable in Settings</div>
@@ -420,6 +432,7 @@
 <audio id="grimmTrack" src="music/04 The Grimm Troupe.mp3" loop preload="auto"></audio>
 <audio id="nexusTrack" src="music/undertale_079. Your Best Nightmare.mp3" loop preload="auto"></audio>
 <audio id="sector2Track" src="music/universfield-creepy-dark-atmosphere-174807.mp3" loop preload="auto"></audio>
+<audio id="chaosKingTrack" src="music/BIG SHOT toby fox.mp3" loop preload="auto"></audio>
 
 <div id="volumeBtn" onclick="Sound.toggleMute()">[ MUTE ]</div>
 
@@ -430,6 +443,7 @@
 <script src="js/saves.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/achievements.js"></script>
+<script src="js/updates.js"></script>
 <script src="js/intro-cutscene.js"></script>
 <script src="js/gameplay.js"></script>
 <script src="js/dlc-gilbert.js"></script>

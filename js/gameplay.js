@@ -36,6 +36,7 @@ function startGame() {
     G.gilbertQuip=''; G.gilbertQuipTimer=0;
     G.gilbertSeen={};
     G.grimmSpawned=false; G.grimmDefeated=false;
+    G.chaosKingPending=false; G.chaosKingStartTime=0; G.chaosKingDefeated=false;
     G.nexusDefeated=false; G.nexusShotLog=[]; G.nexusPurging=false;
     G.nexusPurgeTimer=0; G.nexusPurgeMessages=[]; G.nexusPurgeMessageTimer=0;
     // Reset inventory UI state (data itself is restored from save below)
@@ -208,7 +209,7 @@ function returnToMenu() {
     document.getElementById('pauseMenu').style.display='none';
     $ui.style.display='none'; $menu.style.display='block';
     asteroids=[]; miniBosses=[]; enemyBullets=[]; gasterBlasters=[]; boss=null;
-    G.godMode=false; G.infAmmo=false; G.hyperGun=false; G.noMiniBoss=false; G.noBoss=false;
+    G.godMode=false; G.infAmmo=false; G.hyperGun=false; G.noMiniBoss=false; G.noBoss=false; G.permaTripleShot=false;
     G.gilbert=null; G.gilbertState='none'; G.bossRush=false; G.cyborgScraps=[];
     engineTrail=[]; shootingStars=[];
     G.gilbertDialogue=''; G.gilbertDialogueQueue=[]; G.rope=false;
@@ -328,6 +329,12 @@ function devLeaveSector2() {
 function toggleGodMode() { G.godMode=!G.godMode; document.getElementById('godRow').style.display=G.godMode?'block':'none'; }
 function toggleInfAmmo() { G.infAmmo=!G.infAmmo; if(G.infAmmo)G.ammo=999; updateUI(); }
 function toggleHyperGun() { G.hyperGun=!G.hyperGun; document.getElementById('hyperRow').style.display=G.hyperGun?'block':'none'; }
+function toggleBigShotDisable() {
+    G.bigShotDisabled=!G.bigShotDisabled;
+    if(G.bigShotDisabled){ G.bigShotCharge=0; G.bigShotReady=false; }
+    const btn=document.getElementById('bigShotDisableBtn');
+    if(btn) btn.innerText = G.bigShotDisabled ? 'ENABLE BIG SHOT' : 'DISABLE BIG SHOT';
+}
 function skipLevel() { if(boss) boss.hp=0; else { asteroids=[]; spawnBoss(G.level); } }
 function nukeAll() {
     boom(W/2,H/2,'white',60); Sound.explode();
@@ -339,8 +346,33 @@ function nukeAll() {
     updateUI();
 }
 function addCheatScore(n){G.score+=n;updateUI();}
-function toggleMiniBossSpawns(){G.noMiniBoss=!G.noMiniBoss;alert('Mini boss spawns: '+(G.noMiniBoss?'OFF':'ON'));}
-function toggleBossSpawns(){G.noBoss=!G.noBoss;alert('Boss spawns: '+(G.noBoss?'OFF':'ON'));}
+function toggleMiniBossSpawns(){
+    G.noMiniBoss=!G.noMiniBoss;
+    if(G.noMiniBoss){
+        // Clear existing mini-bosses so the effect is immediate
+        for(const m of miniBosses) boom(m.x,m.y,'#aa00ff',15);
+        miniBosses=[];
+    }
+    const btn=document.getElementById('miniBossToggleBtn');
+    if(btn) btn.innerText = G.noMiniBoss ? 'ENABLE MINI BOSS SPAWNS' : 'DISABLE MINI BOSS SPAWNS';
+}
+function toggleBossSpawns(){
+    G.noBoss=!G.noBoss;
+    const btn=document.getElementById('bossToggleBtn');
+    if(btn) btn.innerText = G.noBoss ? 'ENABLE BOSS SPAWNS' : 'DISABLE BOSS SPAWNS';
+}
+function togglePermaTripleShot(){
+    G.permaTripleShot=!G.permaTripleShot;
+    if(G.permaTripleShot){
+        G.tripleShotTimer=999999;
+        document.getElementById('powerupRow').style.display='block';
+    } else {
+        G.tripleShotTimer=0;
+        document.getElementById('powerupRow').style.display='none';
+    }
+    const btn=document.getElementById('permaTripleBtn');
+    if(btn) btn.innerText = G.permaTripleShot ? 'DISABLE PERMA TRIPLE SHOT' : 'ENABLE PERMA TRIPLE SHOT';
+}
 
 // ============================================================
 //  TEST MODE
@@ -535,17 +567,17 @@ function spawnEnemyBullet(x,y,angle,speed=10) {
     enemyBullets.push({x,y,dx:Math.cos(angle)*speed,dy:Math.sin(angle)*speed,life:100});
 }
 function spawnBoss(type) {
+    // Sans (type 3 and 10) is permanently disabled — redirect to Chaos King (type 11)
+    if(type===3||type===10) type=11;
     for(const a of asteroids)boom(a.x,a.y,'#666'); asteroids=[];
     for(const m of miniBosses)boom(m.x,m.y,'purple',15); miniBosses=[]; enemyBullets=[]; gasterBlasters=[];
-    // Type 10 uses Sans (type 3) logic internally
-    const isSans = (type===3||type===10);
     const diff=DIFFICULTY[currentDifficulty]||DIFFICULTY.normal;
     let hp;
     if(type===7) hp=Math.round(50*diff.bossHp);
     else if(type===6) hp=Math.round(60*diff.bossHp);
     else if(type===5) hp=Math.round(10*diff.bossHp);
     else if(type===4) hp=Math.round(30*diff.bossHp);
-    else if(isSans) hp=G.practice?pSettings.b3hp:Math.round(100*diff.bossHp);
+    else if(type===11) hp=Math.round(40*diff.bossHp);
     else if(G.practice) hp=type===1?pSettings.b1hp:pSettings.b2hp;
     else hp=Math.round((type===1?25:type===2?45:80)*diff.bossHp);
 
@@ -604,6 +636,29 @@ function spawnBoss(type) {
             ambientShootTimer:0, // constant pressure fireballs during target
             rageMultiplier:1, // scales with missing HP
             wallSide:null,wallTimer:0};
+    } else if(type===11){
+        // --- CHAOS KING ---
+        // Giant head anchored above the play area. Grabs the box with four arms;
+        // spikes line the borders. Every 30s, 3 weakpoint "mistakes" appear at
+        // hand-grip positions — shoot all 3 to shatter the box and expose the
+        // head for 10 seconds, then he grabs the ship and throws it back inside.
+        boss={type:11,x:W/2,y:-120,r:120,hp,maxHp:hp,angle:0,dx:0,dy:2.2,
+            state:'enter',timer:0,phase2:false,
+            // Cycle state
+            cycleTimer:0, cycleLength:1800, // 30s @ 60fps
+            mistakes:[], // weakpoints scheduled this cycle
+            mistakesHit:0,
+            brokenTimer:0, brokenLength:600, // 10s vulnerable
+            grabTimer:0, grabLength:90,
+            grabTarget:null, grabStart:null,
+            // Visual
+            shakeX:0, shakeY:0, shakeAmp:0, shakeDecay:0,
+            armAngle:0, mouthOpen:0,
+            // Spikes along borders — pulse inward during shakes
+            spikePulse:0,
+            // Asteroid rain timer
+            rainTimer:0,
+            wallSide:null,wallTimer:0};
     } else {
         boss={type,x:W/2,y:-80,r:type===4?32:45,hp,maxHp:hp,angle:Math.PI/2,dx:0,dy:2,
             state:'enter',timer:0,phase2:false,
@@ -613,7 +668,7 @@ function spawnBoss(type) {
     document.getElementById('bossRow').style.display='block'; updateUI();
     if(type===1) Sound.playMusic('boss1');
     else if(type===2) Sound.playMusic('boss2');
-    else if(isSans){ Sound.playMusic('boss3'); G.checkpoint=G.level; }
+    else if(type===11) { Sound.playMusic('chaosking'); G.checkpoint=Math.max(G.checkpoint||1,3); }
     else if(type===4) Sound.playMusic('boss4');
     else if(type===5) Sound.playMusic('boss5');
     else if(type===6) Sound.playMusic('grimm');

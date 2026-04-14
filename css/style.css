@@ -585,6 +585,45 @@
             transition: all 0.2s; letter-spacing: 2px;
         }
         .set-close:hover { background: linear-gradient(180deg, #777, #666); }
+
+        /* Updates menu */
+        #updatesMenu {
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            width: 560px; max-height: 80vh; background: rgba(5,5,15,0.96);
+            border: 1px solid rgba(0,255,136,0.3); padding: 30px; z-index: 150;
+            pointer-events: auto; backdrop-filter: blur(12px); border-radius: 14px;
+            box-shadow: 0 0 60px rgba(0,255,136,0.15), inset 0 1px 0 rgba(255,255,255,0.03);
+            flex-direction: column;
+        }
+        #updatesMenu.open { display: flex; }
+        #updatesMenu h2 {
+            color: #00ff88; text-align: center; border-bottom: 1px solid rgba(0,255,136,0.2);
+            padding-bottom: 10px; margin: 0 0 16px; letter-spacing: 3px; font-size: 18px;
+            text-shadow: 0 0 12px rgba(0,255,136,0.5);
+        }
+        #updatesList { overflow-y: auto; padding-right: 8px; flex: 1; min-height: 0; }
+        #updatesList::-webkit-scrollbar { width: 8px; }
+        #updatesList::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
+        #updatesList::-webkit-scrollbar-thumb { background: rgba(0,255,136,0.3); border-radius: 4px; }
+        .update-entry {
+            margin-bottom: 18px; padding: 14px 16px;
+            background: rgba(0,255,136,0.04); border-left: 3px solid #00ff88;
+            border-radius: 4px;
+        }
+        .update-header {
+            display: flex; justify-content: space-between; align-items: baseline;
+            margin-bottom: 8px;
+        }
+        .update-version {
+            color: #00ff88; font-weight: bold; font-size: 14px; letter-spacing: 2px;
+        }
+        .update-date { color: #667; font-size: 11px; }
+        .update-title {
+            color: #ccddee; font-size: 13px; margin-bottom: 8px; font-style: italic;
+        }
+        .update-notes { color: #99aabb; font-size: 12px; line-height: 1.6; }
+        .update-notes ul { margin: 4px 0 0 16px; padding: 0; }
+        .update-notes li { margin-bottom: 4px; }
         .set-reset {
             width: 100%; padding: 8px; margin-top: 8px; background: transparent;
             color: #555; border: 1px solid rgba(255,255,255,0.08); cursor: pointer;

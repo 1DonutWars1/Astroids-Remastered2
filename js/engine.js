@@ -26,7 +26,7 @@ function update() {
     if(isAction('fire')&&!_blockShoot) shoot();
     if(G.shotTimer>0) G.shotTimer--;
     if(G.invincibleTimer>0) G.invincibleTimer--;
-    if(G.tripleShotTimer>0){G.tripleShotTimer--;document.getElementById('powerupRow').style.display=G.tripleShotTimer>0?'block':'none';}
+    if(G.tripleShotTimer>0){if(!G.permaTripleShot)G.tripleShotTimer--;document.getElementById('powerupRow').style.display=G.tripleShotTimer>0?'block':'none';}
     if(G.shakeTimer>0) G.shakeTimer--;
     if(G.dashCooldown>0) G.dashCooldown--;
     // Tank repair timer
@@ -85,20 +85,31 @@ function update() {
                 canvas.width=nw;W=nw;
             }
         }
-        if(boss.y>100){boss.state=boss.type===5?'slither':'target';boss.dy=0;boss.timer=0;G.invincibleTimer=90;}
+        if(boss.type===11 ? boss.y>55 : boss.y>100){
+            boss.state = boss.type===5?'slither':(boss.type===11?'grip':'target');
+            boss.dy=0;boss.timer=0;G.invincibleTimer=90;
+        }
         updateUI();return;
     }
 
     // LEVEL TRIGGER (blocked during boss rush and Gilbert events)
     const _l6State=G.level6&&G.level6.state;
     if(!boss&&!G.tutorial&&!G.noBoss&&!G.bossRush&&!_l6State&&(G.gilbertState==='none'||G.gilbertState==='rope'||G.gilbertState==='ally'||G.gilbertState==='scrap_collect')&&elapsed>BOSS_TIME){
-        // 10 levels. Bosses at 1, 2, 4(cyborg), 10(sans). Others are wave-only.
+        // Bosses at 1, 2, 4(cyborg), 5(snake). Sans permanently disabled — level 10 no longer triggers a boss.
         if(G.level<=2) spawnBoss(G.level);
         else if(G.level===4) spawnBoss(4);
         else if(G.level===5) spawnBoss(5);
-        else if(G.level>=10) spawnBoss(10);
         else if(G.level===7&&!G.grimmSpawned&&!G.grimmDefeated){ /* hold level 7 — Grimm incoming */ }
         else { G.level++;G.waveStart=performance.now();G.spawnTimer=0;asteroids=[];for(let k=0;k<8;k++)spawnAsteroid();updateUI(); }
+    }
+
+    // CHAOS KING — spawns 60s after boss 2 is defeated, replaces Sans entirely as the 3rd boss.
+    if(!boss&&!G.tutorial&&!G.noBoss&&!G.bossRush&&!_l6State&&G.chaosKingPending&&!G.chaosKingDefeated){
+        const sinceB2=(performance.now()-G.chaosKingStartTime)/1000;
+        if(sinceB2>=60){
+            G.chaosKingPending=false;
+            spawnBoss(11);
+        }
     }
 
     // GRIMM BOSS (optional) — spawns 60s into level 7 after rouge war, one-time encounter
@@ -123,8 +134,9 @@ function update() {
         }
     }
 
-    // BOSS RUSH (DLC) — trigger 55s after boss 2 defeat
-    if(!G.bossRush&&G.bossRushStartTime>0&&G.gilbertState==='none'&&!boss){
+    // BOSS RUSH (DLC) — trigger 55s after boss 2 defeat. Blocked while Chaos King
+    // is pending or undefeated so the two boss-2-followup triggers don't race.
+    if(!G.bossRush&&G.bossRushStartTime>0&&G.gilbertState==='none'&&!boss&&!G.chaosKingPending&&G.chaosKingDefeated){
         const sinceB2=(performance.now()-G.bossRushStartTime)/1000;
         if(sinceB2>=55){
             G.bossRushStartTime=0;
@@ -1407,6 +1419,221 @@ function update() {
             if(boss.headVulnerable){
                 boss.moveSpeed=6.2;boss.turnSpeed=0.075;
             }
+        } else if(boss.type===11){
+            // --- CHAOS KING ---
+            // Giant head sits OUTSIDE the playing box in a top strip above the arena.
+            // The box itself spans (CK_BOX_TOP..H-CK_BOX_BOT) vertically — leaving
+            // roughly a 150-pixel strip at the top of the canvas where the head lives.
+            // Every 30s, 3 hand-grip weakpoints appear (mistakes). Shoot all 3 to
+            // shatter the box for 10s of vulnerability, then he grabs the ship and
+            // throws it back inside and the cycle restarts.
+            const CK_BOX_TOP = 150;
+            const CK_BOX_SIDE = 18;
+            const CK_BOX_BOT = 18;
+            const CK_HEAD_Y = 55; // rest position of the head (well inside the top strip)
+            boss.x=W/2; boss.y=CK_HEAD_Y;
+            boss.dx=0; boss.dy=0;
+            // Head wobble from current shake amp (smaller, just for the head visual)
+            if(boss.shakeAmp>0){ boss.shakeAmp*=0.92; if(boss.shakeAmp<0.2) boss.shakeAmp=0; }
+            boss.shakeX=Math.sin(boss.timer*0.9)*boss.shakeAmp*0.35;
+            boss.shakeY=Math.cos(boss.timer*1.1)*boss.shakeAmp*0.25;
+            boss.armAngle=Math.sin(boss.timer*0.02)*0.08;
+            // --- BOX SHAKE ATTACK ---
+            // When Chaos King "shakes the box", the whole play box visibly jitters
+            // and every frame of the shake the ship is yanked by the box's motion,
+            // so the player has to actively compensate.
+            if(boss.boxShakeTimer===undefined){ boss.boxShakeTimer=0; boss.boxShakeAmp=0; boss.boxShakeX=0; boss.boxShakeY=0; }
+            if(boss.boxShakeTimer>0){
+                boss.boxShakeTimer--;
+                // High-frequency random jitter
+                const prevBX=boss.boxShakeX, prevBY=boss.boxShakeY;
+                boss.boxShakeX = (Math.random()-0.5)*boss.boxShakeAmp*2;
+                boss.boxShakeY = (Math.random()-0.5)*boss.boxShakeAmp*2;
+                // Ship rides the box — apply the frame-to-frame delta as a shove.
+                ship.x += (boss.boxShakeX - prevBX);
+                ship.y += (boss.boxShakeY - prevBY);
+                ship.tx += (boss.boxShakeX - prevBX)*0.3;
+                ship.ty += (boss.boxShakeY - prevBY)*0.3;
+                // Decay amplitude over the shake duration
+                boss.boxShakeAmp *= 0.985;
+                if(boss.boxShakeTimer<=0){ boss.boxShakeX=0; boss.boxShakeY=0; boss.boxShakeAmp=0; }
+            }
+
+            if(boss.state==='grip'){
+                // Start a new cycle; schedule 3 weakpoints proportional to cycleLength
+                boss.cycleTimer=0; boss.mistakesHit=0;
+                // Sides: 0=top 1=right 2=bottom 3=left; randomize positions
+                const sides=[0,1,2,3].sort(()=>Math.random()-0.5);
+                boss.mistakes=[];
+                const boxH = H - CK_BOX_TOP - CK_BOX_BOT;
+                // Spread 3 weakpoints across the cycle so they all have time to be shot
+                // before the cycle ends. Active window shrinks slightly in phase 2.
+                const cycleLen = boss.cycleLength;
+                const activeWin = boss.phase2 ? 260 : 240;
+                const firstAt = Math.round(cycleLen*0.12);
+                const stepAt = Math.round((cycleLen - firstAt - activeWin - 60) / 3);
+                for(let m=0;m<3;m++){
+                    const side=sides[m];
+                    let wx,wy;
+                    if(side===0){wx=120+Math.random()*(W-240); wy=CK_BOX_TOP+10;}
+                    else if(side===1){wx=W-CK_BOX_SIDE-10; wy=CK_BOX_TOP+60+Math.random()*(boxH-120);}
+                    else if(side===2){wx=120+Math.random()*(W-240); wy=H-CK_BOX_BOT-10;}
+                    else{wx=CK_BOX_SIDE+10; wy=CK_BOX_TOP+60+Math.random()*(boxH-120);}
+                    const start = firstAt + m*stepAt;
+                    boss.mistakes.push({
+                        x:wx,y:wy,r:26,side,
+                        activeStart: start,
+                        activeEnd:   start+activeWin,
+                        hit:false
+                    });
+                }
+                boss.state='cycle'; boss.timer=0;
+                Sound.bossWarn();
+            }
+            else if(boss.state==='cycle'){
+                boss.cycleTimer++;
+                // Chaos King SPITS asteroids everywhere from his mouth — wide radial spray.
+                // Volleys are spaced out so the player has breathing room to aim at weakpoints.
+                boss.rainTimer++;
+                const _ckRainRate = boss.phase2 ? 115 : 140;
+                if(boss.rainTimer>=_ckRainRate){
+                    boss.rainTimer=0;
+                    boss.mouthOpen=1;
+                    const mouthX = boss.x + boss.shakeX;
+                    const mouthY = boss.y + boss.shakeY + boss.r*0.5;
+                    // Volley of 2-3 asteroids in a wide fan downward into the box
+                    const volley = 2+Math.floor(Math.random()*2);
+                    for(let v=0;v<volley;v++){
+                        spawnAsteroid(mouthX+(Math.random()-0.5)*30, mouthY, 16+Math.random()*16, 'normal');
+                        const aR=asteroids[asteroids.length-1];
+                        if(aR){
+                            // Fan angle from straight down, spread ±80°
+                            const ang = Math.PI/2 + (Math.random()-0.5)*2.8;
+                            const spd = 2.2+Math.random()*2.2;
+                            aR.dx = Math.cos(ang)*spd;
+                            aR.dy = Math.sin(ang)*spd;
+                            aR.rot = (Math.random()-0.5)*0.08;
+                        }
+                    }
+                    Sound.explode();
+                }
+                if(boss.mouthOpen>0) boss.mouthOpen-=0.02;
+                // --- PHASE 2 ATTACKS ---
+                if(boss.phase2){
+                    // (1) Aimed fireball from the mouth — single shot aimed at the ship
+                    boss.fireballTimer=(boss.fireballTimer||0)+1;
+                    if(boss.fireballTimer>=170){
+                        boss.fireballTimer=0;
+                        boss.mouthOpen=1;
+                        const mx=boss.x+boss.shakeX, my=boss.y+boss.shakeY+boss.r*0.5;
+                        const a=Math.atan2(ship.y-my, ship.x-mx);
+                        enemyBullets.push({x:mx,y:my,dx:Math.cos(a)*4.2,dy:Math.sin(a)*4.2,life:180,r:6,fire:true});
+                        Sound.hit();
+                    }
+                    // (2) Eye laser — stationary horizontal beam with long telegraph
+                    //    Always leaves a safe zone so the player can dodge by moving
+                    //    to a different y. Long warn window makes reaction time fair.
+                    boss.laserTimer=(boss.laserTimer||0)+1;
+                    if(!boss.laserBeam && boss.laserTimer>=380){
+                        boss.laserTimer=0;
+                        // Pick a y that's not right on top of the ship — give at least
+                        // 140 pixels of escape room from the current ship position.
+                        const minY = CK_BOX_TOP + 40;
+                        const maxY = H - CK_BOX_BOT - 40;
+                        let startY;
+                        let tries = 0;
+                        do {
+                            startY = minY + Math.random()*(maxY-minY);
+                            tries++;
+                        } while(Math.abs(startY - ship.y) < 140 && tries < 8);
+                        boss.laserBeam={y:startY, warn:110, active:0};
+                    }
+                    if(boss.laserBeam){
+                        const lb=boss.laserBeam;
+                        if(lb.warn>0){ lb.warn--; if(lb.warn===0){ Sound.bossWarn(); lb.active=55; } }
+                        else if(lb.active>0){
+                            lb.active--;
+                            // Stationary beam — damage band stays put
+                            if(Math.abs(ship.y-lb.y)<12) hurtPlayer();
+                            if(lb.active<=0) boss.laserBeam=null;
+                        }
+                    }
+                }
+                // Periodic BOX SHAKE attack — every ~4 seconds during the cycle (slightly faster in phase 2)
+                const _ckShakePeriod = boss.phase2 ? 210 : 240;
+                if(boss.cycleTimer%_ckShakePeriod===60){
+                    boss.boxShakeTimer = 75;   // 1.25 seconds of shaking
+                    boss.boxShakeAmp = 24;     // heavy jitter
+                    boss.shakeAmp = 24;        // head wobble too
+                    if(typeof shake==='function') shake(14,30);
+                    boss.spikePulse=1;
+                    Sound.bossWarn();
+                }
+                if(boss.spikePulse>0) boss.spikePulse-=0.02;
+                // Activate/deactivate scheduled weakpoints
+                for(const mk of boss.mistakes){
+                    mk.active = (boss.cycleTimer>=mk.activeStart && boss.cycleTimer<=mk.activeEnd && !mk.hit);
+                }
+                // Immediate shatter as soon as all 3 weakpoints are destroyed
+                if(boss.mistakesHit>=3){
+                    boss.state='broken'; boss.brokenTimer=0; boss.timer=0;
+                    boss.shakeAmp=30;
+                    if(typeof shake==='function') shake(22,45);
+                    Sound.explode();
+                    boss.spikePulse=0;
+                    boss.mistakes=[];
+                    boss.laserBeam=null;
+                }
+                // End of cycle — restart if didn't break all 3 in time
+                else if(boss.cycleTimer>=boss.cycleLength){
+                    boss.state='grip';
+                }
+            }
+            else if(boss.state==='broken'){
+                boss.brokenTimer++;
+                // Head drifts down a bit so its hitbox is more reachable
+                boss.y = CK_HEAD_Y + 30 + Math.sin(boss.brokenTimer*0.04)*15;
+                // Occasional mouth roar — no asteroid rain during broken
+                if(boss.brokenTimer>=boss.brokenLength){
+                    // Grab the ship
+                    boss.state='grab'; boss.grabTimer=0;
+                    boss.grabStart={x:ship.x,y:ship.y};
+                    boss.grabTarget={x:W/2,y:H/2};
+                    Sound.bossWarn();
+                }
+            }
+            else if(boss.state==='grab'){
+                boss.grabTimer++;
+                const t=Math.min(1, boss.grabTimer/boss.grabLength);
+                const ease = 1-Math.pow(1-t,3);
+                // Yoink ship back to center
+                ship.x = boss.grabStart.x + (boss.grabTarget.x - boss.grabStart.x)*ease;
+                ship.y = boss.grabStart.y + (boss.grabTarget.y - boss.grabStart.y)*ease;
+                ship.tx*=0.8; ship.ty*=0.8;
+                if(boss.grabTimer>=boss.grabLength){
+                    boss.state='grip';
+                    G.invincibleTimer=Math.max(G.invincibleTimer,45);
+                    if(typeof shake==='function') shake(10,15);
+                }
+            }
+
+            // --- Spike collision: box walls hurt during cycle/grip/grab states ---
+            // Walls shift with boxShakeX/Y so the ship can actually get crushed into spikes
+            // if they don't move with the shake.
+            const spikesActive = (boss.state==='cycle'||boss.state==='grip'||boss.state==='grab');
+            if(spikesActive){
+                const pulse = boss.spikePulse*10;
+                const sx = boss.boxShakeX||0;
+                const sy = boss.boxShakeY||0;
+                const topI = CK_BOX_TOP + pulse + sy;
+                const leftI = CK_BOX_SIDE + pulse + sx;
+                const rightI = W - CK_BOX_SIDE - pulse + sx;
+                const botI = H - CK_BOX_BOT - pulse + sy;
+                if(ship.x<leftI){ ship.x=leftI; ship.tx=Math.abs(ship.tx); hurtPlayer(); }
+                else if(ship.x>rightI){ ship.x=rightI; ship.tx=-Math.abs(ship.tx); hurtPlayer(); }
+                if(ship.y<topI){ ship.y=topI; ship.ty=Math.abs(ship.ty); hurtPlayer(); }
+                else if(ship.y>botI){ ship.y=botI; ship.ty=-Math.abs(ship.ty); hurtPlayer(); }
+            }
         } else {
             // --- SANS BOSS (type 3 or 10) — matching original attacks ---
             if(boss.state==='dialogue'){
@@ -1599,7 +1826,7 @@ function update() {
                                     G.waveStart=performance.now();G.spawnTimer=0;
                                     G.checkpoint=G.level;updateUI();
                                     // DLC: Start station cutscene after snake boss
-                                    if(G.gilbertState==='ally'&&!G.stationUnlocked){
+                                    if(!G.stationUnlocked){
                                         startStationCutscene();
                                     } else {
                                         asteroids=[];for(let k=0;k<8;k++)spawnAsteroid();
@@ -1636,8 +1863,9 @@ function update() {
             }
         }
 
-        // No collision during dialogue or finisher (non-snake bosses)
-        if(boss&&boss.type!==5&&!(boss.type===7&&boss.purging)&&!((boss.type===3||boss.type===10)&&(boss.state==='dialogue'||boss.state==='gilbert_finisher'))){
+        // No collision during dialogue or finisher (non-snake bosses).
+        // Chaos King head is above the box — no direct body collision (damage comes from spikes and weakpoints).
+        if(boss&&boss.type!==5&&boss.type!==11&&!(boss.type===7&&boss.purging)&&!((boss.type===3||boss.type===10)&&(boss.state==='dialogue'||boss.state==='gilbert_finisher'))){
             if(Math.hypot(ship.x-boss.x,ship.y-boss.y)<ship.r*0.6+boss.r) hurtPlayer();
         }
 
@@ -1651,6 +1879,82 @@ function update() {
             }
             if(boss&&boss.type===5) continue; // Snake collision handled above
             if(boss&&boss.type===7&&boss.purging) continue; // NEXUS purging — invulnerable
+            // --- CHAOS KING bullet handling ---
+            if(boss&&boss.type===11){
+                // During cycle: weakpoints at box borders are the only targets
+                if(boss.state==='cycle'){
+                    let hitMk=false;
+                    for(const mk of boss.mistakes){
+                        if(!mk.active||mk.hit) continue;
+                        if(Math.hypot(bullets[j].x-mk.x,bullets[j].y-mk.y)<mk.r+4){
+                            mk.hit=true; boss.mistakesHit++;
+                            boom(mk.x,mk.y,'#ffaa00',18);
+                            boom(mk.x,mk.y,'#ffffff',10);
+                            Sound.explode();
+                            if(typeof shake==='function') shake(8,12);
+                            bullets.splice(j,1); hitMk=true; break;
+                        }
+                    }
+                    if(hitMk) continue;
+                    // Bullets hitting the actual body outside of weakpoints do nothing
+                    if(Math.hypot(bullets[j].x-boss.x,bullets[j].y-boss.y)<boss.r+5){
+                        boom(bullets[j].x,bullets[j].y,'#662200',3);
+                        bullets.splice(j,1); continue;
+                    }
+                    continue;
+                }
+                // During broken: head is vulnerable — bullets deal HP damage
+                if(boss.state==='broken'){
+                    if(Math.hypot(bullets[j].x-boss.x,bullets[j].y-boss.y)<boss.r+5){
+                        const _dmgCK=bullets[j].big?(bullets[j].damage||5):1;
+                        boss.hp-=_dmgCK;
+                        boom(bullets[j].x,bullets[j].y,'#ff2244',5);
+                        Sound.hit();
+                        bullets.splice(j,1);
+                        updateUI();
+                        // Phase 2 trigger — at 30 HP, Chaos King enrages with new attacks
+                        if(!boss.phase2 && boss.hp<=30 && boss.hp>0){
+                            boss.phase2=true;
+                            boss.cycleLength=1500;      // 25s instead of 30s (milder speed-up)
+                            boss.shakeAmp=40;
+                            if(typeof shake==='function') shake(26,60);
+                            Sound.bossWarn(); Sound.explode();
+                            boom(boss.x,boss.y,'#ff2244',50);
+                            boom(boss.x,boss.y,'#ffaa00',30);
+                            // Initialize phase 2 attack timers
+                            boss.fireballTimer=0;
+                            boss.laserTimer=0;
+                            boss.laserBeam=null;
+                            boss.slamTimer=0;
+                        }
+                        if(boss.hp<=0){
+                            boom(boss.x,boss.y,'#ff2244',60);
+                            boom(boss.x,boss.y,'#ffaa00',40);
+                            shake(20,45); Sound.explode();
+                            addScore(6000); G.mb+=40;
+                            G.totalBossesDefeated++;
+                            G.chaosKingDefeated=true;
+                            G.chaosKingPending=false;
+                            document.getElementById('bossRow').style.display='none';
+                            Sound.playMusic('bgm');
+                            // Clear lingering asteroids spawned by the fight
+                            asteroids=[];
+                            G.level=4; G.waveStart=performance.now(); G.spawnTimer=0;
+                            for(let k=0;k<8;k++) spawnAsteroid();
+                            boss=null;
+                            updateUI();
+                        }
+                        break;
+                    }
+                    continue;
+                }
+                // Grip/grab/enter: invulnerable, absorb bullets
+                if(Math.hypot(bullets[j].x-boss.x,bullets[j].y-boss.y)<boss.r+5){
+                    boom(bullets[j].x,bullets[j].y,'#662200',3);
+                    bullets.splice(j,1); continue;
+                }
+                continue;
+            }
             // NEXUS data node collision
             if(boss&&boss.type===7){
                 let hitNode=false;
@@ -1702,6 +2006,11 @@ function update() {
                         // After boss 2: drop force field, advance
                         boss=null;G.level=3;G.waveStart=performance.now();G.spawnTimer=0;asteroids=[];
                         spawnForceFieldDrop(W/2,H/2); G.checkpoint=3;
+                        // Chaos King spawns 60s after boss 2 defeat (replaces Sans)
+                        if(!G.chaosKingDefeated){
+                            G.chaosKingPending=true;
+                            G.chaosKingStartTime=performance.now();
+                        }
                         // DLC: trigger boss rush 55s after boss 2 defeat (timer will be paused during rush)
                         if(G.gilbertState==='none'){
                             G.bossRushStartTime=performance.now();
@@ -3546,6 +3855,350 @@ function draw() {
             }
 
             ctx.save();ctx.translate(boss.x,boss.y); // re-enter for the final restore
+        } else if(boss.type===11){
+            // === CHAOS KING ===
+            // Undo the boss translate; we position everything in screen space because
+            // the head sits above the canvas and the "box" spans the whole viewport.
+            ctx.restore();
+            ctx.save();
+            const ck = boss;
+            const bx = ck.x + ck.shakeX;
+            const by = ck.y + ck.shakeY;
+            // --- Dark vignette overlay when gripping the box ---
+            if(ck.state!=='broken'){
+                const vig=ctx.createRadialGradient(W/2,H/2,W*0.2,W/2,H/2,W*0.8);
+                vig.addColorStop(0,'rgba(20,0,10,0)');
+                vig.addColorStop(1,'rgba(30,0,0,0.55)');
+                ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
+            }
+            // --- BOX BORDER with spikes ---
+            // Box is asymmetric: big 150px strip at the top where the head lives,
+            // thinner 18px insets on the other three sides.
+            const DBOX_TOP = 150 + ck.spikePulse*10;
+            const DBOX_SIDE = 18 + ck.spikePulse*10;
+            const DBOX_BOT = 18 + ck.spikePulse*10;
+            const boxBroken = ck.state==='broken';
+            if(!boxBroken){
+                const borderCol = ck.state==='cycle'?'#ff3322':'#aa1111';
+                // Inner glow frame around the actual play box — shifted by the box-shake
+                const bsx = ck.boxShakeX||0;
+                const bsy = ck.boxShakeY||0;
+                ctx.save();
+                ctx.translate(bsx, bsy);
+                ctx.strokeStyle=borderCol;
+                ctx.lineWidth=3;
+                ctx.shadowBlur=25;ctx.shadowColor='#ff2200';
+                ctx.strokeRect(DBOX_SIDE, DBOX_TOP, W-DBOX_SIDE*2, H-DBOX_TOP-DBOX_BOT);
+                ctx.shadowBlur=0;
+                // Spikes — 4 borders of the box
+                const drawSpike=(sx,sy,ex,ey,tx,ty)=>{
+                    ctx.beginPath();
+                    ctx.moveTo(sx,sy);
+                    ctx.lineTo(tx,ty);
+                    ctx.lineTo(ex,ey);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                };
+                ctx.fillStyle='#2a0a00';
+                ctx.strokeStyle='#ff4422';
+                ctx.lineWidth=1.2;
+                const spikeLen = 14 + ck.spikePulse*8;
+                const spikeSpacing = 38;
+                // Top spikes — sit along the top of the play box (y=DBOX_TOP), point down
+                for(let x=DBOX_SIDE+12;x<W-DBOX_SIDE-12;x+=spikeSpacing){
+                    drawSpike(x, DBOX_TOP-2, x+spikeSpacing*0.7, DBOX_TOP-2, x+spikeSpacing*0.35, DBOX_TOP-2+spikeLen);
+                }
+                // Bottom spikes (point up)
+                for(let x=DBOX_SIDE+12;x<W-DBOX_SIDE-12;x+=spikeSpacing){
+                    drawSpike(x, H-DBOX_BOT+2, x+spikeSpacing*0.7, H-DBOX_BOT+2, x+spikeSpacing*0.35, H-DBOX_BOT+2-spikeLen);
+                }
+                // Left spikes (point right) — only along the box section (below DBOX_TOP)
+                for(let y=DBOX_TOP+12;y<H-DBOX_BOT-12;y+=spikeSpacing){
+                    drawSpike(DBOX_SIDE-2, y, DBOX_SIDE-2, y+spikeSpacing*0.7, DBOX_SIDE-2+spikeLen, y+spikeSpacing*0.35);
+                }
+                // Right spikes (point left)
+                for(let y=DBOX_TOP+12;y<H-DBOX_BOT-12;y+=spikeSpacing){
+                    drawSpike(W-DBOX_SIDE+2, y, W-DBOX_SIDE+2, y+spikeSpacing*0.7, W-DBOX_SIDE+2-spikeLen, y+spikeSpacing*0.35);
+                }
+                ctx.restore();
+            } else {
+                // Box is shattered — debris floating at where the border was
+                ctx.save();
+                ctx.globalAlpha=Math.max(0, 1-ck.brokenTimer/ck.brokenLength);
+                ctx.strokeStyle='#ff6622';
+                ctx.lineWidth=1;
+                for(let i=0;i<20;i++){
+                    const seed=Math.sin(i*31.7)*9e3;
+                    const rx=((seed%W)+W)%W;
+                    const ry=((seed*1.3%H)+H)%H;
+                    const off=ck.brokenTimer*0.8;
+                    ctx.beginPath();
+                    ctx.moveTo(rx,ry+off);
+                    ctx.lineTo(rx+6,ry+off+2);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            // --- HAND ARMS — 4 arms from head reaching down to corners / weakpoints ---
+            const armBaseY = by + 40;
+            const drawArm = (targetX,targetY,side,glow) => {
+                const sx = bx + (side<2?-50:50);
+                const sy = armBaseY;
+                // Cubic bezier for a curved arm
+                const cp1x = sx + (targetX-sx)*0.3;
+                const cp1y = sy - 20;
+                const cp2x = sx + (targetX-sx)*0.7;
+                const cp2y = targetY - 40;
+                ctx.strokeStyle = glow?'#ffcc22':'#3a0a04';
+                ctx.lineWidth = 18;
+                ctx.shadowBlur = glow?22:10;
+                ctx.shadowColor = glow?'#ffaa00':'#661100';
+                ctx.beginPath();
+                ctx.moveTo(sx,sy);
+                ctx.bezierCurveTo(cp1x,cp1y,cp2x,cp2y,targetX,targetY);
+                ctx.stroke();
+                // Red cable inside arm
+                ctx.strokeStyle = glow?'#ffff88':'#ff2244';
+                ctx.lineWidth = 4;
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.moveTo(sx,sy);
+                ctx.bezierCurveTo(cp1x,cp1y,cp2x,cp2y,targetX,targetY);
+                ctx.stroke();
+                ctx.shadowBlur=0;
+                // Hand "fist" at the target
+                ctx.fillStyle = glow?'#ffaa22':'#2a0a04';
+                ctx.strokeStyle = glow?'#ffeeaa':'#ff4422';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(targetX,targetY,22,0,Math.PI*2);
+                ctx.fill();ctx.stroke();
+                // Knuckles
+                for(let k=0;k<4;k++){
+                    const ka = Math.PI*2*k/4 + T/400;
+                    ctx.fillStyle = glow?'#ffdd66':'#501a0a';
+                    ctx.beginPath();
+                    ctx.arc(targetX+Math.cos(ka)*10, targetY+Math.sin(ka)*10, 4, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            };
+            if(ck.state==='grip'||ck.state==='cycle'){
+                // 4 corner arms
+                drawArm(28,28,0,false);
+                drawArm(W-28,28,1,false);
+                drawArm(28,H-28,2,false);
+                drawArm(W-28,H-28,3,false);
+                // Weakpoint arms — glowing at each active mistake
+                if(ck.state==='cycle'){
+                    for(const mk of ck.mistakes){
+                        if(mk.active&&!mk.hit) drawArm(mk.x,mk.y,mk.side,true);
+                    }
+                }
+            } else if(ck.state==='grab'){
+                // One arm reaching ship
+                drawArm(ship.x,ship.y,1,true);
+            }
+
+            // --- Weakpoint glow ring (telegraph) ---
+            if(ck.state==='cycle'){
+                for(const mk of ck.mistakes){
+                    if(!mk.active||mk.hit) continue;
+                    const pulse = 0.6+Math.sin(T/50)*0.4;
+                    ctx.save();
+                    ctx.translate(mk.x,mk.y);
+                    ctx.strokeStyle=`rgba(255,220,60,${pulse})`;
+                    ctx.lineWidth=3;
+                    ctx.shadowBlur=22;ctx.shadowColor='#ffcc00';
+                    ctx.beginPath();ctx.arc(0,0,mk.r+6,0,Math.PI*2);ctx.stroke();
+                    ctx.fillStyle=`rgba(255,200,40,${pulse*0.4})`;
+                    ctx.beginPath();ctx.arc(0,0,mk.r,0,Math.PI*2);ctx.fill();
+                    // "SHOOT" label
+                    ctx.rotate(0);
+                    ctx.fillStyle='#fff';
+                    ctx.font='bold 10px Courier New';
+                    ctx.textAlign='center';
+                    ctx.fillText('SHOOT',0,mk.r+22);
+                    ctx.shadowBlur=0;
+                    ctx.restore();
+                }
+            }
+
+            // --- THE HEAD ---
+            ctx.save();
+            ctx.translate(bx, by);
+            const headR = ck.r;
+            const enraged = ck.state==='broken' || ck.phase2;
+            // Outer aura
+            ctx.globalAlpha=0.18;
+            const haura=ctx.createRadialGradient(0,0,headR*0.3,0,0,headR+60);
+            haura.addColorStop(0,enraged?'#ff3300':'#aa1100');
+            haura.addColorStop(0.5,'rgba(160,20,0,0.45)');
+            haura.addColorStop(1,'rgba(40,0,0,0)');
+            ctx.fillStyle=haura;
+            ctx.beginPath();ctx.arc(0,0,headR+60,0,Math.PI*2);ctx.fill();
+            ctx.globalAlpha=1;
+            // Giant skull-crown shape
+            ctx.shadowBlur=40;ctx.shadowColor=enraged?'#ff2200':'#880000';
+            const headG=ctx.createRadialGradient(-headR*0.3,-headR*0.4,headR*0.1,0,0,headR*1.1);
+            headG.addColorStop(0,enraged?'#4a0a00':'#2a0400');
+            headG.addColorStop(0.5,enraged?'#2a0200':'#180100');
+            headG.addColorStop(1,'#060000');
+            ctx.fillStyle=headG;
+            ctx.strokeStyle=enraged?'#ff4422':'#aa2200';
+            ctx.lineWidth=3;
+            ctx.beginPath();
+            // Skull shape — irregular angular
+            const hv=14;
+            for(let v=0;v<hv;v++){
+                const a=(Math.PI*2/hv)*v - Math.PI/2;
+                const jitter = Math.sin(T/200+v)*4;
+                const rr = headR + jitter + (v%2===0?0:-6);
+                ctx.lineTo(Math.cos(a)*rr, Math.sin(a)*rr*0.85);
+            }
+            ctx.closePath();ctx.fill();ctx.stroke();
+            ctx.shadowBlur=0;
+            // Crown spikes on top
+            ctx.fillStyle=enraged?'#ff4400':'#661100';
+            ctx.strokeStyle=enraged?'#ffaa44':'#aa2200';
+            for(let c=0;c<7;c++){
+                const ca = -Math.PI/2 + (c-3)*0.2;
+                const csx = Math.cos(ca)*headR*0.95;
+                const csy = Math.sin(ca)*headR*0.85;
+                const ctx2 = Math.cos(ca)*(headR*1.3);
+                const cty = Math.sin(ca)*(headR*1.25);
+                ctx.beginPath();
+                ctx.moveTo(csx-6,csy);
+                ctx.lineTo(ctx2,cty);
+                ctx.lineTo(csx+6,csy);
+                ctx.closePath();ctx.fill();ctx.stroke();
+            }
+            // Eyes — two glowing voids
+            ctx.shadowBlur=25;ctx.shadowColor=enraged?'#ff0000':'#ff4400';
+            const eyeIntensity = enraged?1:(0.7+Math.sin(T/120)*0.3);
+            const eyeOff = headR*0.35;
+            const eyeY = headR*0.1;
+            // Eye sockets
+            ctx.fillStyle='#000';
+            ctx.beginPath();ctx.arc(-eyeOff,eyeY,headR*0.18,0,Math.PI*2);ctx.fill();
+            ctx.beginPath();ctx.arc(eyeOff,eyeY,headR*0.18,0,Math.PI*2);ctx.fill();
+            // Glowing pupils tracking the ship
+            const toShip = Math.atan2(ship.y-by, ship.x-bx);
+            const pupilDX = Math.cos(toShip)*headR*0.06;
+            const pupilDY = Math.sin(toShip)*headR*0.06;
+            ctx.fillStyle=enraged?`rgba(255,60,20,${eyeIntensity})`:`rgba(255,140,20,${eyeIntensity})`;
+            ctx.beginPath();ctx.arc(-eyeOff+pupilDX,eyeY+pupilDY,headR*0.08,0,Math.PI*2);ctx.fill();
+            ctx.beginPath();ctx.arc(eyeOff+pupilDX,eyeY+pupilDY,headR*0.08,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle='#ffffff';
+            ctx.beginPath();ctx.arc(-eyeOff+pupilDX,eyeY+pupilDY,headR*0.035,0,Math.PI*2);ctx.fill();
+            ctx.beginPath();ctx.arc(eyeOff+pupilDX,eyeY+pupilDY,headR*0.035,0,Math.PI*2);ctx.fill();
+            ctx.shadowBlur=0;
+            // Mouth — widens when raining asteroids
+            const mo = ck.mouthOpen||0;
+            const mouthW = headR*0.7;
+            const mouthH = headR*0.15 + mo*headR*0.35;
+            const mouthY = headR*0.5;
+            ctx.fillStyle='#000';
+            ctx.beginPath();
+            ctx.ellipse(0,mouthY,mouthW,mouthH,0,0,Math.PI*2);
+            ctx.fill();
+            // Teeth
+            ctx.fillStyle=enraged?'#ffddaa':'#cc9966';
+            ctx.strokeStyle='#331100';
+            ctx.lineWidth=1;
+            const teethCount=9;
+            for(let t=0;t<teethCount;t++){
+                const tx = -mouthW*0.85 + (mouthW*1.7/teethCount)*t;
+                ctx.beginPath();
+                ctx.moveTo(tx-4, mouthY-mouthH*0.6);
+                ctx.lineTo(tx, mouthY+mouthH*0.2);
+                ctx.lineTo(tx+4, mouthY-mouthH*0.6);
+                ctx.closePath();ctx.fill();ctx.stroke();
+                // Bottom row
+                ctx.beginPath();
+                ctx.moveTo(tx-4, mouthY+mouthH*0.6);
+                ctx.lineTo(tx, mouthY-mouthH*0.2);
+                ctx.lineTo(tx+4, mouthY+mouthH*0.6);
+                ctx.closePath();ctx.fill();ctx.stroke();
+            }
+            // Inner mouth glow
+            if(mo>0.1){
+                const mg=ctx.createRadialGradient(0,mouthY,0,0,mouthY,mouthW);
+                mg.addColorStop(0,`rgba(255,120,20,${mo*0.6})`);
+                mg.addColorStop(1,'transparent');
+                ctx.fillStyle=mg;
+                ctx.beginPath();ctx.ellipse(0,mouthY,mouthW*0.9,mouthH*0.9,0,0,Math.PI*2);ctx.fill();
+            }
+            ctx.restore();
+
+            // --- Cycle progress bar and mistakes counter ---
+            if(ck.state==='cycle'){
+                const barW = 260;
+                const barX = (W-barW)/2;
+                const barY = H - 38;
+                ctx.fillStyle='rgba(0,0,0,0.6)';
+                ctx.fillRect(barX-2,barY-2,barW+4,8);
+                ctx.fillStyle='#ff4422';
+                ctx.fillRect(barX,barY,barW*(ck.cycleTimer/ck.cycleLength),4);
+                ctx.strokeStyle='#ffaa66';
+                ctx.lineWidth=1;
+                ctx.strokeRect(barX-0.5,barY-0.5,barW+1,5);
+                // Mistake hit count
+                ctx.fillStyle='#ffcc44';
+                ctx.font='bold 11px Courier New';
+                ctx.textAlign='center';
+                ctx.fillText('WEAKPOINTS: '+ck.mistakesHit+' / 3', W/2, barY-6);
+            } else if(ck.state==='broken'){
+                const t=1-(ck.brokenTimer/ck.brokenLength);
+                const barW=260;
+                const barX=(W-barW)/2;
+                const barY=H-38;
+                ctx.fillStyle='rgba(0,0,0,0.7)';
+                ctx.fillRect(barX-2,barY-2,barW+4,8);
+                ctx.fillStyle='#ffff22';
+                ctx.fillRect(barX,barY,barW*t,4);
+                ctx.fillStyle='#ffff66';
+                ctx.font='bold 12px Courier New';
+                ctx.textAlign='center';
+                ctx.shadowBlur=10;ctx.shadowColor='#ffaa00';
+                ctx.fillText('HIT HIM NOW',W/2,barY-6);
+                ctx.shadowBlur=0;
+            }
+
+            // --- PHASE 2 LASER BEAM ---
+            if(ck.laserBeam){
+                const lb=ck.laserBeam;
+                ctx.save();
+                if(lb.warn>0){
+                    // Telegraph — flashing red line
+                    const flash=(Math.floor(lb.warn/4)%2===0)?0.9:0.3;
+                    ctx.globalAlpha=flash;
+                    ctx.strokeStyle='#ff2244';
+                    ctx.lineWidth=2;
+                    ctx.setLineDash([12,8]);
+                    ctx.beginPath();ctx.moveTo(18,lb.y);ctx.lineTo(W-18,lb.y);ctx.stroke();
+                    ctx.setLineDash([]);
+                } else if(lb.active>0){
+                    ctx.shadowBlur=25;ctx.shadowColor='#ff3344';
+                    ctx.strokeStyle='#ff4466';
+                    ctx.lineWidth=20;
+                    ctx.globalAlpha=0.35;
+                    ctx.beginPath();ctx.moveTo(18,lb.y);ctx.lineTo(W-18,lb.y);ctx.stroke();
+                    ctx.lineWidth=8;ctx.globalAlpha=0.85;
+                    ctx.strokeStyle='#ff8899';
+                    ctx.beginPath();ctx.moveTo(18,lb.y);ctx.lineTo(W-18,lb.y);ctx.stroke();
+                    ctx.lineWidth=2;ctx.globalAlpha=1;
+                    ctx.strokeStyle='#ffffff';
+                    ctx.beginPath();ctx.moveTo(18,lb.y);ctx.lineTo(W-18,lb.y);ctx.stroke();
+                }
+                ctx.restore();
+            }
+            ctx.restore(); // end chaos king draw scope
+            // Re-enter a boss translate so the trailing ctx.restore() at the end of the
+            // boss draw block (which matches the ctx.save() at line 2921) has something
+            // to balance against.
+            ctx.save();ctx.translate(boss.x,boss.y);
         } else if(boss.type===5){
             // --- SNAKE BOSS --- (drawn from tail to head)
             ctx.restore(); // Undo the translate(boss.x, boss.y) — we draw each segment separately
