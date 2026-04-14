@@ -514,10 +514,20 @@ function spawnMiniBoss(typeOverride,force) {
     if(type==='blaster'){hp=18;speed=0.8;r=28;}
     else if(type==='spawner'){hp=7;speed=2.5;r=20;}
     else if(type==='shooter'){hp=12;speed=1.0;}
+    else if(type==='corruption'){
+        // CORRUPTION — sector 2 mini-boss. Invulnerable, grows over time, explodes
+        // into fire asteroids at max size. Player must avoid.
+        // Spawn anywhere on-screen (not from edges like regular mini-bosses).
+        sx=80+Math.random()*(W-160); sy=80+Math.random()*(H-160);
+        hp=9999; speed=0.35; r=14;
+    }
     else{hp=8;speed=1.6;}
     miniBosses.push({type,x:sx,y:sy,r:r,hp,maxHp:hp,
         speed,rot:0,state:'move',timer:0,blasterLocked:false,blasterTarget:null,
-        dashTarget:null});
+        dashTarget:null,
+        // corruption-specific state
+        corrBaseR: r, corrMaxR: 125, corrGrowth: 0.09,
+        corrSeed: Math.random()*1000, corrGlitchT: 0});
     // Gilbert intro for mini-boss types
     if(GILBERT_INTROS[type]) gilbertIntro(type,GILBERT_INTROS[type]);
 }

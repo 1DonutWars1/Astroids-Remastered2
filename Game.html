@@ -131,6 +131,9 @@
     <button onclick="toggleInfAmmo()">TOGGLE INF AMMO</button>
     <button onclick="toggleHyperGun()">TOGGLE HYPER GUN</button>
     <button onclick="nukeAll()">NUKE ENEMIES</button>
+    <div class="dev-hdr">MINI-BOSSES</div>
+    <button onclick="spawnMiniBoss('corruption',true)">SPAWN CORRUPTION</button>
+    <button onclick="miniBosses=miniBosses.filter(m=>m.type!=='corruption')">CLEAR CORRUPTIONS</button>
     <div class="dev-hdr">FIRE ASTEROIDS</div>
     <button onclick="devSpawnFireAsteroid()">SPAWN FIRE ASTEROID</button>
     <button onclick="devSpawnFireAsteroidBig()">SPAWN BIG FIRE ASTEROID</button>

@@ -170,6 +170,11 @@ function update() {
         if(G.spawnTimer>rate&&asteroids.length<maxAst){spawnAsteroid();G.spawnTimer=0;}
         // Block mini-boss spawns during ANY active level 6 state (so rouges get the spotlight)
         if(!G.noMiniBoss&&!_l6State&&G.currentSector!==2&&Math.random()<0.0002*G.level*diff.mbChance) spawnMiniBoss();
+        // Sector 2 exclusively uses the CORRUPTION mini-boss — a glitched data parasite
+        // that grows over time and explodes into fire asteroids at max size.
+        if(!G.noMiniBoss&&!_l6State&&G.currentSector===2
+           &&miniBosses.filter(m=>m.type==='corruption').length<2
+           &&Math.random()<0.0005*diff.mbChance) spawnMiniBoss('corruption',true);
         // fuel spawns after boss 2
         if(G.hasForceField){G.fuelTimer++;if(G.fuelTimer>Math.round(1500*diff.fuelRate)){spawnAsteroid(undefined,undefined,undefined,'fuel');G.fuelTimer=0;}}
     }
@@ -291,6 +296,58 @@ function update() {
     // MINI BOSSES
     for(let i=miniBosses.length-1;i>=0;i--){
         const mb=miniBosses[i], toShip=Math.atan2(ship.y-mb.y,ship.x-mb.x);
+        if(mb.type==='corruption'){
+            // CORRUPTION — glitched data parasite. Invulnerable, grows continuously,
+            // drifts slowly and randomly, and at max size detonates into fire asteroids.
+            mb.timer++;
+            mb.corrGlitchT++;
+            // Slow organic drift — wobble with a noise-like pattern
+            const drft=0.006;
+            mb.x+=Math.sin((mb.timer+mb.corrSeed)*drft)*mb.speed;
+            mb.y+=Math.cos((mb.timer+mb.corrSeed*1.3)*drft*1.4)*mb.speed;
+            // Keep it on-screen — corruption is a stationary hazard, not a chaser.
+            if(mb.x<mb.r+10)mb.x=mb.r+10;
+            if(mb.x>W-mb.r-10)mb.x=W-mb.r-10;
+            if(mb.y<mb.r+10)mb.y=mb.r+10;
+            if(mb.y>H-mb.r-10)mb.y=H-mb.r-10;
+            // Grow over time
+            if(mb.r<mb.corrMaxR) mb.r+=mb.corrGrowth;
+            // Detonate at max size
+            if(mb.r>=mb.corrMaxR){
+                // Explode into 5-7 fire asteroids (sector 2 so spawnAsteroid flags them fire)
+                const n=5+Math.floor(Math.random()*3);
+                for(let k=0;k<n;k++){
+                    const ang=(Math.PI*2/n)*k+Math.random()*0.3;
+                    const d=mb.r*0.55;
+                    spawnAsteroid(mb.x+Math.cos(ang)*d, mb.y+Math.sin(ang)*d, 18+Math.random()*14, 'normal');
+                    const newA=asteroids[asteroids.length-1];
+                    if(newA){
+                        const sp=1.2+Math.random()*1.4;
+                        newA.dx=Math.cos(ang)*sp; newA.dy=Math.sin(ang)*sp;
+                    }
+                }
+                boom(mb.x,mb.y,'#ff3300',35);
+                boom(mb.x,mb.y,'#ff88aa',25);
+                Sound.explode();
+                if(typeof shake==='function') shake(14,20);
+                miniBosses.splice(i,1);
+                continue;
+            }
+            // Ship contact — corruption hurts on touch
+            if(Math.hypot(ship.x-mb.x,ship.y-mb.y)<ship.r*0.55+mb.r*0.85) hurtPlayer();
+            // Bullets pass through / glitch — no damage. Briefly spark the bullet.
+            for(let j=bullets.length-1;j>=0;j--){
+                if(Math.hypot(bullets[j].x-mb.x,bullets[j].y-mb.y)<mb.r){
+                    // Visual sparkle, no HP change, bullet continues.
+                    if(Math.random()<0.25){
+                        particles.push({x:bullets[j].x,y:bullets[j].y,
+                            dx:(Math.random()-0.5)*2,dy:(Math.random()-0.5)*2,
+                            life:12,maxLife:12,color:Math.random()<0.5?'#ff22aa':'#22ffee',size:1.5});
+                    }
+                }
+            }
+            continue;
+        }
         if(mb.type==='chaser'){
             mb.x+=Math.cos(toShip)*mb.speed;mb.y+=Math.sin(toShip)*mb.speed;mb.rot+=0.08;
         } else if(mb.type==='blaster'){
@@ -1334,23 +1391,21 @@ function update() {
                 seg.angle=Math.atan2(prev.y-seg.y,prev.x-seg.x);
                 if(seg.type==='asteroid'&&!seg.destroyed) seg.angle+=seg.rot*boss.timer;
             }
-            // Head shoots at player
-            boss.shootTimer++;
-            const fireRate=boss.headVulnerable?35:70;
-            if(boss.shootTimer>=fireRate){
-                const toP=Math.atan2(ship.y-boss.y,ship.x-boss.x);
-                if(boss.headVulnerable){
-                    for(let k=-2;k<=2;k++) spawnEnemyBullet(boss.x,boss.y,toP+k*0.2,7);
-                } else {
+            // Head shoots at player (only while armored — once exposed, it stops shooting
+            // and instead becomes a pure high-speed chase to compensate)
+            if(!boss.headVulnerable){
+                boss.shootTimer++;
+                if(boss.shootTimer>=70){
+                    const toP=Math.atan2(ship.y-boss.y,ship.x-boss.x);
                     spawnEnemyBullet(boss.x,boss.y,toP,6);
                     spawnEnemyBullet(boss.x,boss.y,toP+0.15,5);
                     spawnEnemyBullet(boss.x,boss.y,toP-0.15,5);
+                    boss.shootTimer=0;boom(boss.x,boss.y,'#ff4444',3);
                 }
-                boss.shootTimer=0;boom(boss.x,boss.y,'#ff4444',3);
             }
-            // Enraged mode — faster
+            // Enraged mode — no bullets, just much faster chase
             if(boss.headVulnerable){
-                boss.moveSpeed=4;boss.turnSpeed=0.05;
+                boss.moveSpeed=6.2;boss.turnSpeed=0.075;
             }
         } else {
             // --- SANS BOSS (type 3 or 10) — matching original attacks ---
@@ -2250,6 +2305,113 @@ function draw() {
     // --- MINI BOSSES ---
     for(const mb of miniBosses){
         ctx.save();ctx.translate(mb.x,mb.y);ctx.rotate(mb.rot);
+        if(mb.type==='corruption'){
+            // === CORRUPTION — glitched data parasite ===
+            // Grows; explodes into fire asteroids at max size. Cannot be killed.
+            const growPct = Math.min(1, (mb.r-mb.corrBaseR)/(mb.corrMaxR-mb.corrBaseR));
+            const glitch = Math.sin(T/60+mb.corrSeed)*0.5+0.5;
+            const urgent = growPct>0.75;
+            // --- Outer noisy aura ---
+            ctx.globalAlpha = 0.18 + growPct*0.25;
+            const auraR = mb.r + 18 + Math.sin(T/120)*4;
+            const auraG = ctx.createRadialGradient(0,0,mb.r*0.3,0,0,auraR);
+            auraG.addColorStop(0,`rgba(255,60,180,${0.35+growPct*0.4})`);
+            auraG.addColorStop(0.5,`rgba(180,40,220,${0.18+growPct*0.25})`);
+            auraG.addColorStop(1,'rgba(20,0,40,0)');
+            ctx.fillStyle=auraG;
+            ctx.beginPath();ctx.arc(0,0,auraR,0,Math.PI*2);ctx.fill();
+            ctx.globalAlpha=1;
+            // --- Corrupted blob body with RGB channel split ---
+            // Build one irregular jagged polygon, redraw 3 times offset per channel
+            const verts = 22;
+            const rng = (k)=>{
+                const v = Math.sin(mb.corrSeed+k*31.3+Math.floor(T/120))*43758.5453;
+                return (v - Math.floor(v));
+            };
+            const buildPath = (offX,offY,scale)=>{
+                ctx.beginPath();
+                for(let v=0;v<verts;v++){
+                    const a=(Math.PI*2/verts)*v;
+                    const n = rng(v)*0.45 + Math.sin(T/90+v+mb.corrSeed)*0.12;
+                    const rr = (mb.r*scale)*(0.8 + n);
+                    const x = Math.cos(a)*rr + offX;
+                    const y = Math.sin(a)*rr + offY;
+                    if(v===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+                }
+                ctx.closePath();
+            };
+            // Red channel offset
+            ctx.globalCompositeOperation='lighter';
+            ctx.globalAlpha = 0.55;
+            const split = 2 + glitch*4 + growPct*3;
+            ctx.fillStyle='rgba(255,30,80,0.7)';
+            buildPath(-split,0,1);ctx.fill();
+            ctx.fillStyle='rgba(40,255,220,0.55)';
+            buildPath(split*0.6,split*0.4,1);ctx.fill();
+            ctx.fillStyle='rgba(180,40,255,0.6)';
+            buildPath(0,-split*0.7,1);ctx.fill();
+            ctx.globalCompositeOperation='source-over';
+            ctx.globalAlpha=1;
+            // Solid dark core body
+            ctx.fillStyle='rgba(12,2,18,0.85)';
+            ctx.strokeStyle=urgent?`rgba(255,80,100,${0.7+glitch*0.3})`:`rgba(200,60,200,${0.55+glitch*0.25})`;
+            ctx.lineWidth = 1.5 + urgent*1;
+            ctx.shadowBlur = 18 + growPct*20;
+            ctx.shadowColor = urgent?'#ff3366':'#aa22cc';
+            buildPath(0,0,0.9);ctx.fill();ctx.stroke();
+            ctx.shadowBlur=0;
+            // --- Glitch tear rectangles (scanline artifacts) ---
+            ctx.save();
+            ctx.beginPath();ctx.arc(0,0,mb.r,0,Math.PI*2);ctx.clip();
+            for(let g=0;g<4;g++){
+                if(rng(g+100+Math.floor(T/6))<0.55){
+                    const ty = (rng(g+200)-0.5)*mb.r*2;
+                    const th = 2+rng(g+300)*4;
+                    const tx = (rng(g+400)-0.5)*mb.r*0.4;
+                    ctx.fillStyle = ['rgba(255,255,255,0.6)','rgba(255,0,120,0.5)','rgba(0,255,220,0.4)','rgba(0,0,0,0.85)'][g%4];
+                    ctx.fillRect(-mb.r+tx,ty,mb.r*2,th);
+                }
+            }
+            ctx.restore();
+            // --- Pixel-block debris around the rim ---
+            ctx.globalAlpha = 0.8;
+            for(let p=0;p<8;p++){
+                const pa = (T/400+p*0.78+mb.corrSeed)%(Math.PI*2);
+                const pr = mb.r + 4 + Math.sin(T/150+p)*3 + (p%3)*2;
+                const px = Math.cos(pa)*pr;
+                const py = Math.sin(pa)*pr;
+                const sz = 1.5 + rng(p+500)*2;
+                ctx.fillStyle = ['#ff2288','#22ffdd','#ffffff','#aa22ff'][p%4];
+                ctx.fillRect(px-sz/2,py-sz/2,sz,sz);
+            }
+            ctx.globalAlpha=1;
+            // --- Core eye ---
+            const eyeI = 0.6 + glitch*0.4;
+            ctx.shadowBlur=14;ctx.shadowColor=urgent?'#ff0044':'#ff00aa';
+            ctx.fillStyle=`rgba(255,${urgent?40:120},${urgent?80:220},${eyeI})`;
+            ctx.beginPath();ctx.arc(0,0,3+glitch*2,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle='#fff';
+            ctx.beginPath();ctx.arc(0,0,1.4,0,Math.PI*2);ctx.fill();
+            ctx.shadowBlur=0;
+            // --- Warning ring when close to max size ---
+            if(urgent){
+                const wPulse=0.5+Math.sin(T/40)*0.5;
+                ctx.strokeStyle=`rgba(255,60,60,${wPulse*0.9})`;
+                ctx.lineWidth=2;
+                ctx.shadowBlur=14;ctx.shadowColor='#ff2233';
+                ctx.beginPath();ctx.arc(0,0,mb.r+10+Math.sin(T/30)*3,0,Math.PI*2);ctx.stroke();
+                ctx.shadowBlur=0;
+            }
+            // --- "!" / tag label above ---
+            ctx.rotate(-mb.rot);
+            ctx.font='bold 10px Courier New';ctx.textAlign='center';
+            ctx.fillStyle=urgent?'#ff4466':'#ff66cc';
+            ctx.globalAlpha=0.6+glitch*0.4;
+            ctx.fillText(urgent?'UNSTABLE':'CORRUPTED',0,-mb.r-14);
+            ctx.globalAlpha=1;
+            ctx.restore();
+            continue;
+        }
         if(mb.type==='chaser'){
             // === CHASER — Volatile purple plasma entity ===
             const chPulse=0.6+Math.sin(T/150+mb.x)*0.4;
@@ -4324,7 +4486,7 @@ document.addEventListener('keydown', e => {
     if(G.stationCutscene) return; // Block all input during other cutscene phases
 
     // Fast travel menu (X key) — blocked during level 6 events
-    if(e.code==='KeyX'&&G.running&&G.stationUnlocked&&!boss&&G.mode==='space'&&!G.bossRush&&!G.stationCutscene&&!(G.level6&&G.level6.state)){
+    if(e.code==='KeyX'&&G.running&&G.stationUnlocked&&!boss&&G.mode==='space'&&!G.bossRush&&!G.stationCutscene&&!(G.level6&&G.level6.state)&&G.currentSector!==2){
         G.fastTravelOpen=!G.fastTravelOpen;Sound.ui();return;
     }
     // Confirm fast travel
