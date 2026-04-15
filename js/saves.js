@@ -6,17 +6,71 @@ function saveToDisk() { localStorage.setItem('ast_rem_saves', JSON.stringify(sav
 function renderSlots() {
     for (let i=1;i<=3;i++) {
         const el=document.getElementById('slot'+i), d=saves[i];
-        if (!d) el.innerHTML=`<span class="slot-title">SLOT ${i}</span><span class="slot-empty">EMPTY</span>`;
-        else {
+        if (!d) {
+            el.innerHTML=`<span class="slot-title">SLOT ${i}</span><span class="slot-empty">EMPTY</span>`+
+                `<button class="del-btn" style="background:rgba(0,80,120,0.6);color:#44ccff;border-color:rgba(0,200,255,0.3);margin-top:14px;" onclick="importSlot(event,${i})">IMPORT SAVE</button>`;
+        } else {
             const cls=d.playerClass&&CLASS_DEFS[d.playerClass]?CLASS_DEFS[d.playerClass]:null;
             const diffDef=DIFFICULTY[d.difficulty]||DIFFICULTY.normal;
             const diffTag=`<span style="color:${diffDef.color};font-size:10px;">${diffDef.label}</span> `;
             const clsTag=cls?`${diffTag}<span style="color:${cls.color};font-size:11px;">${cls.name}</span><br>`:'';
-            el.innerHTML=`<span class="slot-title">SLOT ${i}</span><div class="slot-info">${clsTag}HIGH: ${d.high}<br>MAX LVL: ${d.maxLvl}</div><button class="del-btn" onclick="delSlot(event,${i})">DELETE</button>`;
+            const title=escapeSaveName(d.name||('SLOT '+i));
+            el.innerHTML=`<span class="slot-title">${title}</span><div class="slot-info">${clsTag}HIGH: ${d.high}<br>MAX LVL: ${d.maxLvl}</div>`+
+                `<button class="del-btn" style="background:rgba(0,100,40,0.6);color:#66ff99;border-color:rgba(0,255,120,0.3);margin-top:10px;" onclick="exportSlot(event,${i})">EXPORT</button>`+
+                `<button class="del-btn" style="background:rgba(60,60,80,0.6);color:#aabbff;border-color:rgba(120,140,255,0.3);margin-top:4px;" onclick="renameSlot(event,${i})">RENAME</button>`+
+                `<button class="del-btn" style="margin-top:4px;" onclick="delSlot(event,${i})">DELETE</button>`;
         }
     }
 }
+function exportSlot(e,id){
+    e.stopPropagation(); Sound.ui();
+    const d=saves[id]; if(!d) return;
+    const payload={_type:'AsteroidsRemasteredSave',_version:1,data:d};
+    const json=JSON.stringify(payload,null,2);
+    const blob=new Blob([json],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const safe=(d.name||('save'+id)).replace(/[^a-zA-Z0-9_-]+/g,'_');
+    const a=document.createElement('a');
+    a.href=url; a.download=safe+'.astsave.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function importSlot(e,id){
+    e.stopPropagation(); Sound.ui();
+    const inp=document.createElement('input');
+    inp.type='file'; inp.accept='.json,application/json';
+    inp.onchange=()=>{
+        const f=inp.files&&inp.files[0]; if(!f) return;
+        const rd=new FileReader();
+        rd.onload=()=>{
+            try{
+                const p=JSON.parse(rd.result);
+                const d=(p&&p._type==='AsteroidsRemasteredSave'&&p.data)?p.data:p;
+                if(!d||typeof d!=='object'||!('high' in d)||!('maxLvl' in d)){
+                    alert('Not a valid Asteroids Remastered save file.'); return;
+                }
+                if(saves[id]&&!confirm('Overwrite existing save in slot '+id+'?')) return;
+                saves[id]=d;
+                saveToDisk();
+            }catch(err){ alert('Failed to read save file: '+err.message); }
+        };
+        rd.readAsText(f);
+    };
+    inp.click();
+}
+function escapeSaveName(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function delSlot(e,id) { e.stopPropagation(); Sound.ui(); if(confirm('Delete Slot '+id+'?')){saves[id]=null;saveToDisk();} }
+function renameSlot(e,id){
+    e.stopPropagation(); Sound.ui();
+    if(!saves[id]) return;
+    const cur=saves[id].name||('User '+id);
+    const name=prompt('Rename save:',cur);
+    if(name==null) return;
+    const trimmed=name.trim().slice(0,24);
+    if(!trimmed) return;
+    saves[id].name=trimmed;
+    saveToDisk();
+}
 function selectSlot(id) {
     if(event&&event.target&&event.target.classList.contains('del-btn')) return;
     Sound.ui();
@@ -246,10 +300,15 @@ function pickClass(cls) {
     _pendingSlotId = null;
     _pendingDifficulty = null;
     currentDifficulty = difficulty;
+    // Prompt for a custom save name
+    let name = prompt('Name your save:', 'User '+id);
+    if(name==null) name='User '+id;
+    name = name.trim().slice(0,24) || ('User '+id);
     // Create save with class data baked in
     const baseUpgrades = {speed:0,agility:0,hull:0,ammoCap:0,reload:0};
     Object.assign(baseUpgrades, def.upgrades);
     saves[id] = {
+        name: name,
         high: 0, maxLvl: 1, mb: def.mb,
         upgrades: baseUpgrades,
         gilbertUpgrades: {fireRate:0,range:0,damage:0},
