@@ -2049,9 +2049,11 @@ function updateWarpCutscene(){
             if(G.currentSector===2){
                 try{Sound.playMusic('sector2');}catch(e){}
                 if(typeof initSector2Wrecks==='function') initSector2Wrecks();
+                if(typeof initSectorStation==='function') initSectorStation();
                 G.grimmFireStreak=false;
             } else {
                 try{Sound.playMusic('bgm');}catch(e){}
+                if(typeof initSectorStation==='function') initSectorStation();
             }
             G.sectorBanner = { t:0, life:240, text:'ENTERING SECTOR '+_sectorWord(G.currentSector) };
             G.warpCutscene=null;

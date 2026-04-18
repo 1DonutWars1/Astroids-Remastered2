@@ -105,6 +105,8 @@ function selectSlot(id) {
         G.level=Math.max(6,s.checkpoint||6);
         G.checkpoint=G.level;
         G.stationUnlocked=true;
+        // Restore force field (unlocked after boss 2, checkpoint >= 3)
+        G.hasForceField=true;G.shieldFuel=getMaxShieldFuel();updateShieldUI();
         // Spawn Gilbert ally if past boss 5
         if(G.gilbertState==='none'){spawnGilbertAlly();G.albertMode=false;}
         // Restore level 6 progress (so fight doesn't re-trigger on reload)

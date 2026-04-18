@@ -152,6 +152,10 @@
     <button onclick="alert('Streak: '+(G.grimmFireStreak?'ON (25% next roll)':'OFF (50% base roll)'))">SHOW STREAK STATUS</button>
     <div class="dev-hdr">REALITY GLITCH</div>
     <button onclick="devTriggerGlitch()">TRIGGER GLITCH (7s)</button>
+    <div class="dev-hdr">RUINED SPACE STATION</div>
+    <button onclick="devSpawnSectorStation()">SPAWN STATION NOW</button>
+    <button onclick="if(G.sectorStation){G.sectorStation.hp=0;if(G.sectorStation.phase==='connected')_destroySectorStation();}">DESTROY STATION</button>
+    <button onclick="if(typeof initSectorStation==='function')initSectorStation()">CLEAR STATION</button>
     <div class="dev-hdr">SCENERY</div>
     <button onclick="if(typeof initSector2Wrecks==='function')initSector2Wrecks();">RESET WRECKS</button>
     <button onclick="devMoreWrecks()">ADD 3 WRECKS</button>
@@ -453,6 +457,7 @@
 <script src="js/station.js"></script>
 <script src="js/level6.js"></script>
 <script src="js/docking-bay.js"></script>
+<script src="js/sector-station.js"></script>
 <script src="js/engine.js"></script>
 
 <!-- DLC auto-loader: if dlc.js exists, it loads additional assets. All content is accessible regardless. -->

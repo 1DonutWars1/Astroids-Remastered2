@@ -6,7 +6,7 @@ function update() {
     if(introCutscene){updateIntroCutscene();return;}
     // Warp cutscene (hyperspace jump) runs independently, freezes everything else
     if(G.warpCutscene){ if(typeof updateWarpCutscene==='function') updateWarpCutscene(); return; }
-    if(!G.running||G.practicePaused||G.paused||G.fastTravelOpen||G.inventoryOpen) {
+    if(!G.running||G.practicePaused||G.paused||G.fastTravelOpen||G.inventoryOpen||(G.sectorStation&&G.sectorStation.consoleOpen)) {
         if(!G.practicePaused&&!G.paused){
             for(const a of asteroids){a.x+=a.dx;a.y+=a.dy;a.angle+=a.rot;
                 if(a.x<-a.r)a.x=W+a.r;if(a.x>W+a.r)a.x=-a.r;if(a.y<-a.r)a.y=H+a.r;if(a.y>H+a.r)a.y=-a.r;}
@@ -22,7 +22,8 @@ function update() {
     if(G.comboTimer>0)G.comboTimer--; else{G.combo=0;G.consecutiveKills=0;document.getElementById('comboRow').style.display='none';}
     // Block normal shooting while charging big shot (level 6 charging or post-level6 hold-charge)
     const _blockShoot=(G.level6&&(G.level6.state==='gilbert_found'||G.level6.state==='charging'||G.level6.state==='release_prompt'))
-                    ||(G.bigShotCharge>0);
+                    ||(G.bigShotCharge>0)
+                    ||(G.sectorStation&&G.sectorStation.phase==='connected');
     if(isAction('fire')&&!_blockShoot) shoot();
     if(G.shotTimer>0) G.shotTimer--;
     if(G.invincibleTimer>0) G.invincibleTimer--;
@@ -152,6 +153,9 @@ function update() {
     if(typeof updateRouges==='function' && rouges.length>0) updateRouges();
     if(typeof updateBigShot==='function') updateBigShot();
 
+    // Sector 2 ruined space station
+    if(typeof updateSectorStation==='function') updateSectorStation();
+
     // Gilbert update
     updateGilbert();
     // Gilbert quip timer
@@ -270,7 +274,12 @@ function update() {
                     Sound.shieldSfx();
                     continue;
                 }
-                if(a.type==='fuel'){boom(a.x,a.y,'#ffff00');Sound.powerup();if(G.hasForceField&&G.shieldFuel<3){G.shieldFuel++;updateShieldUI();}G.fuelCollected++;if(G.fuelCollected>=5)unlockAch('fuel_collector');if(1)gilbertIntro('fuel',GILBERT_INTROS.fuel);}
+                if(a.type==='fuel'){boom(a.x,a.y,'#ffff00');Sound.powerup();
+                    // Redirect fuel to sector station repair if it's nearby and destroyed
+                    let _fuelUsedByStation=false;
+                    if(typeof trySectorStationFuelTransfer==='function') _fuelUsedByStation=trySectorStationFuelTransfer(a.x,a.y);
+                    if(!_fuelUsedByStation && G.hasForceField&&G.shieldFuel<3){G.shieldFuel++;updateShieldUI();}
+                    G.fuelCollected++;if(G.fuelCollected>=5)unlockAch('fuel_collector');if(1)gilbertIntro('fuel',GILBERT_INTROS.fuel);}
                 else{
                     const _isBig=bullets[j].big;
                     boom(a.x,a.y,_isBig?'#ffff00':'#888',_isBig?18:8);Sound.explode();
@@ -4648,6 +4657,9 @@ function draw() {
         ctx.shadowBlur=0;
     }
 
+    // --- SECTOR 2 RUINED STATION (drawn behind ship so player appears docked on top) ---
+    if(typeof drawSectorStation==='function') drawSectorStation();
+
     // --- SHIP ---
     if(G.running){
         const blink=G.invincibleTimer>0&&Math.floor(T/60)%2===0;
@@ -4927,6 +4939,9 @@ function draw() {
         ctx.globalAlpha=1;
     }
 
+    // Sector station console overlay
+    if(typeof drawSectorStationConsole==='function') drawSectorStationConsole();
+
     // Fast travel menu
     if(G.fastTravelOpen){
         ctx.fillStyle='rgba(0,0,0,0.75)';ctx.fillRect(0,0,W,H);
@@ -4940,9 +4955,9 @@ function draw() {
         ctx.fillStyle='rgba(0,200,255,0.2)';ctx.fillRect(W/2-179,H/2-79,358,1);
         ctx.font='bold 20px Courier New';ctx.textAlign='center';ctx.fillStyle='#00ccff';
         ctx.shadowBlur=15;ctx.shadowColor='rgba(0,200,255,0.4)';
-        ctx.fillText('FAST TRAVEL',W/2,H/2-48);ctx.shadowBlur=0;
+        ctx.fillText(G.currentSector===2?'CALL STATION':'FAST TRAVEL',W/2,H/2-48);ctx.shadowBlur=0;
         ctx.font='14px Courier New';ctx.fillStyle='#888';
-        ctx.fillText('Return to Space Station?',W/2,H/2-15);
+        ctx.fillText(G.currentSector===2?'Call the Ruined Space Station?':'Return to Space Station?',W/2,H/2-15);
         ctx.font='bold 13px Courier New';
         ctx.fillStyle='#44ff88';ctx.fillText('[SPACE] Confirm',W/2,H/2+25);
         ctx.fillStyle='#ff6666';ctx.fillText('[ESC] Cancel',W/2,H/2+50);
@@ -5126,6 +5141,11 @@ document.addEventListener('keydown', e => {
         return;
     }
 
+    // Sector station console — must be checked before pause toggle so ESC closes the console, not pauses
+    if(G.sectorStation&&G.sectorStation.consoleOpen){
+        if(typeof sectorStationConsoleKey==='function' && sectorStationConsoleKey(e)) return;
+        return; // swallow other input
+    }
     // Close fast travel menu with ESC (before pause toggle)
     if(e.code==='Escape'&&G.fastTravelOpen){G.fastTravelOpen=false;Sound.ui();return;}
     // Close practice menu with ESC (before pause toggle)
@@ -5216,11 +5236,28 @@ document.addEventListener('keydown', e => {
     if(e.code==='KeyX'&&G.running&&G.stationUnlocked&&!boss&&G.mode==='space'&&!G.bossRush&&!G.stationCutscene&&!(G.level6&&G.level6.state)&&G.currentSector!==2){
         G.fastTravelOpen=!G.fastTravelOpen;Sound.ui();return;
     }
+    // Sector 2: X calls the ruined space station
+    if(e.code==='KeyX'&&G.running&&G.stationUnlocked&&!boss&&G.mode==='space'&&!G.bossRush&&!G.stationCutscene&&!(G.level6&&G.level6.state)&&G.currentSector===2){
+        G.fastTravelOpen=!G.fastTravelOpen;Sound.ui();return;
+    }
     // Confirm fast travel
     if(G.fastTravelOpen){
-        if(e.code==='Space'||e.code==='Enter'){G.fastTravelOpen=false;enterStation();return;}
+        if(e.code==='Space'||e.code==='Enter'){
+            G.fastTravelOpen=false;
+            if(G.currentSector===2){
+                if(typeof callSectorStation==='function') callSectorStation();
+            } else {
+                enterStation();
+            }
+            return;
+        }
         if(e.code==='Escape'){G.fastTravelOpen=false;Sound.ui();return;}
         return; // Block other input while menu is open
+    }
+
+    // E key — open station console if connected to the sector 2 station
+    if(e.code==='KeyE'&&!e.repeat&&G.sectorStation&&G.sectorStation.phase==='connected'){
+        if(typeof toggleSectorStationConsole==='function' && toggleSectorStationConsole()) return;
     }
 
     // Dash module (E key)

@@ -45,6 +45,7 @@ function startGame() {
     if(!Array.isArray(G.dataFragmentsSeen)) G.dataFragmentsSeen=[];
     G.dockingBay={open:false,selection:0,terminalPhase:null,terminalText:[],terminalTimer:0,
                   mapOpen:false,mapSelection:5,teleport:null};
+    if(typeof initSectorStation==='function') initSectorStation();
 
     ship={x:W/2,y:H/2,a:-Math.PI/2,r:14,tx:0,ty:0};
     asteroids=[]; bullets=[]; particles=[]; ammoBoxes=[]; powerups=[];
@@ -215,6 +216,7 @@ function returnToMenu() {
     G.gilbertDialogue=''; G.gilbertDialogueQueue=[]; G.rope=false;
     G.widescreenReturning=false; canvas.width=900; W=900;
     G.mode='space';G.stationCutscene=null;G.stationDialogue='';
+    if(typeof initSectorStation==='function') initSectorStation();
 }
 
 function retryCheckpoint() {
@@ -318,11 +320,13 @@ function devMoreWrecks() {
 }
 function devReturnToStation() {
     G.currentSector=1; G.grimmFireStreak=false; sector2Wrecks=[];
+    if(typeof initSectorStation==='function') initSectorStation();
     if(typeof enterStation==='function') enterStation();
     try{Sound.playMusic('bgm');}catch(e){}
 }
 function devLeaveSector2() {
     G.currentSector=1; G.grimmFireStreak=false; sector2Wrecks=[];
+    if(typeof initSectorStation==='function') initSectorStation();
     asteroids=[]; for(let k=0;k<6;k++) spawnAsteroid();
     try{Sound.playMusic('bgm');}catch(e){}
 }
