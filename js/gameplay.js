@@ -319,13 +319,13 @@ function devMoreWrecks() {
     }
 }
 function devReturnToStation() {
-    G.currentSector=1; G.grimmFireStreak=false; sector2Wrecks=[];
+    G.currentSector=1; G.grimmFireStreak=false; sector2Wrecks=[]; if(typeof interactiveWrecks!=='undefined') interactiveWrecks=[];
     if(typeof initSectorStation==='function') initSectorStation();
     if(typeof enterStation==='function') enterStation();
     try{Sound.playMusic('bgm');}catch(e){}
 }
 function devLeaveSector2() {
-    G.currentSector=1; G.grimmFireStreak=false; sector2Wrecks=[];
+    G.currentSector=1; G.grimmFireStreak=false; sector2Wrecks=[]; if(typeof interactiveWrecks!=='undefined') interactiveWrecks=[];
     if(typeof initSectorStation==='function') initSectorStation();
     asteroids=[]; for(let k=0;k<6;k++) spawnAsteroid();
     try{Sound.playMusic('bgm');}catch(e){}

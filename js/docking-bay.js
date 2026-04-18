@@ -2049,6 +2049,7 @@ function updateWarpCutscene(){
             if(G.currentSector===2){
                 try{Sound.playMusic('sector2');}catch(e){}
                 if(typeof initSector2Wrecks==='function') initSector2Wrecks();
+                if(typeof initSector2InteractiveWrecks==='function') initSector2InteractiveWrecks();
                 if(typeof initSectorStation==='function') initSectorStation();
                 G.grimmFireStreak=false;
             } else {

@@ -15,6 +15,8 @@ function update() {
     }
     // Station mode
     if(G.mode==='station'){updateStation();return;}
+    // Wreck interior mode
+    if(G.mode==='wreck'){if(typeof updateWreckInterior==='function') updateWreckInterior();return;}
     // Cutscene mode
     if(G.stationCutscene){updateCutscene();return;}
     if(G.tutorial) updateTutorial();
@@ -2103,6 +2105,8 @@ function draw() {
     if(G.warpCutscene){ if(typeof drawWarpCutscene==='function') drawWarpCutscene(); return; }
     // Station mode draws separately
     if(G.mode==='station'){drawStation();return;}
+    // Wreck interior mode draws separately
+    if(G.mode==='wreck'){if(typeof drawWreckInterior==='function') drawWreckInterior();return;}
     ctx.save();
     if(G.shakeTimer>0) ctx.translate((Math.random()-0.5)*G.shakeIntensity,(Math.random()-0.5)*G.shakeIntensity);
     const T=performance.now();
@@ -4657,6 +4661,9 @@ function draw() {
         ctx.shadowBlur=0;
     }
 
+    // --- SECTOR 2 INTERACTIVE WRECKS ---
+    if(typeof drawInteractiveWrecks==='function') drawInteractiveWrecks();
+
     // --- SECTOR 2 RUINED STATION (drawn behind ship so player appears docked on top) ---
     if(typeof drawSectorStation==='function') drawSectorStation();
 
@@ -5133,6 +5140,11 @@ document.addEventListener('keydown', e => {
         if(e.code==='KeyZ'||e.code==='Enter'){if(typeof inventoryEquipSelected==='function') inventoryEquipSelected();return;}
         return;
     }
+    // Wreck interior mode — route all keys to wreck handler
+    if(G.mode==='wreck'){
+        if(typeof wreckKeyDown==='function' && wreckKeyDown(e)) return;
+        return;
+    }
     // When docking bay console is open, route keys (prevent browser defaults
     // like Tab navigation, Space scrolling, Arrow keys etc.)
     if(G.dockingBay && G.dockingBay.open){
@@ -5258,6 +5270,16 @@ document.addEventListener('keydown', e => {
     // E key — open station console if connected to the sector 2 station
     if(e.code==='KeyE'&&!e.repeat&&G.sectorStation&&G.sectorStation.phase==='connected'){
         if(typeof toggleSectorStationConsole==='function' && toggleSectorStationConsole()) return;
+    }
+
+    // Board interactive wreck (E key, Sector 2)
+    if(e.code==='KeyE'&&!e.repeat&&G.running&&G.mode==='space'&&G.currentSector===2&&typeof interactiveWrecks!=='undefined'){
+        for(let i=0;i<interactiveWrecks.length;i++){
+            const wr=interactiveWrecks[i];
+            if(Math.hypot(ship.x-wr.x,ship.y-wr.y)<100){
+                if(typeof enterWreck==='function'){enterWreck(i);return;}
+            }
+        }
     }
 
     // Dash module (E key)

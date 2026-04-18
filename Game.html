@@ -156,6 +156,13 @@
     <button onclick="devSpawnSectorStation()">SPAWN STATION NOW</button>
     <button onclick="if(G.sectorStation){G.sectorStation.hp=0;if(G.sectorStation.phase==='connected')_destroySectorStation();}">DESTROY STATION</button>
     <button onclick="if(typeof initSectorStation==='function')initSectorStation()">CLEAR STATION</button>
+    <div class="dev-hdr">EXPLORABLE WRECKS</div>
+    <button onclick="if(typeof devSpawnWreck==='function')devSpawnWreck()">SPAWN RANDOM WRECK</button>
+    <button onclick="if(typeof devSpawnWreckType==='function')devSpawnWreckType(0)">SPAWN CARGO FREIGHTER</button>
+    <button onclick="if(typeof devSpawnWreckType==='function')devSpawnWreckType(1)">SPAWN PATROL CRUISER</button>
+    <button onclick="if(typeof devSpawnWreckType==='function')devSpawnWreckType(2)">SPAWN RESEARCH VESSEL</button>
+    <button onclick="if(typeof devSpawnWreckType==='function')devSpawnWreckType(3)">SPAWN ESCAPE PODS</button>
+    <button onclick="if(typeof interactiveWrecks!=='undefined')interactiveWrecks=[];">CLEAR EXPLORABLE WRECKS</button>
     <div class="dev-hdr">SCENERY</div>
     <button onclick="if(typeof initSector2Wrecks==='function')initSector2Wrecks();">RESET WRECKS</button>
     <button onclick="devMoreWrecks()">ADD 3 WRECKS</button>
@@ -458,6 +465,7 @@
 <script src="js/level6.js"></script>
 <script src="js/docking-bay.js"></script>
 <script src="js/sector-station.js"></script>
+<script src="js/wreck-interior.js"></script>
 <script src="js/engine.js"></script>
 
 <!-- DLC auto-loader: if dlc.js exists, it loads additional assets. All content is accessible regardless. -->
