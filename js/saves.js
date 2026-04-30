@@ -92,6 +92,7 @@ function selectSlot(id) {
     if(s.kratGreeted==null) s.kratGreeted=false;
     if(s.itemTutorialShown==null) s.itemTutorialShown=false;
     if(!Array.isArray(s.dataFragmentsSeen)) s.dataFragmentsSeen=[];
+    if(s.lastSector==null) s.lastSector=1;
     // Load into G
     G.inventory=s.inventory.slice();
     G.kratGreeted=!!s.kratGreeted;
@@ -113,7 +114,22 @@ function selectSlot(id) {
         if(G.level6){
             if(s.bigShotUnlocked) G.level6.bigShotUnlocked=true;
         }
-        enterStation();
+        // If the player left from sector 2, drop them back into sector 2
+        // with their drifting space station nearby instead of the main station.
+        if(s.lastSector===2){
+            G.currentSector=2;
+            if(typeof leaveStation==='function') leaveStation();
+            try{Sound.playMusic('sector2');}catch(e){}
+            if(typeof initSector2Wrecks==='function') initSector2Wrecks();
+            if(typeof initSector2InteractiveWrecks==='function') initSector2InteractiveWrecks();
+            if(typeof initSectorStation==='function') initSectorStation();
+            G.grimmFireStreak=false;
+            if(typeof spawnSectorStation==='function') spawnSectorStation(true);
+            if(G.sectorStation){ G.sectorStation.told=true; G.sectorStation.phase='approaching'; }
+            G.sectorBanner={ t:0, life:240, text:'ENTERING SECTOR TWO' };
+        } else {
+            enterStation();
+        }
     }
 }
 // ============================================================

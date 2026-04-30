@@ -116,8 +116,9 @@ function update() {
         }
     }
 
-    // GRIMM BOSS (optional) — spawns 60s into level 7 after rouge war, one-time encounter
-    if(!boss&&!G.noBoss&&!G.bossRush&&!_l6State&&G.level===7&&!G.grimmDefeated&&!G.grimmSpawned&&elapsed>60){
+    // GRIMM BOSS (optional) — spawns 60s into level 7 after rouge war, one-time encounter.
+    // Sector-1 only — Grimm should never appear during the sector-2 detour.
+    if(!boss&&!G.noBoss&&!G.bossRush&&!_l6State&&G.currentSector!==2&&G.level===7&&!G.grimmDefeated&&!G.grimmSpawned&&elapsed>60){
         G.grimmSpawned=true;
         spawnBoss(6);
     }

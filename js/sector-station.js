@@ -412,6 +412,7 @@ function _sectorStationTeleportToFloor3(){
     st.active=false; st.spawned=false; st.phase=null;
     // Return to sector 1 station, floor 2 (the 3rd floor = docking bay)
     G.currentSector=1;
+    if(G.slotId && saves[G.slotId]){ saves[G.slotId].lastSector=1; saveToDisk(); }
     if(typeof sector2Wrecks!=='undefined') sector2Wrecks=[];
     if(typeof enterStation==='function') enterStation();
     if(G.station){

@@ -387,23 +387,7 @@ function updateWreckInterior(){
     wi.playerX+=wi.playerVX;
     wi.playerX=Math.max(30,Math.min(worldW-30,wi.playerX));
 
-    // Locked door collision — block player from walking through locked doors
-    const wreckForCollision = interactiveWrecks[wi.wreckIdx];
-    if(def.lockedDoors){
-        for(let i=0;i<def.lockedDoors.length;i++){
-            const door=def.lockedDoors[i];
-            if(door.floor!==wi.floor) continue;
-            const isUnlocked=wreckForCollision.unlockedDoors&&wreckForCollision.unlockedDoors.includes(i);
-            if(isUnlocked) continue;
-            // Only block if player is inside the door's thickness (8px half-width)
-            // and push them to whichever side they were closer to
-            if(Math.abs(wi.playerX - door.x) < 10){
-                if(wi.playerVX > 0) { wi.playerX = door.x - 10; }
-                else { wi.playerX = door.x + 10; }
-                wi.playerVX = 0;
-            }
-        }
-    }
+    // Vault doors are walk-through — interaction prompt handles unlocking + looting.
 
     // Camera follow
     const targetCam=wi.playerX-W/2;

@@ -2043,6 +2043,7 @@ function updateWarpCutscene(){
             // Drop into space as sector two
             wc.phase='done';
             G.currentSector = wc.sectorId || 2;
+            if(G.slotId && saves[G.slotId]){ saves[G.slotId].lastSector=G.currentSector; saveToDisk(); }
             // Set sector BEFORE leaveStation so initial asteroid spawn sees the sector
             if(typeof leaveStation==='function') leaveStation();
             // Sector-specific music + setup
