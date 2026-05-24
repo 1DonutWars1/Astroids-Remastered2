@@ -10,6 +10,15 @@ function startGame() {
     G.running=true; G.paused=false; G.score=0; G.level=1; G.albertMode=false; G.fastTravelOpen=false;
     // Reset sector on fresh run so sector-2 music doesn't carry over after death/restart
     G.currentSector=1; G.grimmFireStreak=false;
+    // Clear sector-2-only content so it doesn't bleed into a fresh sector-1 run
+    sector2Wrecks=[]; if(typeof interactiveWrecks!=='undefined') interactiveWrecks=[];
+    // Reset level-6 progression so big shot isn't carried over from a previous slot
+    if(G.level6){
+        G.level6.state=null;
+        G.level6.bigShotUnlocked=false;
+        G.level6.bigShotReady=false;
+    }
+    G.bigShotCharge=0; G.bigShotReady=false; G.bigShotCharging=false;
     G.widescreenReturning=false; canvas.width=900; W=900;
     const diff = DIFFICULTY[currentDifficulty] || DIFFICULTY.normal;
     G.ammo = G.tutorial ? 999 : (G.practice ? pSettings.ammo : diff.ammo);
