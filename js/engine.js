@@ -17,6 +17,8 @@ function update() {
     if(G.mode==='station'){updateStation();return;}
     // Wreck interior mode
     if(G.mode==='wreck'){if(typeof updateWreckInterior==='function') updateWreckInterior();return;}
+    // Combat mode (hologram on-foot combat zones)
+    if(G.mode==='combat'){if(typeof updateCombat==='function') updateCombat();return;}
     // Cutscene mode
     if(G.stationCutscene){updateCutscene();return;}
     if(G.tutorial) updateTutorial();
@@ -2108,6 +2110,8 @@ function draw() {
     if(G.mode==='station'){drawStation();return;}
     // Wreck interior mode draws separately
     if(G.mode==='wreck'){if(typeof drawWreckInterior==='function') drawWreckInterior();return;}
+    // Combat mode draws separately
+    if(G.mode==='combat'){if(typeof drawCombat==='function') drawCombat();return;}
     ctx.save();
     if(G.shakeTimer>0) ctx.translate((Math.random()-0.5)*G.shakeIntensity,(Math.random()-0.5)*G.shakeIntensity);
     const T=performance.now();
@@ -5146,6 +5150,13 @@ document.addEventListener('keydown', e => {
         if(typeof wreckKeyDown==='function' && wreckKeyDown(e)) return;
         return;
     }
+    // Combat mode — route action keys, prevent browser default for arrows/space
+    if(G.mode==='combat'){
+        if(e.code==='ArrowLeft'||e.code==='ArrowRight'||e.code==='ArrowUp'||e.code==='ArrowDown'||e.code==='Space') e.preventDefault();
+        if(e.code==='Escape'){togglePause();return;}
+        if(typeof combatKeyDown==='function' && combatKeyDown(e)) return;
+        return;
+    }
     // When docking bay console is open, route keys (prevent browser defaults
     // like Tab navigation, Space scrolling, Arrow keys etc.)
     if(G.dockingBay && G.dockingBay.open){
@@ -5314,7 +5325,10 @@ document.addEventListener('keydown', e => {
         }
     }
 });
-document.addEventListener('keyup', e => { keys[e.code]=false; });
+document.addEventListener('keyup', e => {
+    keys[e.code]=false;
+    if(G.mode==='combat' && typeof combatKeyUp==='function') combatKeyUp(e);
+});
 
 // Splash dismiss
 let splashDismissed=false;

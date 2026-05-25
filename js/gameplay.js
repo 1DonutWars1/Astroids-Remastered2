@@ -223,7 +223,10 @@ function returnToMenu() {
     G.gilbert=null; G.gilbertState='none'; G.bossRush=false; G.cyborgScraps=[];
     engineTrail=[]; shootingStars=[];
     G.gilbertDialogue=''; G.gilbertDialogueQueue=[]; G.rope=false;
-    G.widescreenReturning=false; canvas.width=900; W=900;
+    // Restore canvas to default size (combat mode may have enlarged it)
+    G.widescreenReturning=false; canvas.width=900; canvas.height=650; W=900; H=650;
+    // Clean up combat state
+    G.combat=null; G.holo=null; G.combatReturn=null;
     G.mode='space';G.stationCutscene=null;G.stationDialogue='';
     if(typeof initSectorStation==='function') initSectorStation();
 }

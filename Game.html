@@ -296,6 +296,13 @@
         <button class="btn" style="border-color:#ffd700;color:#ffd700;padding:10px 30px;font-size:16px;" onclick="openAchievements()">TROPHIES</button>
         <button class="btn" style="border-color:#00ff88;color:#00ff88;padding:10px 30px;font-size:16px;" onclick="openUpdates()">UPDATES</button>
         <button class="btn" id="testBtn" style="border-color:#00ffaa;color:#00ffaa;padding:10px 30px;font-size:16px;text-shadow:0 0 10px #00ffaa;" onclick="toggleTestMode()">TEST</button>
+        <div style="display:inline-block;position:relative;">
+            <button class="btn" id="moreBtn" style="border-color:#cc66ff;color:#cc66ff;padding:10px 30px;font-size:16px;" onclick="toggleMoreMenu()">MORE ▾</button>
+            <div id="moreDropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);min-width:240px;background:rgba(8,4,18,0.96);border:1px solid rgba(204,102,255,0.6);border-radius:8px;padding:8px;z-index:200;box-shadow:0 0 30px rgba(204,102,255,0.25);backdrop-filter:blur(8px);">
+                <button class="btn" style="display:block;width:100%;border-color:rgba(204,102,255,0.6);color:#cc66ff;padding:10px 16px;font-size:14px;margin:0;" onclick="startCombatPlayground()">COMBAT PLAYGROUND</button>
+                <div style="color:#666;font-size:10px;text-align:center;margin-top:6px;letter-spacing:1px;">MORE COMING SOON</div>
+            </div>
+        </div>
     </div>
     <div class="controls-hint">Controls customizable in Settings</div>
 </div>
@@ -466,6 +473,7 @@
 <script src="js/docking-bay.js"></script>
 <script src="js/sector-station.js"></script>
 <script src="js/wreck-interior.js"></script>
+<script src="js/combat.js"></script>
 <script src="js/engine.js"></script>
 
 <!-- DLC auto-loader: if dlc.js exists, it loads additional assets. All content is accessible regardless. -->
