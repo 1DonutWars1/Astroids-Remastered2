@@ -26,6 +26,9 @@ const COMBAT = {
     JUMP_BUFFER_FRAMES: 6,
     ATTACK_COOLDOWN: 18,
     ATTACK_DURATION: 14,
+    // Parry — frames after pressing X during which incoming bot melee /
+    // projectiles get reflected instead of damaging the player. 0.5s @ 60fps.
+    PARRY_WINDOW: 30,
     ATTACK_REACH: 56,
     ATTACK_HEIGHT: 44,
     UP_ATTACK_REACH: 50,
@@ -65,6 +68,10 @@ function _newCombatZone(opts){
         platforms: opts.platforms || _defaultPlaygroundPlatforms(),
         // Training dummies
         dummies: opts.dummies || [],
+        // AI bots — mobile, fights-back opponents (see combat-bot.js)
+        bots: [],
+        // Projectiles fired by bots — circles that damage the player on contact
+        botProjectiles: [],
         // Floating damage popups
         popups: [],
         // Particles (sparks, dust, hit flashes, code shards, glitch slices)
@@ -163,6 +170,8 @@ function _newHoloPlayer(spawnX, spawnY){
         attackCooldown: 0,
         attackDir: 'side',            // 'side' | 'up' | 'down'
         attackHit: false,             // already connected this attack
+        parryWindow: 0,               // >0: pressing X just now; incoming hits get parried
+        parryFlash: 0,                // >0: visual flash after a successful parry
         // Animation
         animState: 'idle',            // idle | run | jump | fall | land | attack
         animTimer: 0,
@@ -461,6 +470,10 @@ function combatKeyDown(e){
         _holoTryDash();
         return true;
     }
+    if (e.code === 'KeyB' && !e.repeat) {
+        if (typeof _summonPlaygroundBot === 'function') _summonPlaygroundBot();
+        return true;
+    }
     return false;
 }
 function combatKeyUp(e){
@@ -485,6 +498,9 @@ function _holoTryAttack(){
     h.attackTimer = COMBAT.ATTACK_DURATION;
     h.attackCooldown = COMBAT.ATTACK_COOLDOWN;
     h.attackHit = false;
+    // Open the parry window — any bot melee or projectile that connects in
+    // the next PARRY_WINDOW frames is reflected instead of dealing damage.
+    h.parryWindow = COMBAT.PARRY_WINDOW;
     h.animState = 'attack';
     h.animTimer = 0;
     // Build slash arc — purely visual
@@ -573,6 +589,8 @@ function updateCombat(){
     _updateHoloPhysics();
     _updateHoloAttack();
     _updateDummies();
+    if (typeof _updateBots === 'function') _updateBots();
+    if (typeof _updateBotProjectiles === 'function') _updateBotProjectiles();
     _updateCombatFx();
     _updateCombatCamera();
     _updateCombatTutorial();
@@ -747,6 +765,8 @@ function _updateHoloAttack(){
     const h = G.holo;
     if (h.attackCooldown > 0) h.attackCooldown--;
     if (h.attackTimer > 0) h.attackTimer--;
+    if (h.parryWindow > 0) h.parryWindow--;
+    if (h.parryFlash > 0) h.parryFlash--;
     if (h.slash) {
         h.slash.t++;
         if (h.slash.t >= h.slash.life) h.slash = null;
@@ -809,7 +829,28 @@ function _resolveAttackHits(box){
         // Sound + screen shake
         try { Sound.explode && Sound.explode(); } catch(e){}
         if (typeof shake === 'function') shake(4, 6);
-        break;
+        return;
+    }
+    // Also check bots — same hit semantics, separate damage path
+    if (Z.bots){
+        for (const b of Z.bots){
+            if (b.dying) continue;
+            const bbx = { x: b.x - b.w/2, y: b.y - b.h, w: b.w, h: b.h };
+            if (!_rectsOverlap(box, bbx)) continue;
+            h.attackHit = true;
+            if (typeof _onBotHit === 'function') _onBotHit(b, box);
+            // Pogo bounce on down-strike
+            if (box.dir === 'down') {
+                h.vy = COMBAT.POGO_BOUNCE_V;
+                h.jumping = true;
+                h.grounded = false;
+                h.animState = 'jump';
+                h.animTimer = 0;
+            }
+            try { Sound.explode && Sound.explode(); } catch(e){}
+            if (typeof shake === 'function') shake(4, 6);
+            return;
+        }
     }
 }
 
@@ -1168,6 +1209,12 @@ function drawCombat(){
 
     // Training dummies
     for (const d of Z.dummies) _drawDummy(d, T);
+
+    // AI bots — drawn before FX so hit sparks read on top of them
+    if (typeof _drawBots === 'function') _drawBots(T);
+
+    // Bot projectiles
+    if (typeof _drawBotProjectiles === 'function') _drawBotProjectiles(Z);
 
     // FX particles (sparks, dust) — beneath player so hits feel snappy
     _drawCombatFx(Z);
@@ -1615,6 +1662,23 @@ function _drawHologram(h, T){
     ctx.fillStyle = halo;
     ctx.beginPath(); ctx.arc(0,0,40,0,Math.PI*2); ctx.fill();
     ctx.restore();
+    // Post-parry flash — bright white-cyan rim expanding outward from the
+    // player's silhouette. Sells the "you just parried" moment.
+    if (h.parryFlash > 0){
+        const pf = h.parryFlash / 18;
+        ctx.save();
+        ctx.translate(h.x, h.y - h.h/2);
+        ctx.globalAlpha = pf;
+        ctx.strokeStyle = '#ffffff';
+        ctx.shadowColor = '#aef9ff';
+        ctx.shadowBlur = 18;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, 26 + (1-pf)*22, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.restore();
+    }
     _drawHologramSilhouette(h.x, h.y, h.facing, h.animState, h.animTimer, h.landSquash, h.attackDir);
     ctx.globalAlpha = 1;
     // Faint base ring (the "projector" floor mark)
@@ -2253,7 +2317,7 @@ function _drawCombatHUD(Z, h, T){
         ctx.shadowBlur = 0;
         ctx.font = '11px Courier New, monospace';
         ctx.fillStyle = '#aef9ff';
-        ctx.fillText('Z JUMP   X STRIKE   C SPRINT   ↑+X UPPERCUT   ↓+X POGO', W/2, 118);
+        ctx.fillText('Z JUMP   X STRIKE   C SPRINT   ↑+X UPPERCUT   ↓+X POGO   B SUMMON BOT', W/2, 118);
         ctx.restore();
     }
 
