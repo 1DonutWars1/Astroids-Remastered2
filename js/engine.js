@@ -5153,7 +5153,11 @@ document.addEventListener('keydown', e => {
     // Combat mode — route action keys, prevent browser default for arrows/space
     if(G.mode==='combat'){
         if(e.code==='ArrowLeft'||e.code==='ArrowRight'||e.code==='ArrowUp'||e.code==='ArrowDown'||e.code==='Space') e.preventDefault();
-        if(e.code==='Escape'){togglePause();return;}
+        if(e.code==='Escape'){
+            // ESC closes the bot-config modal first (don't open pause menu over it)
+            if(G.botConfigOpen){if(typeof closeBotConfig==='function') closeBotConfig(); return;}
+            togglePause();return;
+        }
         if(typeof combatKeyDown==='function' && combatKeyDown(e)) return;
         return;
     }

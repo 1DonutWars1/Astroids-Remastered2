@@ -237,6 +237,8 @@ function enterCombatZone(opts){
 }
 
 function exitCombatZone(){
+    // Make sure the bot config modal doesn't survive the zone exit
+    if (typeof closeBotConfig === 'function') closeBotConfig();
     const ret = G.combatReturn || { mode:'space', canvasW:900, canvasH:650 };
     const goMenu = G.combat && G.combat.returnTo === 'menu';
     // Restore canvas
@@ -458,6 +460,15 @@ function _holoJumpHeld(){ return !!(keys['KeyZ']); }
 function combatKeyDown(e){
     if (!G.holo || !G.combat) return false;
     if (G.paused) return false;
+    // Bot config modal open — only Escape passes through (to close it).
+    // Anything else is swallowed so the player can't fight while configuring.
+    if (G.botConfigOpen){
+        if (e.code === 'Escape'){
+            if (typeof closeBotConfig === 'function') closeBotConfig();
+            return true;
+        }
+        return true;
+    }
     if (e.code === 'KeyZ' && !e.repeat) {
         G.holo.jumpBuffer = COMBAT.JUMP_BUFFER_FRAMES;
         return true;
@@ -582,6 +593,9 @@ function _buildSlashArc(dir, facing){
 // ---- Update ----
 function updateCombat(){
     if (!G.combat || !G.holo) return;
+    // Bot-config modal is open — freeze the combat zone so the bot can't
+    // shoot the player while they're picking settings.
+    if (G.botConfigOpen) return;
     const Z = G.combat;
     Z.elapsed++;
     if (Z.banner.t < Z.banner.life) Z.banner.t++;

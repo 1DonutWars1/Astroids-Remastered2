@@ -36,6 +36,127 @@
 </div>
 
 
+<!-- Combat bot config modal — opens when the player hits B in the combat zone -->
+<style>
+#botConfigMenu {
+    display:none;
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:780px; max-height:90vh; overflow:hidden;
+    background:rgba(2,6,18,0.96);
+    border:1.5px solid rgba(92,246,255,0.75);
+    border-radius:10px;
+    box-shadow:0 0 40px rgba(92,246,255,0.22), inset 0 0 60px rgba(20,80,140,0.12);
+    z-index:200;
+    pointer-events:auto;
+    color:#aef9ff;
+    font-family:'Courier New',monospace;
+    backdrop-filter:blur(6px);
+    padding:0;
+    flex-direction:column;
+}
+#botConfigMenu .bcm-hdr {
+    background:linear-gradient(180deg,rgba(92,246,255,0.18),rgba(92,246,255,0.05));
+    padding:14px 18px; border-bottom:1px solid rgba(92,246,255,0.4);
+    color:#5cf6ff; font-weight:bold; font-size:18px; letter-spacing:3px; text-align:center;
+    text-shadow:0 0 10px #5cf6ff;
+}
+#botConfigMenu .bcm-presets {
+    padding:12px 18px; border-bottom:1px solid rgba(92,246,255,0.2);
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+}
+#botConfigMenu .bcm-presets-label {
+    color:#5cf6ff; font-size:11px; letter-spacing:2px; margin-right:8px;
+}
+#botConfigMenu .bcm-preset-btn {
+    background:rgba(255,142,60,0.12);
+    color:#ff8e3c;
+    border:1px solid rgba(255,142,60,0.7);
+    padding:6px 16px; font-family:'Courier New',monospace; font-size:12px; font-weight:bold;
+    letter-spacing:2px; cursor:pointer; border-radius:4px;
+    text-shadow:0 0 6px #ff8e3c;
+    transition:all 0.12s;
+}
+#botConfigMenu .bcm-preset-btn:hover {
+    background:rgba(255,142,60,0.28);
+    box-shadow:0 0 12px rgba(255,142,60,0.5);
+}
+#botConfigMenu .bcm-preset-btn.bcm-load {
+    background:rgba(92,246,255,0.08);
+    color:#5cf6ff;
+    border-color:rgba(92,246,255,0.6);
+    text-shadow:0 0 6px #5cf6ff;
+}
+#botConfigMenu .bcm-preset-btn.bcm-load:hover {
+    background:rgba(92,246,255,0.18);
+    box-shadow:0 0 10px rgba(92,246,255,0.4);
+}
+#botConfigMenu .bcm-body {
+    padding:12px 18px; overflow-y:auto; max-height:55vh;
+    display:grid; grid-template-columns:1fr 1fr; gap:6px 22px;
+}
+#botConfigMenu .botCfgSection {
+    margin-bottom:8px; padding:6px 0;
+}
+#botConfigMenu .botCfgSectionHdr {
+    color:#5cf6ff; font-size:11px; letter-spacing:3px; font-weight:bold;
+    border-bottom:1px solid rgba(92,246,255,0.3); padding-bottom:3px; margin-bottom:6px;
+}
+#botConfigMenu .botCfgRow {
+    display:grid; grid-template-columns:140px 1fr 42px; gap:8px;
+    align-items:center; padding:3px 0;
+}
+#botConfigMenu .botCfgRow label {
+    color:#aef9ff; font-size:11px;
+}
+#botConfigMenu .botCfgHint {
+    color:#7090a0; font-size:9px;
+}
+#botConfigMenu .botCfgRow input[type=range] {
+    width:100%; accent-color:#5cf6ff; height:6px;
+}
+#botConfigMenu .botCfgVal {
+    color:#ffd84a; font-size:11px; font-weight:bold; text-align:right;
+    text-shadow:0 0 4px rgba(255,216,74,0.5);
+}
+#botConfigMenu .bcm-actions {
+    padding:14px 18px; border-top:1px solid rgba(92,246,255,0.3);
+    display:flex; gap:10px; justify-content:center; align-items:center;
+    background:rgba(0,0,0,0.35);
+}
+#botConfigMenu .bcm-action-btn {
+    padding:9px 28px; font-family:'Courier New',monospace; font-size:13px; font-weight:bold;
+    letter-spacing:3px; cursor:pointer; border-radius:4px;
+    border:1.5px solid currentColor; background:transparent;
+    transition:all 0.12s;
+}
+#botConfigMenu .bcm-spawn { color:#5cf6ff; text-shadow:0 0 8px #5cf6ff; }
+#botConfigMenu .bcm-spawn:hover { background:rgba(92,246,255,0.18); box-shadow:0 0 14px rgba(92,246,255,0.55); }
+#botConfigMenu .bcm-cancel { color:#888; }
+#botConfigMenu .bcm-cancel:hover { color:#ff5a3c; }
+#botConfigMenu .bcm-footer-hint {
+    color:#6090a0; font-size:10px; margin-left:auto; letter-spacing:1px;
+}
+</style>
+<div id="botConfigMenu">
+    <div class="bcm-hdr">▸ CONFIGURE COMBAT BOT</div>
+    <div class="bcm-presets">
+        <span class="bcm-presets-label">SPAWN PRESET:</span>
+        <button class="bcm-preset-btn" onclick="spawnBotPreset('easy')">EASY</button>
+        <button class="bcm-preset-btn" onclick="spawnBotPreset('medium')">MEDIUM</button>
+        <button class="bcm-preset-btn" onclick="spawnBotPreset('hard')">HARD</button>
+        <span class="bcm-presets-label" style="margin-left:18px;">LOAD INTO SLIDERS:</span>
+        <button class="bcm-preset-btn bcm-load" onclick="applyBotPreset('easy')">EASY</button>
+        <button class="bcm-preset-btn bcm-load" onclick="applyBotPreset('medium')">MEDIUM</button>
+        <button class="bcm-preset-btn bcm-load" onclick="applyBotPreset('hard')">HARD</button>
+    </div>
+    <div class="bcm-body" id="botCfgSliders"></div>
+    <div class="bcm-actions">
+        <button class="bcm-action-btn bcm-spawn" onclick="spawnBotCustom()">▸ SPAWN CUSTOM</button>
+        <button class="bcm-action-btn bcm-cancel" onclick="closeBotConfig()">CANCEL</button>
+        <span class="bcm-footer-hint">ESC to close</span>
+    </div>
+</div>
+
 <div id="splash">
     <h1>ASTEROIDS</h1>
     <h2>REMASTERED</h2>

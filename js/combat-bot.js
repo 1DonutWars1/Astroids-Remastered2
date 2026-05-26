@@ -60,18 +60,88 @@ const BOT = {
     CONTACT_DMG: 6,
 };
 
+// ---- Difficulty presets ---------------------------------------------------
+// Each preset is a partial override of BOT. Properties not listed inherit
+// from BOT defaults. Personality (aggression/ranged/mobility) is also driven
+// through here so a "hard" bot fights with hard personality stats.
+const BOT_PRESETS = {
+    easy: {
+        label: 'AGENT.easy',
+        MAX_HP: 90, MELEE_DMG: 6, PROJ_DMG: 4, CONTACT_DMG: 2, PROJ_SPEED: 5.5,
+        WINDUP_MELEE: 36, WINDUP_THROW: 40,
+        CD_MELEE: 80, CD_THROW: 140, CD_DASH: 100, CD_JUMP: 60,
+        WALK_SPEED: 1.8, RUN_SPEED: 3.0, DASH_SPEED: 8.0,
+        aggression: 0.30, ranged: 0.25, mobility: 0.25,
+    },
+    medium: {
+        label: 'AGENT.med',
+        MAX_HP: 160, MELEE_DMG: 12, PROJ_DMG: 8, CONTACT_DMG: 6, PROJ_SPEED: 7.5,
+        WINDUP_MELEE: 22, WINDUP_THROW: 26,
+        CD_MELEE: 40, CD_THROW: 70, CD_DASH: 55, CD_JUMP: 35,
+        WALK_SPEED: 2.6, RUN_SPEED: 4.4, DASH_SPEED: 11.0,
+        aggression: 0.65, ranged: 0.55, mobility: 0.65,
+    },
+    hard: {
+        label: 'AGENT.hard',
+        MAX_HP: 240, MELEE_DMG: 18, PROJ_DMG: 12, CONTACT_DMG: 9, PROJ_SPEED: 9.5,
+        WINDUP_MELEE: 13, WINDUP_THROW: 16,
+        CD_MELEE: 22, CD_THROW: 40, CD_DASH: 30, CD_JUMP: 22,
+        WALK_SPEED: 3.4, RUN_SPEED: 5.6, DASH_SPEED: 13.5,
+        aggression: 0.90, ranged: 0.70, mobility: 0.90,
+    },
+};
+
+// Schema for the bot config menu — drives slider generation. Each entry is
+// one customizable knob: key matches a property name in BOT or personality.
+const BOT_CUSTOM_SETTINGS = [
+    // COMBAT
+    { key:'MAX_HP',       label:'Max HP',            min:40,  max:400, step:10,  section:'COMBAT' },
+    { key:'MELEE_DMG',    label:'Melee Damage',      min:2,   max:30,  step:1,   section:'COMBAT' },
+    { key:'PROJ_DMG',     label:'Projectile Damage', min:1,   max:25,  step:1,   section:'COMBAT' },
+    { key:'CONTACT_DMG',  label:'Contact Damage',    min:0,   max:15,  step:1,   section:'COMBAT' },
+    { key:'PROJ_SPEED',   label:'Projectile Speed',  min:3,   max:14,  step:0.5, section:'COMBAT' },
+    // TIMING
+    { key:'WINDUP_MELEE', label:'Melee Windup',      min:6,   max:50,  step:1,   section:'TIMING', hint:'lower = harder' },
+    { key:'WINDUP_THROW', label:'Throw Windup',      min:8,   max:50,  step:1,   section:'TIMING', hint:'lower = harder' },
+    { key:'CD_MELEE',     label:'Melee Cooldown',    min:10,  max:120, step:5,   section:'TIMING' },
+    { key:'CD_THROW',     label:'Throw Cooldown',    min:20,  max:200, step:5,   section:'TIMING' },
+    { key:'CD_DASH',      label:'Dash Cooldown',     min:20,  max:150, step:5,   section:'TIMING' },
+    // MOVEMENT
+    { key:'WALK_SPEED',   label:'Walk Speed',        min:0.8, max:5.0, step:0.1, section:'MOVEMENT' },
+    { key:'RUN_SPEED',    label:'Run Speed',         min:1.5, max:8.0, step:0.1, section:'MOVEMENT' },
+    { key:'DASH_SPEED',   label:'Dash Speed',        min:4,   max:18,  step:0.5, section:'MOVEMENT' },
+    // PERSONALITY (0..1)
+    { key:'aggression',   label:'Aggression',        min:0,   max:1,   step:0.05, section:'PERSONALITY' },
+    { key:'ranged',       label:'Ranged Tendency',   min:0,   max:1,   step:0.05, section:'PERSONALITY' },
+    { key:'mobility',     label:'Mobility',          min:0,   max:1,   step:0.05, section:'PERSONALITY' },
+];
+
+// Last-used custom settings — persisted across menu opens within a session.
+// Starts as a copy of the medium preset so first-time-open is friendly.
+let BOT_LAST_CUSTOM = null;
+
 // ---- Spawn ----------------------------------------------------------------
 
 function _spawnCombatBot(x, y, opts){
     opts = opts || {};
+    // Build a per-bot settings object. Customizable properties default to BOT
+    // values but can be overridden by opts.settings. Geometry (W/H) and a few
+    // tightly-tuned timings (ACTIVE_*, RECOVER_*, GRAVITY, JUMP_V,
+    // STAGGER_THRESHOLD, HURT_FRAMES, PLAYER_HIT_IFRAMES, MELEE_REACH/HEIGHT,
+    // DASH_FRAMES, AIR_DRIFT) stay on BOT — exposing them would require
+    // rebalancing animations and collision shapes.
+    const ps = opts.settings || {};
+    const s = Object.assign({}, BOT, ps);
     return {
         type: 'bot',
+        s,                          // settings (per-bot) — runtime lookups go through this
         x, y,                       // foot position
         spawnX: x, spawnY: y,
         vx: 0, vy: 0,
         w: BOT.W, h: BOT.H,
         facing: opts.facing || -1,
-        hp: BOT.MAX_HP, maxHp: BOT.MAX_HP,
+        hp: s.MAX_HP, maxHp: s.MAX_HP,
+        label: opts.label || ps.label || 'AGENT',
         grounded: false,
         // Visual / hit feedback
         hitFlash: 0,
@@ -93,12 +163,13 @@ function _spawnCombatBot(x, y, opts){
         cd: { melee: 0, throw: 0, dash: 0, jump: 0 },
         // Stagger
         stagger: 0,
-        // Personality (jitter slightly so repeat summons feel different)
+        // Personality — explicit settings (from preset / sliders) win; otherwise
+        // we jitter so repeat summons of the default feel different.
         personality: {
-            aggression: 0.55 + Math.random()*0.25,
-            ranged:     0.40 + Math.random()*0.35,
-            mobility:   0.50 + Math.random()*0.30,
-            preferredRange: 200 + Math.random()*80,    // tries to hold this distance
+            aggression: ps.aggression !== undefined ? ps.aggression : 0.55 + Math.random()*0.25,
+            ranged:     ps.ranged     !== undefined ? ps.ranged     : 0.40 + Math.random()*0.35,
+            mobility:   ps.mobility   !== undefined ? ps.mobility   : 0.50 + Math.random()*0.30,
+            preferredRange: ps.preferredRange || 200 + Math.random()*80,
         },
         // Death animation
         dying: false,
@@ -116,10 +187,17 @@ function _spawnCombatBot(x, y, opts){
     };
 }
 
-// Bound to the B key from combat.js. Summons a bot near the player on the ground.
-// If a bot is already alive, the existing one is hurried into death so a fresh
-// fight can start immediately — feels better than refusing the input.
+// Bound to the B key from combat.js. Opens the config menu so the player can
+// pick a preset or fine-tune settings before the bot actually spawns.
 function _summonPlaygroundBot(){
+    if (!G.combat || !G.holo) return;
+    openBotConfig();
+}
+
+// Actually drops a bot into the arena with the given settings object. The
+// menu's "spawn" buttons call this. If a bot is already alive, the existing
+// one is hurried into death so a fresh fight can start immediately.
+function _spawnConfiguredBot(settings){
     const Z = G.combat; const h = G.holo;
     if (!Z || !h) return;
     // Replace any existing live bot
@@ -135,7 +213,7 @@ function _summonPlaygroundBot(){
     let sx = h.x + side * 380;
     // Clamp to inside the world walls (40px wall on each side, world is 2400 wide)
     sx = Math.max(120, Math.min((Z.worldW||2400) - 120, sx));
-    const bot = _spawnCombatBot(sx, groundY, { facing: -side });
+    const bot = _spawnCombatBot(sx, groundY, { facing: -side, settings });
     Z.bots.push(bot);
     // Spawn FX — code shower + ground ring
     for (let i=0; i<22; i++){
@@ -164,12 +242,118 @@ function _summonPlaygroundBot(){
     });
     if (typeof shake === 'function') shake(3, 8);
     try { Sound.explode && Sound.explode(); } catch(e){}
-    // On-screen note above the new bot
+    // On-screen note above the new bot — use the bot's chosen label
     Z.popups.push({
         x: sx, y: groundY - BOT.H - 22,
         vy: -1.0, life: 70, max: 70,
-        text: 'AGENT.exe', color: '#ff8e3c', scaleIn: 1.0,
+        text: bot.label, color: '#ff8e3c', scaleIn: 1.0,
     });
+}
+
+// ---- Config menu UI -------------------------------------------------------
+// Renders the bot-config modal, reads slider values back, applies presets,
+// and invokes _spawnConfiguredBot when the player confirms.
+//
+// The menu's outer DOM (#botConfigMenu) lives in Game.html. The slider list
+// is generated here from BOT_CUSTOM_SETTINGS the first time the menu opens,
+// so adding a new knob only requires extending the schema.
+
+function openBotConfig(){
+    const el = document.getElementById('botConfigMenu');
+    if (!el) return;
+    if (!BOT_LAST_CUSTOM) BOT_LAST_CUSTOM = Object.assign({}, BOT_PRESETS.medium);
+    _buildBotConfigSliders();
+    _applyBotConfigValues(BOT_LAST_CUSTOM);
+    el.style.display = 'flex';
+    G.botConfigOpen = true;
+}
+
+function closeBotConfig(){
+    const el = document.getElementById('botConfigMenu');
+    if (el) el.style.display = 'none';
+    G.botConfigOpen = false;
+}
+
+// Preset button handler — applies the preset's full settings and spawns
+// immediately. Also stashes the preset values into BOT_LAST_CUSTOM so the
+// custom sliders reflect the most recent choice next time the menu opens.
+function spawnBotPreset(name){
+    const preset = BOT_PRESETS[name];
+    if (!preset) return;
+    BOT_LAST_CUSTOM = Object.assign({}, preset);
+    _spawnConfiguredBot(Object.assign({}, preset));
+    closeBotConfig();
+}
+
+// "SPAWN" button handler — reads each slider, builds a settings object, and
+// hands it to the spawn pipeline. Personality keys (0..1) and BOT-shaped keys
+// live in the same flat object — _spawnCombatBot already knows how to apply
+// both sides.
+function spawnBotCustom(){
+    const settings = _readBotConfigValues();
+    settings.label = 'AGENT.custom';
+    BOT_LAST_CUSTOM = Object.assign({}, settings);
+    _spawnConfiguredBot(settings);
+    closeBotConfig();
+}
+
+// Builds the slider rows once, keyed off BOT_CUSTOM_SETTINGS. Idempotent —
+// re-calling on an already-built menu is a no-op.
+function _buildBotConfigSliders(){
+    const host = document.getElementById('botCfgSliders');
+    if (!host || host.dataset.built === '1') return;
+    // Group by section
+    const sections = {};
+    for (const cfg of BOT_CUSTOM_SETTINGS){
+        if (!sections[cfg.section]) sections[cfg.section] = [];
+        sections[cfg.section].push(cfg);
+    }
+    let html = '';
+    for (const section of Object.keys(sections)){
+        html += `<div class="botCfgSection"><div class="botCfgSectionHdr">${section}</div>`;
+        for (const cfg of sections[section]){
+            const hintHtml = cfg.hint ? ` <span class="botCfgHint">(${cfg.hint})</span>` : '';
+            html += `
+                <div class="botCfgRow">
+                    <label for="botCfg_${cfg.key}">${cfg.label}${hintHtml}</label>
+                    <input type="range" id="botCfg_${cfg.key}" min="${cfg.min}" max="${cfg.max}" step="${cfg.step}"
+                        oninput="document.getElementById('botCfgVal_${cfg.key}').textContent = (+this.value).toFixed(${cfg.step < 1 ? 2 : 0})">
+                    <span class="botCfgVal" id="botCfgVal_${cfg.key}">0</span>
+                </div>`;
+        }
+        html += `</div>`;
+    }
+    host.innerHTML = html;
+    host.dataset.built = '1';
+}
+
+function _applyBotConfigValues(settings){
+    for (const cfg of BOT_CUSTOM_SETTINGS){
+        const input = document.getElementById('botCfg_'+cfg.key);
+        const span  = document.getElementById('botCfgVal_'+cfg.key);
+        if (!input) continue;
+        const v = settings[cfg.key] !== undefined ? settings[cfg.key] : BOT[cfg.key];
+        input.value = v;
+        if (span) span.textContent = (+v).toFixed(cfg.step < 1 ? 2 : 0);
+    }
+}
+
+function _readBotConfigValues(){
+    const out = {};
+    for (const cfg of BOT_CUSTOM_SETTINGS){
+        const input = document.getElementById('botCfg_'+cfg.key);
+        if (!input) continue;
+        out[cfg.key] = +input.value;
+    }
+    return out;
+}
+
+// Preset button in the menu that loads (but doesn't spawn) — lets the player
+// pick a preset baseline then tweak. Bound from HTML via onclick.
+function applyBotPreset(name){
+    const preset = BOT_PRESETS[name];
+    if (!preset) return;
+    _applyBotConfigValues(preset);
 }
 
 // ---- Per-frame entry from combat.js --------------------------------------
@@ -204,7 +388,7 @@ function _updateBots(){
                 if (h.parryWindow > 0){
                     _onPlayerParryMelee(h, b);
                 } else {
-                    _hitHoloFromBot(h, box, BOT.MELEE_DMG, b.facing);
+                    _hitHoloFromBot(h, box, b.s.MELEE_DMG, b.facing);
                 }
                 b.attackHit = true;
             }
@@ -223,7 +407,7 @@ function _updateBots(){
         if (h && h.invuln <= 0 && h.parryWindow <= 0 && !b.dying){
             if (_rectsOverlap(_botBox(b), _holoBox(h))){
                 const pushDir = (h.x >= b.x) ? 1 : -1;
-                _hitHoloFromBot(h, null, BOT.CONTACT_DMG, pushDir);
+                _hitHoloFromBot(h, null, b.s.CONTACT_DMG, pushDir);
             }
         }
     }
@@ -268,7 +452,7 @@ function _updateBotAI(b, h, Z){
         case 'melee_active':
             b.state = 'recover';
             b.stateTimer = BOT.RECOVER_MELEE;
-            b.cd.melee = BOT.CD_MELEE;
+            b.cd.melee = b.s.CD_MELEE;
             return;
         case 'windup_throw':
             b.state = 'throw_active';
@@ -279,7 +463,7 @@ function _updateBotAI(b, h, Z){
         case 'throw_active':
             b.state = 'recover';
             b.stateTimer = BOT.RECOVER_THROW;
-            b.cd.throw = BOT.CD_THROW;
+            b.cd.throw = b.s.CD_THROW;
             return;
         case 'dash':
             b.state = 'idle';
@@ -353,13 +537,13 @@ function _botPickNextAction(b, h, Z){
     switch (pick.kind){
         case 'melee':
             b.state = 'windup_melee';
-            b.stateTimer = BOT.WINDUP_MELEE;
+            b.stateTimer = b.s.WINDUP_MELEE;
             b.attackDir = b.facing;
             b.telegraph = 0;
             break;
         case 'throw':
             b.state = 'windup_throw';
-            b.stateTimer = BOT.WINDUP_THROW;
+            b.stateTimer = b.s.WINDUP_THROW;
             b.attackDir = b.facing;
             b.telegraph = 0;
             break;
@@ -393,7 +577,7 @@ function _tickBotState(b, h, Z){
         // Plant feet during windup, face the player, build up the telegraph.
         b.vx *= 0.5;
         b.facing = (dx >= 0) ? 1 : -1;
-        const total = (b.state === 'windup_melee') ? BOT.WINDUP_MELEE : BOT.WINDUP_THROW;
+        const total = (b.state === 'windup_melee') ? b.s.WINDUP_MELEE : b.s.WINDUP_THROW;
         const elapsed = total - b.stateTimer;
         b.telegraph = Math.min(1, elapsed / total);
         // Emit a tiny charge spark each frame near the weapon hand
@@ -436,7 +620,7 @@ function _tickBotState(b, h, Z){
     else if (tooNear) dir = (dx > 0) ? -1 : 1;
     // Use run speed when far away, walk when close to target — feels more
     // deliberate up close, like the bot is sizing up its options.
-    const sp = (adx > target + 200) ? BOT.RUN_SPEED : BOT.WALK_SPEED;
+    const sp = (adx > target + 200) ? b.s.RUN_SPEED : b.s.WALK_SPEED;
     if (dir !== 0 && b.grounded){
         b.vx += dir * 0.5;
         if (b.vx >  sp) b.vx =  sp;
@@ -452,9 +636,9 @@ function _botStartDash(b, dir){
     b.stateTimer = BOT.DASH_FRAMES;
     b.dashDir = dir || b.facing;
     b.facing = b.dashDir;
-    b.vx = b.dashDir * BOT.DASH_SPEED;
+    b.vx = b.dashDir * b.s.DASH_SPEED;
     b.vy = Math.min(b.vy, 0);
-    b.cd.dash = BOT.CD_DASH;
+    b.cd.dash = b.s.CD_DASH;
     b.invuln = Math.max(b.invuln, 10);
     // Streak FX
     const Z = G.combat; if (Z){
@@ -478,7 +662,7 @@ function _botStartDash(b, dir){
 function _botStartJump(b, towardDir){
     b.state = 'idle';
     b.stateTimer = 8;
-    b.cd.jump = BOT.CD_JUMP;
+    b.cd.jump = b.s.CD_JUMP;
     b.vy = BOT.JUMP_V;
     b.grounded = false;
     // Give it some horizontal push in the chosen direction
@@ -509,7 +693,7 @@ function _botStartJump(b, towardDir){
 function _updateBotPhysics(b, Z){
     // Dash overrides regular movement; gravity is suspended for the burst.
     if (b.state === 'dash'){
-        b.vx = b.dashDir * BOT.DASH_SPEED;
+        b.vx = b.dashDir * b.s.DASH_SPEED;
         b.vy = 0;
     } else {
         // Gravity
@@ -610,17 +794,17 @@ function _botFireProjectile(b, h){
     let dy = ty - sy;
     // Quick lead estimate — assume player keeps current vx for the projectile flight time
     const roughDist = Math.hypot(dx, dy);
-    const tFlight = roughDist / BOT.PROJ_SPEED;
+    const tFlight = roughDist / b.s.PROJ_SPEED;
     dx += (b.lastSeenPlayerVx || 0) * tFlight * 0.55;
     const m = Math.hypot(dx, dy) || 1;
-    const vx = (dx/m) * BOT.PROJ_SPEED;
-    const vy = (dy/m) * BOT.PROJ_SPEED;
+    const vx = (dx/m) * b.s.PROJ_SPEED;
+    const vy = (dy/m) * b.s.PROJ_SPEED;
     Z.botProjectiles.push({
         x: sx, y: sy,
         vx, vy,
         life: 110, max: 110,
         r: 8,
-        dmg: BOT.PROJ_DMG,
+        dmg: b.s.PROJ_DMG,
         rot: Math.atan2(vy, vx),
         spin: (Math.random()-0.5)*0.1,
         trail: [],
@@ -871,7 +1055,10 @@ function _onPlayerParryMelee(h, b){
 function _parryProjectile(h, pr){
     const Z = G.combat;
     pr.parried = true;
-    pr.dmg = Math.max(pr.dmg, BOT.PROJ_DMG + 6);
+    // Parry-reflected projectiles always pack a meaningful punch — a flat
+    // bonus on top of the original throw damage, with a floor so easy-bot
+    // shards still feel rewarding to send back.
+    pr.dmg = Math.max(pr.dmg + 4, 12);
     // Reflect: send it back where it came from, slightly faster than before.
     const sp = Math.hypot(pr.vx, pr.vy);
     const newSp = Math.min(14, sp + 2.5);
@@ -1103,7 +1290,7 @@ function _drawBot(b, T){
     ctx.fillStyle = '#ff8e3c';
     ctx.font = 'bold 9px Courier New, monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('AGENT', b.x, by - 4);
+    ctx.fillText(b.label || 'AGENT', b.x, by - 4);
 }
 
 function _drawBotSilhouette(b, T){
@@ -1163,7 +1350,7 @@ function _drawBotSilhouette(b, T){
     let weapon = null; // {x,y,angle,kind}
     if (b.state === 'windup_melee'){
         // Sword raised behind for a windmill chop
-        const t = 1 - (b.stateTimer / BOT.WINDUP_MELEE);
+        const t = 1 - (b.stateTimer / b.s.WINDUP_MELEE);
         armX = -2 - t*4;
         armY = torsoY - 6 - t*4;
         weapon = { x: armX-6, y: armY-4, angle: -Math.PI*0.85, kind:'sword' };
@@ -1174,7 +1361,7 @@ function _drawBotSilhouette(b, T){
         armY = torsoY + 8;
         weapon = { x: armX, y: armY, angle: -Math.PI*0.2 + t*Math.PI*0.6, kind:'sword' };
     } else if (b.state === 'windup_throw'){
-        const t = 1 - (b.stateTimer / BOT.WINDUP_THROW);
+        const t = 1 - (b.stateTimer / b.s.WINDUP_THROW);
         armX = -8 + t*4;
         armY = torsoY + 4 - t*6;
         weapon = { x: armX, y: armY, angle: -Math.PI*0.6, kind:'spear' };
