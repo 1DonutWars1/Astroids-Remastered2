@@ -2,8 +2,38 @@
 //  UPDATES / PATCH NOTES
 //  Newest entries go at the TOP of the list.
 //  When adding a new update, copy the template block and fill it in.
+//
+//  >>> READ THIS, CLAUDE <<<
+//  EVERY TIME YOU FINISH A USER-VISIBLE CHANGE (new feature, bug fix,
+//  balance tweak, new mechanic, new UI), YOU MUST ADD AN ENTRY HERE.
+//  This file is what the player sees in the in-game "UPDATES" button.
+//  If you forget to add an entry, the change exists silently — the player
+//  has no way to know about it.
+//
+//  Rules:
+//   - Add a new {version, date, title, notes:[]} block at the TOP of the
+//     UPDATES array, ABOVE the most recent entry.
+//   - Bump the patch version (v1.0.X → v1.0.X+1). Bigger features can bump
+//     the minor (v1.X.0). Use today's date in YYYY-MM-DD.
+//   - Phrase notes from the player's perspective — what changed, not how
+//     it was implemented. "Added a parry mechanic" not "Added parryWindow
+//     to holo state".
+//   - One note per discrete change. Group related changes by version, not
+//     by bullet — if you did 3 things this session, that's 3 bullets.
+//
+//  Do this BEFORE telling the user the task is done.
 // ============================================================
 const UPDATES = [
+    {
+        version: 'v1.0.7',
+        date: '2026-05-27',
+        title: 'Audio Fixes & Ground Shatter Buff',
+        notes: [
+            'Fixed a bug where master volume reset to default on every game launch — your saved volume settings now persist correctly across sessions, even if you had them at 0.',
+            'Fixed a bug where the combat playground\'s background music kept looping over the main menu after you exited the arena. Music now stops on exit.',
+            'Buffed the Ground Shatter (↓+Z) damage — direct hits now deal 20 (up from 10), grazing hits 10 (up from 5).'
+        ]
+    },
     {
         version: 'v1.0.6',
         date: '2026-04-14',

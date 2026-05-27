@@ -29,6 +29,15 @@ const COMBAT = {
     // Parry — frames after pressing X during which incoming bot melee /
     // projectiles get reflected instead of damaging the player. 0.5s @ 60fps.
     PARRY_WINDOW: 30,
+    // Ground shatter (Down + Z while airborne) — the player phases through
+    // the boundary between reality and code, slams down, and detonates an
+    // area-of-effect shockwave on impact.
+    GROUND_SHATTER_CD: 600,         // 10 s @ 60fps
+    GROUND_SHATTER_SPEED: 22,       // downward velocity during the descent
+    GROUND_SHATTER_DIRECT_R: 80,    // within this radius = direct hit
+    GROUND_SHATTER_OUTER_R: 180,    // within this radius (but outside direct) = grazing hit
+    GROUND_SHATTER_DIRECT_DMG: 20,
+    GROUND_SHATTER_OUTER_DMG: 10,
     ATTACK_REACH: 56,
     ATTACK_HEIGHT: 44,
     UP_ATTACK_REACH: 50,
@@ -172,6 +181,13 @@ function _newHoloPlayer(spawnX, spawnY){
         attackHit: false,             // already connected this attack
         parryWindow: 0,               // >0: pressing X just now; incoming hits get parried
         parryFlash: 0,                // >0: visual flash after a successful parry
+        // Ground shatter — Down+Z triggers a downward slam through the
+        // reality/code boundary. While groundSlamming, the player is invuln,
+        // gravity is overridden, and the silhouette renders in a glitched
+        // "between states" form.
+        groundShatterCooldown: 0,
+        groundSlamming: false,
+        slamGlitchT: 0,               // frame counter for slam visuals + trail spawn
         // Animation
         animState: 'idle',            // idle | run | jump | fall | land | attack
         animTimer: 0,
@@ -249,7 +265,11 @@ function exitCombatZone(){
     G.holo = null;
     G.combatReturn = null;
     if (goMenu) {
-        // Return to home menu
+        // Return to home menu. enterCombatZone() called Sound.playMusic('bgm');
+        // the menu has no music of its own, so stop whatever's playing before
+        // handing back to it — otherwise the combat BGM keeps looping over the
+        // main menu.
+        try { Sound.playMusic && Sound.playMusic('none'); } catch(e) {}
         G.running = false;
         G.mode = 'space';
         if (typeof $ui!=='undefined' && $ui) $ui.style.display='none';
@@ -470,7 +490,14 @@ function combatKeyDown(e){
         return true;
     }
     if (e.code === 'KeyZ' && !e.repeat) {
-        G.holo.jumpBuffer = COMBAT.JUMP_BUFFER_FRAMES;
+        // Down + Z while airborne triggers Ground Shatter (off cooldown, not
+        // already slamming). Otherwise Z buffers a normal jump.
+        const h = G.holo;
+        if (_holoDownHeld() && !h.grounded && h.groundShatterCooldown <= 0 && !h.groundSlamming){
+            _holoStartGroundShatter();
+            return true;
+        }
+        h.jumpBuffer = COMBAT.JUMP_BUFFER_FRAMES;
         return true;
     }
     if (e.code === 'KeyX' && !e.repeat) {
@@ -517,6 +544,236 @@ function _holoTryAttack(){
     // Build slash arc — purely visual
     h.slash = _buildSlashArc(dir, h.facing);
     try { Sound.ui(); } catch(e) {}
+}
+
+// ---- Ground Shatter (Down + Z while airborne) ----
+//
+// The player phases into a "between reality and code" state and falls
+// straight down at high speed. On impact, an area-of-effect shockwave
+// shatters out, dealing 10 dmg within DIRECT_R and 5 dmg within OUTER_R.
+//
+// Lore: the player exists momentarily in the seam between the rendered
+// world and its underlying source — that's why their silhouette glitches,
+// error tags leak out, and code shards stream off them during the descent.
+// The fragile-place flavor is purely visual; mechanically the slam is a
+// committed move (no input, no damage taken, no cancel).
+function _holoStartGroundShatter(){
+    const h = G.holo;
+    h.groundSlamming = true;
+    h.groundShatterCooldown = COMBAT.GROUND_SHATTER_CD;
+    h.slamGlitchT = 0;
+    // Snap velocity into the slam — strong down, kill horizontal.
+    h.vy = COMBAT.GROUND_SHATTER_SPEED;
+    h.vx *= 0.4;
+    // Cancel anything that would interfere
+    h.dashing = false;
+    h.dashTimer = 0;
+    h.attackTimer = 0;
+    h.attackHit = true;
+    h.slash = null;
+    h.parryWindow = 0;
+    h.jumpBuffer = 0;
+    h.jumpHoldFrames = 0;
+    h.jumping = false;
+    h.animState = 'fall';
+    h.animTimer = 0;
+    try { Sound.ui && Sound.ui(); } catch(e){}
+    // Tiny initial burst at the start of the descent — signals "I committed"
+    const Z = G.combat;
+    if (Z){
+        for (let i=0; i<10; i++){
+            const ang = Math.random()*Math.PI*2;
+            const spd = 1.5 + Math.random()*2.5;
+            Z.fx.push({
+                type:'char',
+                x: h.x + (Math.random()-0.5)*h.w,
+                y: h.y - h.h*0.5 + (Math.random()-0.5)*h.h,
+                vx: Math.cos(ang)*spd,
+                vy: Math.sin(ang)*spd - 1.0,
+                life: 22, max: 22,
+                rot: 0, spin: (Math.random()-0.5)*0.2,
+                text: _randGlyph(),
+                color: i%3===0 ? '#ffffff' : '#ff8e3c',
+                size: 11,
+            });
+        }
+        Z.fx.push({
+            type:'ring',
+            x: h.x, y: h.y - h.h*0.5,
+            r: 4, rMax: 36,
+            life: 14, max: 14,
+            color: '#ff8e3c',
+        });
+    }
+}
+
+// Detonate on landing. Hits each combat entity (training dummies + AI bots)
+// once based on distance — 10 dmg inside DIRECT_R, 5 dmg inside OUTER_R.
+function _holoExecuteShatter(){
+    const h = G.holo;
+    const Z = G.combat;
+    h.groundSlamming = false;
+    h.slamGlitchT = 0;
+    // Brief post-impact iframes so contact damage from a hit bot doesn't
+    // immediately punish the player while they're still in the recovery pose.
+    h.invuln = Math.max(h.invuln, 18);
+
+    const cx = h.x, cy = h.y - 4;
+    const DR = COMBAT.GROUND_SHATTER_DIRECT_R;
+    const OR = COMBAT.GROUND_SHATTER_OUTER_R;
+    const DR2 = DR*DR, OR2 = OR*OR;
+
+    // Dummies — bypass _onDummyHit's random dmg by applying directly.
+    for (const d of Z.dummies){
+        if (d.respawnTimer > 0 || d.dying) continue;
+        const dx = d.x - cx, dy = (d.y - d.h*0.5) - cy;
+        const d2 = dx*dx + dy*dy;
+        if (d2 > OR2) continue;
+        const direct = d2 <= DR2;
+        const dmg = direct ? COMBAT.GROUND_SHATTER_DIRECT_DMG : COMBAT.GROUND_SHATTER_OUTER_DMG;
+        d.hp = Math.max(0, d.hp - dmg);
+        d.hitFlash = 14;
+        // Pop upward + outward away from slam center
+        const push = direct ? 3.2 : 1.6;
+        d.vx = (dx === 0 ? (Math.random()-0.5) : Math.sign(dx)) * push;
+        d.vy = -3.2;
+        d.leanVel += (dx >= 0 ? 1 : -1) * 0.25;
+        d.lastHitDir = dx >= 0 ? 1 : -1;
+        Z.popups.push({
+            x: d.x + (Math.random()-0.5)*12,
+            y: d.y - d.h - 4,
+            vy: -1.6, life: 40, max: 40,
+            text: '-'+dmg,
+            color: direct ? '#ffd84a' : '#ff8e3c',
+            scaleIn: 1.0,
+        });
+        if (d.hp <= 0 && !d.dying) _beginDereal(d);
+    }
+
+    // Bots (if combat-bot.js is loaded) — same distance bands. Forward the
+    // hit through a synthetic side-box so existing reactions (stagger,
+    // knockback) still trigger; the dmg comes from the box override.
+    if (Z.bots){
+        for (const b of Z.bots){
+            if (b.dying || b.invuln > 0) continue;
+            const dx = b.x - cx, dy = (b.y - b.h*0.5) - cy;
+            const d2 = dx*dx + dy*dy;
+            if (d2 > OR2) continue;
+            const direct = d2 <= DR2;
+            const dmg = direct ? COMBAT.GROUND_SHATTER_DIRECT_DMG : COMBAT.GROUND_SHATTER_OUTER_DMG;
+            b.hp = Math.max(0, b.hp - dmg);
+            b.hitFlash = 14;
+            b.stagger = (b.stagger || 0) + dmg;
+            const push = direct ? 4.0 : 2.2;
+            b.vx = (dx === 0 ? (Math.random()-0.5) : Math.sign(dx)) * push;
+            b.vy = -3.8;
+            // Interrupt windups, since this is a heavy AoE — same rule as a
+            // normal hit landing during a telegraphed swing.
+            if (b.state === 'windup_melee' || b.state === 'windup_throw'){
+                b.stagger = (typeof BOT !== 'undefined') ? BOT.STAGGER_THRESHOLD : 32;
+            }
+            if (typeof BOT !== 'undefined' && b.stagger >= BOT.STAGGER_THRESHOLD){
+                b.state = 'hurt';
+                b.stateTimer = BOT.HURT_FRAMES;
+                b.stagger = 0;
+                b.invuln = BOT.HURT_FRAMES + 6;
+                b.attackBox = null;
+                b.swingArc = null;
+            }
+            Z.popups.push({
+                x: b.x + (Math.random()-0.5)*12,
+                y: b.y - b.h - 4,
+                vy: -1.6, life: 40, max: 40,
+                text: '-'+dmg,
+                color: direct ? '#ffd84a' : '#ff8e3c',
+                scaleIn: 1.0,
+            });
+            if (b.hp <= 0 && !b.dying && typeof _killBot === 'function') _killBot(b, false);
+        }
+    }
+
+    // ---- Impact FX ----
+    // Two expanding rings — inner (direct band, orange) and outer (graze
+    // band, yellow). Sized to match the actual damage radii so the player
+    // can read the falloff at a glance.
+    Z.fx.push({
+        type:'ring',
+        x: cx, y: cy,
+        r: 8, rMax: DR*2,
+        life: 22, max: 22,
+        color: '#ff8e3c',
+    });
+    Z.fx.push({
+        type:'ring',
+        x: cx, y: cy,
+        r: 8, rMax: OR*2,
+        life: 34, max: 34,
+        color: '#ffd84a',
+    });
+    Z.fx.push({
+        type:'ring',
+        x: cx, y: cy,
+        r: 4, rMax: DR,
+        life: 14, max: 14,
+        color: '#ffffff',
+    });
+    // Reality crack at the slam point — the "between states" leaks back
+    // closed as the player phases back into normal space.
+    Z.fx.push({
+        type:'tear',
+        x: cx, y: cy - 36,
+        h: 110,
+        life: 52, max: 52,
+        wMax: 22 + Math.random()*8,
+    });
+    // Code shard burst — heavier than a normal hit
+    for (let i=0; i<36; i++){
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 2 + Math.random() * 6;
+        Z.fx.push({
+            type:'char',
+            x: cx + (Math.random()-0.5)*20,
+            y: cy + (Math.random()-0.5)*8,
+            vx: Math.cos(ang)*spd,
+            vy: -Math.abs(Math.sin(ang))*spd*0.7 - 1,
+            life: 44, max: 44,
+            rot: 0, spin: (Math.random()-0.5)*0.22,
+            text: _randGlyph(),
+            color: i%4===0 ? '#ffffff' : (i%3===0 ? '#ffd84a' : '#ff8e3c'),
+            size: 11 + Math.floor(Math.random()*4),
+            rise: true,
+        });
+    }
+    // A pair of error tags floating up — lore
+    for (let i=0; i<2; i++){
+        const tag = ERROR_TAGS[Math.floor(Math.random()*ERROR_TAGS.length)];
+        Z.fx.push({
+            type:'errortag',
+            x: cx + (Math.random()-0.5)*70,
+            y: cy - 18,
+            vy: -0.8 - Math.random()*0.4,
+            life: 70, max: 70,
+            text: tag,
+            color: i === 0 ? '#ff5a3c' : '#ffd84a',
+        });
+    }
+    _spawnDustPuff(cx, h.y, 1);
+    _spawnDustPuff(cx - 30, h.y, 1);
+    _spawnDustPuff(cx + 30, h.y, 1);
+    Z.glitch = Math.max(Z.glitch||0, 14);
+    if (typeof shake === 'function') shake(7, 16);
+    try { Sound.explode && Sound.explode(); } catch(e){}
+    // "SHATTER" popup over the player
+    Z.popups.push({
+        x: cx, y: h.y - h.h - 22,
+        vy: -1.0, life: 60, max: 60,
+        text: 'SHATTER',
+        color: '#ffffff', scaleIn: 0.6,
+    });
+    // Brief landing squash exaggeration — physics already sets landSquash=1,
+    // but we want this to feel heavier than a normal landing.
+    h.landSquash = 1.4;
+    h.vy = 0;
 }
 
 // Tap C → instant dash burst. Hold C past the dash to keep sprinting after it ends.
@@ -618,6 +875,7 @@ function _updateHoloPhysics(){
     // Tick timers that exist regardless of dash state
     if (h.dashCooldown > 0) h.dashCooldown--;
     if (h.invuln > 0) h.invuln--;
+    if (h.groundShatterCooldown > 0) h.groundShatterCooldown--;
 
     // --- DASH OVERRIDE ---
     // While dashing we lock horizontal velocity, suspend gravity, ignore input,
@@ -636,6 +894,49 @@ function _updateHoloPhysics(){
             // Preserve momentum: vx is left at the dash speed; the next-frame
             // cap will clamp it down to MAX_SPRINT or MAX_RUN.
         }
+    } else if (h.groundSlamming){
+        // --- GROUND SHATTER DESCENT ---
+        // Locked into the slam — no input control, no gravity (we set vy
+        // directly). Vx decays so any pre-slam horizontal momentum bleeds off.
+        // The player is "between reality and code" here — particles + tags
+        // bleed out continuously to sell the lore.
+        h.sprinting = false;
+        h.vy = COMBAT.GROUND_SHATTER_SPEED;
+        h.vx *= 0.7;
+        h.slamGlitchT++;
+        // Glitchy code trail — denser than the normal sprint trail and uses
+        // the full reality/code palette (cyan + orange + yellow) to read as a
+        // mix of "self" and "underlying source".
+        if (Z && h.slamGlitchT % 2 === 0){
+            Z.fx.push({
+                type:'char',
+                x: h.x + (Math.random()-0.5)*h.w,
+                y: h.y - h.h*0.5 + (Math.random()-0.5)*h.h,
+                vx: (Math.random()-0.5)*1.5,
+                vy: -0.4 - Math.random()*0.7,
+                life: 22, max: 22,
+                rot: 0, spin: (Math.random()-0.5)*0.2,
+                text: _randGlyph(),
+                color: Math.random()<0.45 ? '#ff8e3c' : (Math.random()<0.5 ? '#5cf6ff' : '#ffd84a'),
+                size: 10 + Math.floor(Math.random()*3),
+                rise: true,
+            });
+        }
+        // Occasional ERROR_TAG drifting up — "reality leak" flavor
+        if (Z && h.slamGlitchT % 7 === 0){
+            const tag = ERROR_TAGS[Math.floor(Math.random()*ERROR_TAGS.length)];
+            Z.fx.push({
+                type:'errortag',
+                x: h.x + (Math.random()-0.5)*60,
+                y: h.y - h.h*0.5 + (Math.random()-0.5)*40,
+                vy: -0.5 - Math.random()*0.3,
+                life: 36, max: 36,
+                text: tag, color: '#ffd84a',
+            });
+        }
+        // Push a screen-space glitch tick so the background shimmers while
+        // we're between states
+        if (Z) Z.glitch = Math.max(Z.glitch, 4);
     } else {
         // Horizontal input. Sprint is sticky across jumps so a running leap keeps its
         // momentum — without that the cap would slam vx back down to MAX_RUN mid-air.
@@ -653,13 +954,13 @@ function _updateHoloPhysics(){
         }
     }
     const maxV = h.sprinting ? COMBAT.MAX_SPRINT : COMBAT.MAX_RUN;
-    if (!h.dashing){
+    if (!h.dashing && !h.groundSlamming){
         if (h.vx >  maxV) h.vx =  maxV;
         if (h.vx < -maxV) h.vx = -maxV;
     }
 
-    // Gravity (suspended during dash above)
-    if (!h.dashing){
+    // Gravity (suspended during dash and ground slam — both set vy explicitly)
+    if (!h.dashing && !h.groundSlamming){
         h.vy += COMBAT.GRAVITY;
         if (h.vy > 18) h.vy = 18; // terminal velocity
     }
@@ -669,7 +970,7 @@ function _updateHoloPhysics(){
     else if (h.coyote > 0) h.coyote--;
     if (h.jumpBuffer > 0) h.jumpBuffer--;
 
-    if (h.jumpBuffer > 0 && (h.grounded || h.coyote > 0)) {
+    if (!h.groundSlamming && h.jumpBuffer > 0 && (h.grounded || h.coyote > 0)) {
         // Sprinting jumps go higher — both stronger initial velocity and a few
         // extra hold-boost frames for variable-height control.
         const sprintJump = h.sprinting;
@@ -702,6 +1003,8 @@ function _updateHoloPhysics(){
 
     // Landing
     if (!wasGrounded && h.grounded) {
+        // Ground shatter detonates on impact and exits the slam state
+        if (h.groundSlamming) _holoExecuteShatter();
         h.landSquash = 1;
         h.jumping = false;
         h.animState = 'land';
@@ -1693,7 +1996,21 @@ function _drawHologram(h, T){
         ctx.shadowBlur = 0;
         ctx.restore();
     }
+    // ---- BETWEEN-STATES (ground shatter descent) ----
+    // The player exists momentarily in the seam between the rendered world
+    // and the underlying source. We render chromatic RGB-offset silhouettes,
+    // a vertical reality seam dropping through them, and a cycling lore tag.
+    // All purely visual — mechanics don't change here, the slam is already
+    // locked into its physics.
+    if (h.groundSlamming){
+        _drawSlamBetweenStates(h);
+    }
     _drawHologramSilhouette(h.x, h.y, h.facing, h.animState, h.animTimer, h.landSquash, h.attackDir);
+    // Post-silhouette slam overlay: glitch bands cut across the silhouette
+    // so the player reads as fractured, not just colorful.
+    if (h.groundSlamming){
+        _drawSlamGlitchBands(h);
+    }
     ctx.globalAlpha = 1;
     // Faint base ring (the "projector" floor mark)
     if (h.grounded){
@@ -1706,6 +2023,88 @@ function _drawHologram(h, T){
         ctx.beginPath(); ctx.ellipse(0, 1, 22, 6, 0, 0, Math.PI*2); ctx.stroke();
         ctx.restore();
     }
+}
+
+// Slam visual layered BEHIND the silhouette: chromatic RGB ghost rects,
+// extra cyan halo, and a vertical reality seam dropping through the body.
+function _drawSlamBetweenStates(h){
+    const SL_W = h.w + 14, SL_H = h.h + 12;
+    const SL_X = h.x - SL_W/2, SL_Y = h.y - h.h - 6;
+    // Extra "phase" halo — bigger and white-hot
+    ctx.save();
+    ctx.translate(h.x, h.y - h.h/2);
+    const phaseR = 56;
+    const phase = ctx.createRadialGradient(0,0,4,0,0,phaseR);
+    phase.addColorStop(0,'rgba(255,255,255,0.45)');
+    phase.addColorStop(0.4,'rgba(255,142,60,0.35)');
+    phase.addColorStop(1,'transparent');
+    ctx.fillStyle = phase;
+    ctx.beginPath(); ctx.arc(0,0,phaseR,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    // Chromatic RGB-offset silhouette ghosts, screen-blended
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const wob = 4 + Math.sin(h.slamGlitchT*0.35)*2;
+    const channels = ['#ff3344', '#33ff99', '#3399ff'];
+    for (let i = 0; i < 3; i++){
+        const off = (i - 1) * wob;
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle = channels[i];
+        _roundRect(SL_X + off, SL_Y, SL_W, SL_H, 6);
+        ctx.fill();
+    }
+    ctx.restore();
+    // Vertical reality seam descending from the player
+    ctx.save();
+    ctx.globalAlpha = 0.75;
+    ctx.strokeStyle = '#ffffff';
+    ctx.shadowColor = '#aef9ff';
+    ctx.shadowBlur = 14;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    let py = h.y - h.h;
+    ctx.moveTo(h.x, py);
+    while (py < h.y + 40){
+        py += 6;
+        ctx.lineTo(h.x + (Math.random()-0.5)*3, py);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+    // Floating lore tag cycling through phase descriptors. Anchors the
+    // mechanic in the game's matrix-y identity.
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = '#aef9ff';
+    ctx.font = 'bold 10px Courier New, monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#5cf6ff';
+    ctx.shadowBlur = 8;
+    const LORE = ['[BETWEEN_STATES]','[REALITY_BREACH]','[CODE_PHASE]','[SOURCE_LEAK]'];
+    ctx.fillText(LORE[Math.floor(h.slamGlitchT/8)%LORE.length], h.x, h.y - h.h - 10);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+}
+
+// Slam visual layered IN FRONT of the silhouette: horizontal glitch bands
+// + a few thin slice rectangles, so the body reads as fractured. Kept small
+// in count so it doesn't smother the hologram itself.
+function _drawSlamGlitchBands(h){
+    ctx.save();
+    const SL_W = h.w + 18;
+    const bands = 4;
+    for (let i = 0; i < bands; i++){
+        const yy = h.y - h.h + Math.random() * h.h;
+        const xoff = (Math.random()-0.5) * 16;
+        const bh = 2 + Math.random()*3;
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle = (i % 2 === 0) ? '#ff8e3c' : '#aef9ff';
+        ctx.fillRect(h.x - SL_W/2 + xoff, yy, SL_W, bh);
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(h.x - SL_W/2 + xoff, yy + bh, SL_W, 1);
+    }
+    ctx.restore();
 }
 
 // Hologram is drawn as a stylized humanoid silhouette in cyan, with simple
@@ -2331,7 +2730,7 @@ function _drawCombatHUD(Z, h, T){
         ctx.shadowBlur = 0;
         ctx.font = '11px Courier New, monospace';
         ctx.fillStyle = '#aef9ff';
-        ctx.fillText('Z JUMP   X STRIKE   C SPRINT   ↑+X UPPERCUT   ↓+X POGO   B SUMMON BOT', W/2, 118);
+        ctx.fillText('Z JUMP   X STRIKE   C SPRINT   ↑+X UPPERCUT   ↓+X POGO   ↓+Z SHATTER   B SUMMON BOT', W/2, 118);
         ctx.restore();
     }
 

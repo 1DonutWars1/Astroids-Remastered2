@@ -10,6 +10,13 @@ const Sound = {
         this.master.gain.value = 0.6;
         this.master.connect(this.ctx.destination);
         this.initTracks();
+        // Audio nodes only exist after this point. loadSettings() ran at page
+        // load and called applySettings(), but at that moment master/bgmAudio
+        // were still null — so the bail-out checks skipped the user's saved
+        // volumes. Re-apply now so saved settings beat the init defaults.
+        if (typeof applySettings === 'function') {
+            try { applySettings(); } catch(e) {}
+        }
     },
     bgmAudio: null, boss3Audio: null, boss3P2Audio: null, boss4Audio: null, boss5Audio: null, rougeAudio: null, grimmAudio: null, nexusAudio: null, sector2Audio: null, currentTrack: 'none',
     initTracks() {

@@ -402,9 +402,9 @@ function _updateBots(){
         }
         // Contact damage — body overlap chips the player. Cheaper than a real
         // attack, but means standing inside the bot is never free. Gated by
-        // player iframes AND the parry window so a parrying player isn't
-        // punished by contact damage at the same instant they deflect a hit.
-        if (h && h.invuln <= 0 && h.parryWindow <= 0 && !b.dying){
+        // player iframes, the parry window, and the ground-slam state — the
+        // player is phased out of normal interaction in all three cases.
+        if (h && h.invuln <= 0 && h.parryWindow <= 0 && !h.groundSlamming && !b.dying){
             if (_rectsOverlap(_botBox(b), _holoBox(h))){
                 const pushDir = (h.x >= b.x) ? 1 : -1;
                 _hitHoloFromBot(h, null, b.s.CONTACT_DMG, pushDir);
@@ -1172,7 +1172,7 @@ function _hitHoloFromProjectile(h, pr){
 // sandbox, not a death zone.
 function _damageHolo(amount, dirSign){
     const h = G.holo;
-    if (!h || h.invuln > 0 || h.parryWindow > 0) return;
+    if (!h || h.invuln > 0 || h.parryWindow > 0 || h.groundSlamming) return;
     h.hp = Math.max(0, h.hp - amount);
     h.invuln = BOT.PLAYER_HIT_IFRAMES;
     h.vx = (dirSign||1) * 4.5;
