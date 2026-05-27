@@ -1,4 +1,38 @@
 // ============================================================
+//  PERF CACHES
+//  -----------
+//  Hot paths in update()/draw() repeatedly do work the browser can't easily
+//  amortize for us: document.getElementById() lookups, ctx.createRadialGradient()
+//  with parameters that haven't changed since last frame, etc. The caches below
+//  preserve all current visuals and behavior — they just skip rebuilding things
+//  that didn't actually change.
+//
+//  Conventions:
+//    - DOM cache: lazy-init via a helper, since some elements may not exist
+//      when this file is loaded.
+//    - Gradient cache: keyed by a string of the inputs that affect the gradient
+//      (W/H/state). On a cache miss, build via the supplied factory function.
+//    - Per-entity caches: attach the cached gradient directly to the entity
+//      (e.g. star._haloGrad) and invalidate by storing the color used. Cheaper
+//      than a Map lookup when the cache hits.
+// ============================================================
+const _gradCache = new Map();
+function _cachedGrad(key, builder){
+    let g = _gradCache.get(key);
+    if (!g){ g = builder(); _gradCache.set(key, g); }
+    return g;
+}
+// Clears the cache. Call when the canvas size changes — gradient anchor points
+// keyed on W/H become stale otherwise.
+function _invalidateGradCache(){ _gradCache.clear(); }
+
+let _domReloadBar = null, _domComboRow = null, _domPowerupRow = null, _domBossRow = null;
+function _getReloadBar(){ return _domReloadBar || (_domReloadBar = document.getElementById('reloadBar')); }
+function _getComboRow(){  return _domComboRow  || (_domComboRow  = document.getElementById('comboRow'));  }
+function _getPowerupRow(){return _domPowerupRow|| (_domPowerupRow= document.getElementById('powerupRow'));}
+function _getBossRow(){   return _domBossRow   || (_domBossRow   = document.getElementById('bossRow'));   }
+
+// ============================================================
 //  UPDATE
 // ============================================================
 function update() {
@@ -23,7 +57,7 @@ function update() {
     if(G.stationCutscene){updateCutscene();return;}
     if(G.tutorial) updateTutorial();
 
-    if(G.comboTimer>0)G.comboTimer--; else{G.combo=0;G.consecutiveKills=0;document.getElementById('comboRow').style.display='none';}
+    if(G.comboTimer>0)G.comboTimer--; else{G.combo=0;G.consecutiveKills=0;_getComboRow().style.display='none';}
     // Block normal shooting while charging big shot (level 6 charging or post-level6 hold-charge)
     const _blockShoot=(G.level6&&(G.level6.state==='gilbert_found'||G.level6.state==='charging'||G.level6.state==='release_prompt'))
                     ||(G.bigShotCharge>0)
@@ -31,7 +65,7 @@ function update() {
     if(isAction('fire')&&!_blockShoot) shoot();
     if(G.shotTimer>0) G.shotTimer--;
     if(G.invincibleTimer>0) G.invincibleTimer--;
-    if(G.tripleShotTimer>0){if(!G.permaTripleShot)G.tripleShotTimer--;document.getElementById('powerupRow').style.display=G.tripleShotTimer>0?'block':'none';}
+    if(G.tripleShotTimer>0){if(!G.permaTripleShot)G.tripleShotTimer--;_getPowerupRow().style.display=G.tripleShotTimer>0?'block':'none';}
     if(G.shakeTimer>0) G.shakeTimer--;
     if(G.sector2GlitchTimer>0) G.sector2GlitchTimer--;
     if(G.dashCooldown>0) G.dashCooldown--;
@@ -54,7 +88,7 @@ function update() {
     const elapsed=(performance.now()-G.waveStart)/1000;
     // reload bar
     const pct=G.shotTimer>0?(1-G.shotTimer/SHOT_CD)*100:100;
-    const bar=document.getElementById('reloadBar');
+    const bar=_getReloadBar();
     bar.style.width=pct+'%';
     bar.style.background=G.shotTimer>0?(G.tripleShotTimer>0?'orange':'#ff3333'):(G.tripleShotTimer>0?'orange':'#00ff00');
 
@@ -2121,14 +2155,20 @@ function draw() {
     const isSector2=G.currentSector===2 && !isGrimm && !isNexus && !isP2;
 
     // --- BACKGROUND ---
-    // Deep space gradient with layered depth
-    const bgGrad=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,W*0.9);
-    if(isNexus){bgGrad.addColorStop(0,'#040810');bgGrad.addColorStop(0.4,'#020408');bgGrad.addColorStop(1,'#000102');}
-    else if(isGrimm&&boss.phase3){bgGrad.addColorStop(0,'#2a0c04');bgGrad.addColorStop(0.4,'#140602');bgGrad.addColorStop(1,'#060201');}
-    else if(isGrimm){bgGrad.addColorStop(0,'#1a0808');bgGrad.addColorStop(0.4,'#0d0404');bgGrad.addColorStop(1,'#030101');}
-    else if(isP2){bgGrad.addColorStop(0,'#1a0028');bgGrad.addColorStop(0.4,'#0d0015');bgGrad.addColorStop(1,'#030003');}
-    else if(isSector2){bgGrad.addColorStop(0,'#2a0a04');bgGrad.addColorStop(0.35,'#180402');bgGrad.addColorStop(0.7,'#0a0201');bgGrad.addColorStop(1,'#050000');}
-    else{bgGrad.addColorStop(0,'#080c18');bgGrad.addColorStop(0.3,'#040810');bgGrad.addColorStop(0.7,'#020408');bgGrad.addColorStop(1,'#010103');}
+    // Deep space gradient with layered depth. Anchor + colors are fully
+    // determined by W/H and the current boss/sector state — cache it so we're
+    // not rebuilding the same gradient 60 times a second.
+    const bgKey='bg:'+W+'x'+H+':'+(isNexus?'nx':isGrimm?(boss.phase3?'gr3':'gr'):isP2?'p2':isSector2?'s2':'def');
+    const bgGrad=_cachedGrad(bgKey,()=>{
+        const g=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,W*0.9);
+        if(isNexus){g.addColorStop(0,'#040810');g.addColorStop(0.4,'#020408');g.addColorStop(1,'#000102');}
+        else if(isGrimm&&boss.phase3){g.addColorStop(0,'#2a0c04');g.addColorStop(0.4,'#140602');g.addColorStop(1,'#060201');}
+        else if(isGrimm){g.addColorStop(0,'#1a0808');g.addColorStop(0.4,'#0d0404');g.addColorStop(1,'#030101');}
+        else if(isP2){g.addColorStop(0,'#1a0028');g.addColorStop(0.4,'#0d0015');g.addColorStop(1,'#030003');}
+        else if(isSector2){g.addColorStop(0,'#2a0a04');g.addColorStop(0.35,'#180402');g.addColorStop(0.7,'#0a0201');g.addColorStop(1,'#050000');}
+        else{g.addColorStop(0,'#080c18');g.addColorStop(0.3,'#040810');g.addColorStop(0.7,'#020408');g.addColorStop(1,'#010103');}
+        return g;
+    });
     ctx.fillStyle=bgGrad;ctx.fillRect(-10,-10,W+20,H+20);
 
     // Animated nebula clouds — larger, more varied, more vivid
@@ -2230,11 +2270,23 @@ function draw() {
         ctx.beginPath();ctx.arc(s.x,s.y,s.size,0,Math.PI*2);ctx.fill();
         // Bright stars get a soft glow halo + cross flare
         if(s.size>1.2&&s.alpha>0.4){
-            // Glow halo
+            // Glow halo — cache the radial gradient per-star. Stars move
+            // vertically each frame, so we build the gradient anchored at the
+            // origin and use translate() to position it. That keeps the
+            // gradient itself reusable; we only rebuild when the palette swap
+            // changes the color. Then we draw the actual arc in world coords
+            // (no translate) so the surrounding flare/cross-flare code below
+            // — which uses s.x/s.y directly — still lines up.
             ctx.globalAlpha*=0.22;
-            const sg=ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,s.size*5);
-            sg.addColorStop(0,col);sg.addColorStop(0.4,col+'66');sg.addColorStop(1,'transparent');
-            ctx.fillStyle=sg;ctx.beginPath();ctx.arc(s.x,s.y,s.size*5,0,Math.PI*2);ctx.fill();
+            if(s._haloCol!==col){
+                const sg=ctx.createRadialGradient(0,0,0,0,0,s.size*5);
+                sg.addColorStop(0,col);sg.addColorStop(0.4,col+'66');sg.addColorStop(1,'transparent');
+                s._haloGrad=sg;s._haloCol=col;
+            }
+            ctx.save();
+            ctx.translate(s.x,s.y);
+            ctx.fillStyle=s._haloGrad;ctx.beginPath();ctx.arc(0,0,s.size*5,0,Math.PI*2);ctx.fill();
+            ctx.restore();
             // Cross flare
             ctx.globalAlpha=Math.max(0.04,s.alpha+twinkle)*0.4;
             ctx.strokeStyle=col;ctx.lineWidth=0.7;
@@ -2248,19 +2300,31 @@ function draw() {
     }
     ctx.globalAlpha=1;
 
-    // Vignette overlay
-    const vig=ctx.createRadialGradient(W/2,H/2,W*0.3,W/2,H/2,W*0.75);
-    vig.addColorStop(0,'transparent');vig.addColorStop(1,'rgba(0,0,0,0.35)');
+    // Vignette overlay — purely W/H-dependent, cache it.
+    const vig=_cachedGrad('vig:'+W+'x'+H,()=>{
+        const g=ctx.createRadialGradient(W/2,H/2,W*0.3,W/2,H/2,W*0.75);
+        g.addColorStop(0,'transparent');g.addColorStop(1,'rgba(0,0,0,0.35)');
+        return g;
+    });
     ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
 
-    // Ambient floating space dust motes
+    // Ambient floating space dust motes — anchor the gradient at the origin
+    // and translate, so the per-dust gradient stays valid as the mote drifts.
+    // Invalidate only when the isP2 palette flips.
+    const _dustMode=isP2?1:0;
     for(const d of spaceDust){
         d.x+=d.dx;d.y+=d.dy;
         if(d.x<0)d.x=W;if(d.x>W)d.x=0;if(d.y<0)d.y=H;if(d.y>H)d.y=0;
         ctx.globalAlpha=d.alpha+Math.sin(T/2000+d.x+d.y)*0.02;
-        const dg=ctx.createRadialGradient(d.x,d.y,0,d.x,d.y,d.size*3);
-        dg.addColorStop(0,isP2?'rgba(255,100,200,0.6)':'rgba(100,150,255,0.5)');dg.addColorStop(1,'transparent');
-        ctx.fillStyle=dg;ctx.beginPath();ctx.arc(d.x,d.y,d.size*3,0,Math.PI*2);ctx.fill();
+        if(d._dgMode!==_dustMode){
+            const dg=ctx.createRadialGradient(0,0,0,0,0,d.size*3);
+            dg.addColorStop(0,isP2?'rgba(255,100,200,0.6)':'rgba(100,150,255,0.5)');dg.addColorStop(1,'transparent');
+            d._dg=dg;d._dgMode=_dustMode;
+        }
+        ctx.save();
+        ctx.translate(d.x,d.y);
+        ctx.fillStyle=d._dg;ctx.beginPath();ctx.arc(0,0,d.size*3,0,Math.PI*2);ctx.fill();
+        ctx.restore();
     }
     ctx.globalAlpha=1;
 
@@ -2463,23 +2527,31 @@ function draw() {
             ctx.shadowBlur=28;ctx.shadowColor='#ffcc00';
             ctx.strokeStyle='#ffdd22';ctx.fillStyle='#2a2400';
         } else if(a.fire){
-            // Fire asteroid — glowing molten core with charred rim
+            // Fire asteroid — glowing molten core with charred rim. The body
+            // gradient depends only on a.r (fixed per asteroid), so cache it
+            // on the asteroid the first time it's drawn.
             ctx.shadowBlur=24;ctx.shadowColor='#ff3300';
-            const fg=ctx.createRadialGradient(-a.r*0.2,-a.r*0.2,a.r*0.08,0,0,a.r*1.15);
-            fg.addColorStop(0,'#fff2aa');
-            fg.addColorStop(0.2,'#ffaa22');
-            fg.addColorStop(0.5,'#ff4400');
-            fg.addColorStop(0.85,'#441008');
-            fg.addColorStop(1,'#1a0402');
-            ctx.fillStyle=fg;ctx.strokeStyle='#ff5522';
+            if(!a._bodyGrad||a._bodyVar!=='fire'){
+                const fg=ctx.createRadialGradient(-a.r*0.2,-a.r*0.2,a.r*0.08,0,0,a.r*1.15);
+                fg.addColorStop(0,'#fff2aa');
+                fg.addColorStop(0.2,'#ffaa22');
+                fg.addColorStop(0.5,'#ff4400');
+                fg.addColorStop(0.85,'#441008');
+                fg.addColorStop(1,'#1a0402');
+                a._bodyGrad=fg;a._bodyVar='fire';
+            }
+            ctx.fillStyle=a._bodyGrad;ctx.strokeStyle='#ff5522';
         } else if(isP2){
             ctx.shadowBlur=16;ctx.shadowColor='#00ddff';
             ctx.strokeStyle='#00ddee';ctx.fillStyle='rgba(0,40,48,0.75)';
         } else {
             ctx.shadowBlur=8;ctx.shadowColor='rgba(140,140,180,0.5)';
-            const ag=ctx.createRadialGradient(-a.r*0.35,-a.r*0.35,a.r*0.08,a.r*0.15,a.r*0.15,a.r*1.1);
-            ag.addColorStop(0,'#3a3a42');ag.addColorStop(0.35,'#1e1e24');ag.addColorStop(0.75,'#0f0f14');ag.addColorStop(1,'#050508');
-            ctx.fillStyle=ag;ctx.strokeStyle='#6a6a78';
+            if(!a._bodyGrad||a._bodyVar!=='rock'){
+                const ag=ctx.createRadialGradient(-a.r*0.35,-a.r*0.35,a.r*0.08,a.r*0.15,a.r*0.15,a.r*1.1);
+                ag.addColorStop(0,'#3a3a42');ag.addColorStop(0.35,'#1e1e24');ag.addColorStop(0.75,'#0f0f14');ag.addColorStop(1,'#050508');
+                a._bodyGrad=ag;a._bodyVar='rock';
+            }
+            ctx.fillStyle=a._bodyGrad;ctx.strokeStyle='#6a6a78';
         }
         ctx.lineWidth=1.5;ctx.beginPath();
         for(let i=0;i<a.verts;i++){const ang=(Math.PI*2/a.verts)*i,r=a.r+a.offsets[i];i===0?ctx.moveTo(Math.cos(ang)*r,Math.sin(ang)*r):ctx.lineTo(Math.cos(ang)*r,Math.sin(ang)*r);}
