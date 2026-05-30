@@ -349,10 +349,11 @@ function startPractice() { Sound.ui(); G.practice=true; G.tutorial=false; G.slot
 const BOSS_DEFS=[
     {type:1,name:'Boss 1 — Energy Orb',color:'#ff2222',desc:'Charges at you. 25 HP.',dlc:false},
     {type:2,name:'Boss 2 — Cyan Orb',color:'#00ccff',desc:'Spawns asteroids. 45 HP.',dlc:false},
+    {type:11,name:'Boss 3 — Chaos King',color:'#ff00aa',desc:'Giant head, four arms, three mistakes per cycle.',dlc:false},
     {type:4,name:'Boss 4 — Cyborg',color:'#00ff88',desc:'Wall trap + dash. 30 HP.',dlc:true},
     {type:5,name:'Boss 5 — Snake',color:'#ffaa00',desc:'Destroy segments first. 10 HP head.',dlc:true},
-    {type:3,name:'Boss 3 — Sans',color:'#fff',desc:'Two phases, gaster blasters. 100 HP.',dlc:false},
-    {type:10,name:'Boss 10 — Sans (DLC)',color:'#ff00ff',desc:'DLC final boss. 100 HP.',dlc:true},
+    {type:10,name:'Challenge Boss — Sans',color:'#ff00ff',desc:'Two phases, gaster blasters. 100 HP.',dlc:false},
+    {type:6,name:'Challenge Boss — Nightmare King Grimm',color:'#ff3344',desc:'Optional fire boss. Teleports, flame pillars, bats.',dlc:false},
     {type:'bossRush',name:'Boss Rush (DLC)',color:'#ffaa00',desc:'4 waves of mini-bosses.',dlc:true},
     {type:'rougeAmbush',name:'Rouge Ambush (DLC)',color:'#ff6622',desc:'Kidnap + arena fight.',dlc:true},
     {type:'rougeBattle',name:'Rouge Battlefield (DLC)',color:'#ff8844',desc:'60s fullscreen war.',dlc:true},
@@ -423,13 +424,14 @@ function startBossPractice(bossType){
     else if(bossType===2) G.level=2;
     else if(bossType===4) G.level=4;
     else if(bossType===5) G.level=5;
-    else if(bossType===3) G.level=3;
+    else if(bossType===6) G.level=7;
     else if(bossType===10) G.level=10;
+    else if(bossType===11) G.level=3;
     // Spawn the boss directly
     asteroids=[];
     spawnBoss(bossType);
     // Spawn Albert (silent Gilbert replica) for bosses where Gilbert normally helps
-    if(bossType===4||bossType===5||bossType===10){
+    if(bossType===4||bossType===5||bossType===6||bossType===10){
         spawnGilbertAlly();
         G.albertMode=true; // Flag to suppress all Gilbert dialogue/quips
     }

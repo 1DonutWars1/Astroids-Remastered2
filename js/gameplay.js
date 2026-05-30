@@ -589,8 +589,9 @@ function spawnEnemyBullet(x,y,angle,speed=10) {
     enemyBullets.push({x,y,dx:Math.cos(angle)*speed,dy:Math.sin(angle)*speed,life:100});
 }
 function spawnBoss(type) {
-    // Sans (type 3 and 10) is permanently disabled — redirect to Chaos King (type 11)
-    if(type===3||type===10) type=11;
+    // The old "normal" Sans (type 3) is permanently disabled — redirect to Chaos King (type 11).
+    // The challenge Sans fight (type 10) still runs normally — see boss practice list.
+    if(type===3) type=11;
     for(const a of asteroids)boom(a.x,a.y,'#666'); asteroids=[];
     for(const m of miniBosses)boom(m.x,m.y,'purple',15); miniBosses=[]; enemyBullets=[]; gasterBlasters=[];
     const diff=DIFFICULTY[currentDifficulty]||DIFFICULTY.normal;
