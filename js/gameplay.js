@@ -778,7 +778,7 @@ function updateTutorial() {
         case 0: if(isAction('thrust'))G.tutTimer++; if(G.tutTimer>25){G.tutStep++;G.tutTimer=0;} break;
         case 1: if(isAction('left')||isAction('right'))G.tutTimer++; if(G.tutTimer>25){G.tutStep++;G.tutTimer=0;spawnAsteroid(W/2,120,20);} break;
         case 2: if(asteroids.length===0){G.tutStep++;G.tutTimer=0;G.ammo=0;updateUI();dropAmmo();}else G.ammo=999; break;
-        case 3: if(G.ammo>0){G.tutStep++;G.tutTimer=0;} break;
+        case 3: if(G.ammo>0){G.tutStep++;G.tutTimer=0;}else if(ammoBoxes.length===0)dropAmmo(); break;
         case 4: G.tutTimer++; if(G.tutTimer>90)winGame(); break;
     }
 }

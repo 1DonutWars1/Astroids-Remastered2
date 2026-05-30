@@ -25,6 +25,14 @@
 // ============================================================
 const UPDATES = [
     {
+        version: 'v1.0.8',
+        date: '2026-05-30',
+        title: 'Tutorial Softlock Fix',
+        notes: [
+            'Fixed a softlock in the tutorial where if the resupply ammo box drifted off-screen before you collected it, you\'d be stuck forever with no way to progress. A fresh ammo box now drops in whenever the previous one falls off the map.'
+        ]
+    },
+    {
         version: 'v1.0.7',
         date: '2026-05-27',
         title: 'Audio Fixes & Ground Shatter Buff',
