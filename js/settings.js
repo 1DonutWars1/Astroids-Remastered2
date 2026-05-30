@@ -33,6 +33,15 @@ function loadSettings() {
     document.getElementById('set_timer').value = settings.timer;
     document.getElementById('set_bosshp').value = settings.bosshp;
     if(!settings.keybinds) settings.keybinds=JSON.parse(JSON.stringify(DEFAULT_KEYBINDS));
+    // Backfill default keys onto any action missing them (handles old saves
+    // from before arrow keys were in the defaults — symptom was arrow keys
+    // doing nothing because stored keybinds only had KeyW/A/D).
+    for(const action of Object.keys(DEFAULT_KEYBINDS)){
+        if(!Array.isArray(settings.keybinds[action])) settings.keybinds[action]=[];
+        for(const code of DEFAULT_KEYBINDS[action]){
+            if(!settings.keybinds[action].includes(code)) settings.keybinds[action].push(code);
+        }
+    }
     updateKeybindUI();
     applySettings();
 }

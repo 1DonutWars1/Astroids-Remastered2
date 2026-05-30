@@ -27,9 +27,10 @@ const UPDATES = [
     {
         version: 'v1.0.8',
         date: '2026-05-30',
-        title: 'Tutorial Softlock Fix',
+        title: 'Tutorial Softlock & Arrow Key Fix',
         notes: [
-            'Fixed a softlock in the tutorial where if the resupply ammo box drifted off-screen before you collected it, you\'d be stuck forever with no way to progress. A fresh ammo box now drops in whenever the previous one falls off the map.'
+            'Fixed a softlock in the tutorial where if the resupply ammo box drifted off-screen before you collected it, you\'d be stuck forever with no way to progress. A fresh ammo box now drops in whenever the previous one falls off the map.',
+            'Fixed arrow keys not working to turn and thrust for players whose saved settings predated the arrow-key defaults. Default arrow keybindings are now backfilled on load, so Up/Left/Right work alongside W/A/D out of the box.'
         ]
     },
     {
