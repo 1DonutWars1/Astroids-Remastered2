@@ -34,6 +34,7 @@ function startGame() {
     G.shotsFired=0; G.totalBossesDefeated=0; G.levelsCleared=0;
     G.noShieldBoss3=true; G.consecutiveKills=0; G.peakAmmo=0;
     G.practicePaused=false;
+    G.bpStats=null; // Boss practice run-stats; populated by startBossPractice
     // Gilbert / Boss Rush (DLC)
     G.bossRush=false; G.bossRushWave=0; G.bossRushKills=0; G.bossRushTotal=0;
     G.bossRushPauseOffset=0; G.bossRushStartTime=0;
@@ -215,6 +216,7 @@ function applyPauseDisplay(){
 function returnToMenu() {
     Sound.ui(); Sound.playMusic('none');
     G.running=false; G.paused=false; G.practice=false; G.tutorial=false; G.practicePaused=false;
+    G.bpStats=null; _resetWinScreenChrome();
     $over.style.display='none'; $win.style.display='none'; $debug.style.display='none'; if($debug2)$debug2.style.display='none'; $practice.style.display='none';
     document.getElementById('pauseMenu').style.display='none';
     $ui.style.display='none'; $menu.style.display='block';
@@ -710,8 +712,11 @@ function spawnBoss(type) {
 // ============================================================
 //  DAMAGE
 // ============================================================
+function _bpHit() { if(G.bpStats && !G.bpStats.statsShown) G.bpStats.shotsHit++; }
 function hurtPlayer(instantKill) {
     if(G.tutorial){boom(ship.x,ship.y,'orange',8);ship.x=W/2;ship.y=H/2;ship.tx=0;ship.ty=0;return;}
+    // Boss practice: count would-be-fatal hits even though godMode prevents them.
+    if(G.bpStats && !G.bpStats.statsShown && !G.invincibleTimer) G.bpStats.hitsTaken++;
     if(G.godMode) return;
     if(G.invincibleTimer>0) return;
     // Shield absorb (only available after boss 2)
@@ -749,7 +754,10 @@ function endGame() {
 function winGame() {
     G.running=false; Sound.playMusic('none');
     if(G.slotId){const s=saves[G.slotId];if(G.score>s.high)s.high=G.score;if(G.level>s.maxLvl)s.maxLvl=G.level;saveToDisk();}
+    // Reset win-screen chrome to the default (in case a previous boss-practice run mutated it)
+    _resetWinScreenChrome();
     document.getElementById('winScore').innerText=G.score; $win.style.display='block';
+    if(G.bpStats && !G.bpStats.statsShown) { showBossPracticeStats(); return; }
     if(G.tutorial) unlockAch('graduate');
     // Speed demon: beat game (non-tutorial) under 8 minutes
     if(!G.tutorial && !G.practice) {
@@ -757,9 +765,60 @@ function winGame() {
         if(totalTime < 480) unlockAch('speed_demon');
     }
 }
+function _resetWinScreenChrome() {
+    const h1=document.querySelector('#winScreen h1');
+    const h2=document.querySelector('#winScreen h2');
+    const scoreRow=document.getElementById('winScoreRow');
+    const block=document.getElementById('bpStatsBlock');
+    if(h1) h1.innerText='MISSION COMPLETE';
+    if(h2){ h2.innerText='GALAXY SECURED'; h2.style.color='#ccc'; }
+    if(scoreRow) scoreRow.style.display='block';
+    if(block) block.style.display='none';
+}
+function showBossPracticeStats() {
+    G.bpStats.statsShown=true;
+    G.running=false;
+    Sound.playMusic('none');
+    const s=G.bpStats;
+    const elapsed=(performance.now()-s.startTime)/1000;
+    const mins=Math.floor(elapsed/60);
+    const secs=(elapsed-mins*60).toFixed(1);
+    const timeStr=mins>0?(mins+'m '+secs+'s'):(secs+'s');
+    const fired=Math.max(0,G.shotsFired-s.startShotsFired);
+    const accRatio=fired>0?(s.shotsHit/fired):0;
+    const accStr=fired>0?((accRatio*100).toFixed(1)+'%'):'—';
+    const accColor=accRatio>=0.6?'#00ff88':accRatio>=0.3?'#ffcc44':'#ff6644';
+    const ast=Math.max(0,G.asteroidsDestroyed-s.startAsteroidsDestroyed);
+    const hitsColor=s.hitsTaken===0?'#00ff88':s.hitsTaken<=2?'#ffcc44':'#ff6644';
+    const row=(label,val,color)=>'<div style="display:flex;justify-content:space-between;gap:20px;"><span>'+label+'</span><span style="color:'+(color||'#fff')+';font-weight:bold;">'+val+'</span></div>';
+    const html='<div style="color:#ff44aa;font-weight:bold;border-bottom:1px solid #553355;padding-bottom:6px;margin-bottom:10px;text-align:center;letter-spacing:2px;font-size:14px;">'+s.bossName+'</div>'+
+        '<div style="text-align:left;color:#aaa;font-size:14px;line-height:1.8;max-width:340px;margin:0 auto;">'+
+        row('Time',timeStr)+
+        row('Shots fired',fired)+
+        row('Shots hit',s.shotsHit)+
+        row('Accuracy',accStr,accColor)+
+        row('Hits taken',s.hitsTaken+(s.hitsTaken===0?' (FLAWLESS)':''),hitsColor)+
+        row('Asteroids destroyed',ast)+
+        row('Max combo',s.maxCombo+'x')+
+        row('Score earned',G.score)+
+        '</div>';
+    const block=document.getElementById('bpStatsBlock');
+    block.innerHTML=html;
+    block.style.display='block';
+    // Retitle the win screen for boss-practice context
+    const h1=document.querySelector('#winScreen h1');
+    const h2=document.querySelector('#winScreen h2');
+    if(h1) h1.innerText='BOSS DEFEATED';
+    if(h2){ h2.innerText='PRACTICE COMPLETE'; h2.style.color='#ff88cc'; }
+    // Hide the standalone score row — score is in the stats block now
+    const scoreRow=document.getElementById('winScoreRow');
+    if(scoreRow) scoreRow.style.display='none';
+    $win.style.display='block';
+}
 function addScore(pts) {
     G.combo++; G.comboTimer=90;
     const mult=Math.min(Math.floor(G.combo/3)+1,8);
+    if(G.bpStats && mult>G.bpStats.maxCombo) G.bpStats.maxCombo=mult;
     G.score+=pts*mult;
     if(mult>=5)unlockAch('sharpshooter');
     if(mult>=8)unlockAch('combo_king');

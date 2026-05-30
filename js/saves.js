@@ -389,6 +389,18 @@ function startBossPractice(bossType){
     G.godMode=true;G.infAmmo=true;G.ammo=999;
     document.getElementById('godRow').style.display='block';
     G.hasForceField=true;G.shieldFuel=getMaxShieldFuel();updateShieldUI();
+    // Per-run stats — single-boss fights only (skip multi-wave set pieces).
+    if(bossType!=='bossRush' && bossType!=='rougeAmbush' && bossType!=='rougeBattle'){
+        const def=BOSS_DEFS.find(b=>b.type===bossType);
+        G.bpStats={
+            bossType, bossName: def?def.name:('Boss '+bossType),
+            startTime: performance.now(),
+            startShotsFired: G.shotsFired,
+            startAsteroidsDestroyed: G.asteroidsDestroyed,
+            shotsHit: 0, hitsTaken: 0, maxCombo: 0,
+            bossSpawned: false, statsShown: false
+        };
+    }
     // Special DLC set-pieces (boss rush, rouge war phases)
     if(bossType==='bossRush'){
         G.level=3;
@@ -430,6 +442,7 @@ function startBossPractice(bossType){
     // Spawn the boss directly
     asteroids=[];
     spawnBoss(bossType);
+    if(G.bpStats) G.bpStats.bossSpawned=true;
     // Spawn Albert (silent Gilbert replica) for bosses where Gilbert normally helps
     if(bossType===4||bossType===5||bossType===6||bossType===10){
         spawnGilbertAlly();

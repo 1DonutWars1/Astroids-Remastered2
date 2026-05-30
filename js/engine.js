@@ -330,7 +330,7 @@ function update() {
                     if(typeof tryDropDataFragment==='function') tryDropDataFragment(!!a.hasLoreDrop);}
                 // NEXUS tracking: bullet hit asteroid = hit
                 if(bullets[j]._nexusTracked){G.nexusShotLog.push('hit');if(G.nexusShotLog.length>20)G.nexusShotLog.shift();}
-                bullets.splice(j,1);asteroids.splice(i,1);addScore(100);break;
+                _bpHit();bullets.splice(j,1);asteroids.splice(i,1);addScore(100);break;
             }
         }
     }
@@ -463,7 +463,7 @@ function update() {
         for(let j=bullets.length-1;j>=0;j--){
             if(Math.hypot(bullets[j].x-mb.x,bullets[j].y-mb.y)<mb.r+4){
                 const hitCol=mb.type==='blaster'?'cyan':mb.type==='spawner'?'#44ff44':(mb.type==='shooter'?'red':'violet');
-                const _dmgMB=bullets[j].big?(bullets[j].damage||5):1;boom(bullets[j].x,bullets[j].y,hitCol,4);mb.hp-=_dmgMB;Sound.hit();bullets.splice(j,1);
+                const _dmgMB=bullets[j].big?(bullets[j].damage||5):1;boom(bullets[j].x,bullets[j].y,hitCol,4);mb.hp-=_dmgMB;Sound.hit();_bpHit();bullets.splice(j,1);
                 if(mb.hp<=0){boom(mb.x,mb.y,hitCol,25);Sound.explode();addScore(mb.type==='blaster'?1000:mb.type==='spawner'?600:(mb.type==='shooter'?800:400));G.mb+=(mb.type==='blaster'?8:mb.type==='spawner'?5:(mb.type==='shooter'?6:3));G.miniBossKills++;if(G.miniBossKills>=5)unlockAch('bounty_hunter');if(G.miniBossKills>=10)unlockAch('dlc_exterminator');miniBosses.splice(i,1);break;}
             }
         }
@@ -1909,7 +1909,7 @@ function update() {
                                 }
                             }
                         }
-                        bullets.splice(j,1);hitSeg=true;break;
+                        _bpHit();bullets.splice(j,1);hitSeg=true;break;
                     }
                 }
                 if(hitSeg) continue;
@@ -1945,7 +1945,7 @@ function update() {
                             boom(mk.x,mk.y,'#ffffff',10);
                             Sound.explode();
                             if(typeof shake==='function') shake(8,12);
-                            bullets.splice(j,1); hitMk=true; break;
+                            _bpHit();bullets.splice(j,1); hitMk=true; break;
                         }
                     }
                     if(hitMk) continue;
@@ -1963,7 +1963,7 @@ function update() {
                         boss.hp-=_dmgCK;
                         boom(bullets[j].x,bullets[j].y,'#ff2244',5);
                         Sound.hit();
-                        bullets.splice(j,1);
+                        _bpHit();bullets.splice(j,1);
                         updateUI();
                         // Phase 2 trigger — at 30 HP, Chaos King enrages with new attacks
                         if(!boss.phase2 && boss.hp<=30 && boss.hp>0){
@@ -2017,7 +2017,7 @@ function update() {
                     if(Math.hypot(bullets[j].x-nd.x,bullets[j].y-nd.y)<nd.r+4){
                         nd.hp--;boom(nd.x,nd.y,'#00ffff',4);Sound.hit();
                         if(nd.hp<=0){nd.dying=true;nd.dieTimer=15;boom(nd.x,nd.y,'#00ffff',10);Sound.explode();}
-                        bullets.splice(j,1);hitNode=true;break;
+                        _bpHit();bullets.splice(j,1);hitNode=true;break;
                     }
                 }
                 if(hitNode) continue;
@@ -2035,7 +2035,7 @@ function update() {
                     gasterBlasters=[];enemyBullets=[];asteroids=[];
                 }
                 if((boss.type===3||boss.type===10)&&boss.hp<=boss.maxHp/2&&!boss.phase2){boss.phase2=true;boss.state='dialogue';boss.timer=0;gasterBlasters=[];Sound.playMusic('boss3phase2');}
-                updateUI();bullets.splice(j,1);
+                _bpHit();updateUI();bullets.splice(j,1);
                 if(boss.hp<=0){
                     boom(boss.x,boss.y,'orange',50);shake(12,25);Sound.explode();
                     const isSansBoss=(boss.type===3||boss.type===10);
@@ -2127,6 +2127,14 @@ function update() {
     if(G.running&&!isDailyComplete()){
         const dm=getDailyMission();
         if(dm.check()) completeDailyMission();
+    }
+
+    // Boss practice: when the chosen boss is dead, freeze the run and show stats.
+    // (Most boss defeats advance the level rather than calling winGame, so we
+    // need to intercept here. winGame paths already call showBossPracticeStats
+    // directly.)
+    if(G.bpStats && G.bpStats.bossSpawned && !boss && !G.bpStats.statsShown && G.running){
+        if(typeof showBossPracticeStats==='function') showBossPracticeStats();
     }
 
     updateUI();

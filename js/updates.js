@@ -32,7 +32,8 @@ const UPDATES = [
             'Fixed a softlock in the tutorial where if the resupply ammo box drifted off-screen before you collected it, you\'d be stuck forever with no way to progress. A fresh ammo box now drops in whenever the previous one falls off the map.',
             'Fixed arrow keys not working to turn and thrust for players whose saved settings predated the arrow-key defaults. Default arrow keybindings are now backfilled on load, so Up/Left/Right work alongside W/A/D out of the box.',
             'Added Chaos King and Nightmare King Grimm to the boss practice list — Chaos King sits in the main lineup as Boss 3, Grimm joins the challenge bosses.',
-            'Removed the old broken normal Sans entry from boss practice. The working Sans fight is now listed simply as a Challenge Boss (no more "DLC" tag, no Boss 3 numbering).'
+            'Removed the old broken normal Sans entry from boss practice. The working Sans fight is now listed simply as a Challenge Boss (no more "DLC" tag, no Boss 3 numbering).',
+            'Boss practice now ends with a stats screen when you defeat the boss instead of dumping you back into endless practice mode. Tracks time taken, shots fired, shots hit, accuracy %, hits taken (a.k.a. would-be deaths in god mode), asteroids destroyed, max combo, and score earned. From there hit MENU to return to the main menu.'
         ]
     },
     {
