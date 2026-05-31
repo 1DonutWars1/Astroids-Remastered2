@@ -20,25 +20,372 @@ const MODULE_DEFS={
     rear_gun:{name:'REAR TURRET',cost:1000,desc:'Auto-fires backward at enemies.'},
 };
 const STATION_NPCS=[
-    // Floor 1 (floor:0)
+    // ============================================================
+    //  FLOOR 0 \u2014 GROUND DECK
+    // ============================================================
     {id:'banker',x:350,floor:0,name:'BANKER',color:'#ffdd00',shape:'square',
         lines:["Need to convert your Score?","50 Score = 1 MB.","I'll handle the exchange."],role:'banker'},
+    {id:'bartender',x:550,floor:0,name:'BARTENDER DROOG',color:'#ff5566',shape:'square',
+        lines:["You drink?","Don't answer. You're a drone. I asked anyway.","Place is dead tonight. Place is dead every night.",
+               "Heard a salvager came back last week missing thirty seven seconds of memory. Just \u2014 gone.",
+               "Said the asteroid hummed at him. Said it was singing his mother's lullaby.",
+               "I poured him three on the house. He didn't drink any of them."]},
     {id:'mechanic',x:700,floor:0,name:'MECHANIC',color:'#ff8800',shape:'hex',
         lines:["Welcome to my stand.","I can tune up your ship.","What do you need?"],role:'shop_upgrades'},
+    {id:'plant_keeper',x:830,floor:0,name:'KIRI',color:'#66dd66',shape:'diamond',
+        lines:["Don't touch the plant. She bites.","I'm kidding. She'll just judge you.",
+               "Brought her up from the surface in '49. She's older than half this station's hardware.",
+               "Sometimes I catch her leaning. I don't know how. There's no wind in here."]},
     {id:'engineer',x:1100,floor:0,name:'ENGINEER',color:'#00ffaa',shape:'diamond',
         lines:["Looking for modules?","These'll give you an edge out there."],role:'shop_modules'},
+    {id:'janitor',x:1280,floor:0,name:'JANITOR JEM',color:'#aaaaaa',shape:'square',
+        lines:["Mind the wet floor.","No I'm not actually mopping. The floor's dry. The sign just lives there now.",
+               "Found a tooth in the airlock filter last week. Human tooth. Adult molar.",
+               "Filed a report. They reclassified it as 'organic debris' and closed the ticket.",
+               "I keep the report. In case anyone ever asks the right question."]},
     {id:'pilot',x:1500,floor:0,name:'PILOT VERA',color:'#ff44aa',shape:'hex',
         lines:["I used to fly out there too.","Watch your back past level 6.","The deeper you go, the weirder it gets.","Sometimes the rocks look almost... written. Like text you can't read."]},
-    // Floor 2 (floor:1)
+    // ============================================================
+    //  FLOOR 1 \u2014 UPPER DECK
+    // ============================================================
+    {id:'historian',x:200,floor:1,name:'HISTORIAN ELDA',color:'#dda84a',shape:'square',
+        lines:["You're the salvager? Sit. No, I don't actually want you to sit. Drones don't sit.",
+               "I document. Lumina built the Nexus to upload paying customers. 47,234 of them.",
+               "It went live two and a half hours ago by station time.",
+               "Inside the server? Two hundred years. Give or take a decade.",
+               "Every Sector you dive into is a fragment of that timeline. People have lived entire lives in there.",
+               "And here we are, drinking the same lukewarm coffee we ordered before initialization."]},
     {id:'gilbert_npc',x:400,floor:1,name:'GILBERT',color:'#44ff44',shape:'gilbert',
         lines:["This place is pretty nice!","Talk to the Banker to convert Score to MB.","Then buy upgrades for both of us!"],role:'shop_gilbert'},
     {id:'scientist',x:800,floor:1,name:'DR. NOVA',color:'#cc66ff',shape:'diamond',
         lines:["Fascinating... a Fragment, here.","The asteroids aren't natural, you know.","Something is sending them.","I pulled headers from one. Embedded metadata. A name: NEXUS.","47,234 signatures in a single shard. Does that number mean anything to you?"]},
+    {id:'chaplain',x:1000,floor:1,name:'CHAPLAIN MORI',color:'#ddccff',shape:'hex',
+        lines:["Most stations have a chapel. This one has me, a folding chair, and a closet.",
+               "Families come in. They ask if I can pray for someone who's still technically alive.",
+               "What do you say to that? Their grandmother bought the upload package. Cashed in the estate for it.",
+               "She's been gone two hours. She's been gone seventy years. Both true.",
+               "I light a candle anyway. The candle doesn't care which one she is."]},
     {id:'commander',x:1200,floor:1,name:'COMMANDER',color:'#ffdd00',shape:'hex',
         lines:["This is the command center.","Your progress is saved when you dock.","Stay sharp out there, Fragment.","Between you and me \u2014 I don't think this station is as old as it should be.","Clocks on the deep deck run slow. Or ours run fast. Hard to tell which."]},
+    {id:'hacker_zed',x:1480,floor:1,name:'HACKER ZED',color:'#33ffcc',shape:'diamond',
+        lines:["Hey \u2014 keep your voice down. Not that you have one. Whatever.",
+               "I'm pulling escape protocols off a hacker's terminal someone salvaged from Sector 11.",
+               "There IS an exit. It works. But it dumps the upload back into the body they uploaded from.",
+               "No memory of the Nexus. Two hours older. That's it. Two hours.",
+               "Would you take that deal? Lose everyone you ever loved in there in exchange for being you again?",
+               "Yeah. Me neither. That's why the door's welded shut from BOTH sides."]},
+    {id:'tourist',x:1650,floor:1,name:'TOURIST',color:'#ff99cc',shape:'hex',
+        lines:["Hi! Are you the salvage drone everyone talks about? Can I get a picture?",
+               "...You don't have a face. Right.",
+               "I came out here for the view. The Nexus wreckage is supposed to be visible from the observation deck.",
+               "It's just lights blinking. I don't know what I was expecting.",
+               "Did you know my aunt bought a slot? Forty years ago. Real money. Forty years of payments.",
+               "She got in last month. She'll be in there longer than the rest of her life put together. Weird, huh?"]},
 ];
 const STATION_WIDTH=1800;
 const STATION_FLOORS=3; // 0=ground, 1=upper, 2=docking bay (requires MODULE ACCESS key)
+
+// ============================================================
+//  STATION INTERACTIVE OBJECTS
+//  ------------------------------------------------------------
+//  Props the player can press [E] on. Same dialogue pipeline as NPCs —
+//  just need an `id`, `name`, `color`, and `lines` array. The `draw` field
+//  selects the sprite renderer in _drawStationObject(). Add new ones here;
+//  no engine changes required. Per the user: NO floating "interact with X"
+//  hint above objects — they look interactable enough on their own.
+// ============================================================
+const STATION_OBJECTS=[
+    // ----- FLOOR 0 -----
+    // Positions chosen to sit in gaps BETWEEN NPC interaction ranges
+    // (NPC range = ±60). NPCs are checked first when picking interactTarget,
+    // so any object placed inside an NPC's range would be unreachable.
+    {id:'coffee',     x:215, floor:0, name:'COFFEE DISPENSER',  color:'#aa7744', draw:'coffee', radius:45,
+        lines:["The machine sputters. A brown liquid that may once have been coffee dribbles into a non-existent cup.",
+               "Sign on top: \"OUT OF ORDER SINCE INITIALIZATION.\" Initialization was two hours ago. The sign is faded."]},
+    {id:'plant',      x:450, floor:0, name:'DUSTY POTTED PLANT', color:'#66dd66', draw:'plant', radius:35,
+        lines:["A leafy little thing, somehow thriving under recycled station air.",
+               "There's a hand-written tag tied to the pot: \"DON'T WATER. SHE FIGURED IT OUT.\""]},
+    {id:'vending',    x:1190, floor:0, name:'VENDING MACHINE',   color:'#7799ff', draw:'vending', radius:25,
+        lines:["The display cycles through products in alphabetical order — every single slot says \"OUT.\"",
+               "Someone has scratched into the glass: \"I PUT IN A CREDIT IN 2023. WHERE IS MY GUM.\""]},
+    {id:'poster',     x:1390, floor:0, name:'POSTER BOARD',      color:'#ffcc44', draw:'poster', radius:45,
+        lines:["Three glossy Lumina recruitment posters, sun-bleached even though there's no sun out here.",
+               "1) \"UPLOAD TODAY. LIVE FOREVER.\" (a smiling family in a meadow)",
+               "2) \"WHY AGE? WHY DIE? WHY WAIT?\" (a model holding a glowing cube)",
+               "3) \"THE NEXUS — WHERE YOU FINALLY MATTER.\" The third one has been scratched out and someone wrote \"LIARS\" across it."]},
+    {id:'compactor',  x:1620, floor:0, name:'TRASH COMPACTOR',   color:'#995533', draw:'compactor', radius:40,
+        lines:["A dented industrial compactor that hums when no one is near it and goes quiet when you approach.",
+               "Stuck to the door: \"DO NOT CLIMB IN. — Janitor Jem.\"",
+               "Underneath, in different handwriting: \"or do, who's stopping you.\""]},
+    // ----- FLOOR 1 -----
+    {id:'cabinet',    x:580, floor:1, name:'FILING CABINET',     color:'#888899', draw:'cabinet', radius:45,
+        lines:["Four drawers. The top one is locked. The bottom three are empty.",
+               "Taped to the top drawer: \"PRE-INITIALIZATION PERSONNEL — DO NOT OPEN.\" The tape is yellowed.",
+               "There's a faint scratching sound from inside. Probably the ventilation. Probably."]},
+    {id:'holoboard',  x:1340, floor:1, name:'HOLO NEWS TICKER',  color:'#44ddff', draw:'holoboard', radius:45,
+        lines:["A flickering blue holo-display loops the same three news ticker items, in order:",
+               "▸ \"LUMINA STOCK +4.2% ON UPLOAD MILESTONE — Q2 NEXUS DEPLOYMENT EXCEEDS PROJECTIONS\"",
+               "▸ \"RELAY STATION COMMENCES OBSERVATION SHIFT — NEXUS GOES LIVE 02:14:00 STATION TIME\"",
+               "▸ \"ANALYSTS BULLISH ON DIGITAL IMMORTALITY MARKET — 47,234 PIONEERS NOW UPLOADED\"",
+               "The timestamp on every story is from this morning. Some of those analysts are uploaded too."]},
+    {id:'window',     x:1565, floor:1, name:'OBSERVATION WINDOW', color:'#88aaff', draw:'window', radius:25,
+        lines:["A long curved viewport looking out at what's left of the Nexus.",
+               "From here it's just a smear of running lights against the dark. You can see one of the antenna arrays still rotating.",
+               "Somewhere in there, 47,234 people are living lives you'll never meet.",
+               "Two hours, station time. Two hundred years, theirs. The window doesn't care which is true."]},
+    {id:'clock',      x:1755, floor:1, name:'WALL CLOCK',         color:'#ffaa66', draw:'clock', radius:35,
+        lines:["A circular analog clock mounted at eye level. Hands frozen at 02:14.",
+               "Below it, a small digital readout cycles: \"STATION TIME 02:24:18\" then \"NEXUS TIME — UNRESOLVED — UNRESOLVED — UNRESOLVED\".",
+               "Someone has taped a note under the clock: \"It's right twice a century.\""]},
+];
+
+// Hidden gate for objects, like _npcHidden — none currently.
+function _stationObjectHidden(obj){ return false; }
+
+// Dispatcher for rendering interactive objects. Each draw type expects
+// the canvas to already be translated to (obj.x, floorY).
+function _drawStationObject(obj, T, isNear){
+    const c = obj.color || '#88aaff';
+    ctx.save();
+    // Soft ground shadow
+    ctx.globalAlpha=0.18; ctx.fillStyle='#000';
+    ctx.beginPath(); ctx.ellipse(0,2,22,5,0,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+    // Hover aura
+    if(isNear){
+        ctx.globalAlpha=0.10;
+        const g=ctx.createRadialGradient(0,-20,4,0,-20,42);
+        g.addColorStop(0,c); g.addColorStop(1,'transparent');
+        ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,-20,42,0,Math.PI*2); ctx.fill();
+        ctx.globalAlpha=1;
+    }
+    ctx.shadowBlur = isNear?14:6;
+    ctx.shadowColor = c;
+    ctx.strokeStyle = c;
+    ctx.lineWidth = isNear?2:1.2;
+    switch(obj.draw){
+        case 'coffee': {
+            // Boxy dispenser on a short stand
+            ctx.fillStyle='rgba(40,28,18,0.85)';
+            ctx.fillRect(-14,-44,28,40);
+            ctx.strokeRect(-14,-44,28,40);
+            // Drip tray
+            ctx.fillStyle='rgba(60,40,25,0.9)';
+            ctx.fillRect(-10,-8,20,4);
+            // Status light
+            ctx.fillStyle=c; ctx.globalAlpha=0.4+Math.sin(T/600)*0.3;
+            ctx.beginPath(); ctx.arc(0,-38,2.2,0,Math.PI*2); ctx.fill();
+            ctx.globalAlpha=1;
+            // Spout
+            ctx.strokeStyle=c; ctx.beginPath(); ctx.moveTo(0,-16); ctx.lineTo(0,-12); ctx.stroke();
+            break;
+        }
+        case 'plant': {
+            // Pot
+            ctx.fillStyle='rgba(80,50,30,0.9)';
+            ctx.beginPath();
+            ctx.moveTo(-12,-2); ctx.lineTo(12,-2); ctx.lineTo(9,-18); ctx.lineTo(-9,-18); ctx.closePath();
+            ctx.fill(); ctx.stroke();
+            // Leaves
+            ctx.fillStyle=c; ctx.strokeStyle=c;
+            for(let i=0;i<5;i++){
+                const ang=-Math.PI/2 + (i-2)*0.5 + Math.sin(T/1500+i)*0.04;
+                const lx=Math.cos(ang)*16, ly=Math.sin(ang)*22 - 18;
+                ctx.beginPath();
+                ctx.ellipse(lx*0.5, ly, 5, 11, ang+Math.PI/2, 0, Math.PI*2);
+                ctx.fill();
+            }
+            break;
+        }
+        case 'vending': {
+            // Tall fridge body
+            ctx.fillStyle='rgba(25,30,55,0.92)';
+            ctx.fillRect(-18,-66,36,62);
+            ctx.strokeRect(-18,-66,36,62);
+            // Glass window
+            ctx.fillStyle='rgba(120,150,200,0.15)';
+            ctx.fillRect(-14,-60,28,38);
+            ctx.strokeStyle='rgba(150,180,220,0.35)'; ctx.lineWidth=0.7;
+            ctx.strokeRect(-14,-60,28,38);
+            // Empty shelf bars
+            for(let i=0;i<3;i++){
+                ctx.beginPath(); ctx.moveTo(-13,-50+i*10); ctx.lineTo(13,-50+i*10); ctx.stroke();
+            }
+            // Slot/keypad
+            ctx.strokeStyle=c; ctx.lineWidth=1.2;
+            ctx.strokeRect(-8,-18,16,8);
+            ctx.fillStyle=c; ctx.globalAlpha=0.5+Math.sin(T/350)*0.3;
+            ctx.fillRect(-6,-16,12,4); ctx.globalAlpha=1;
+            break;
+        }
+        case 'poster': {
+            // Three taped posters in a row
+            const colors=['#ffd066','#66aaff','#ff6677'];
+            for(let i=0;i<3;i++){
+                const px=-26+i*22, py=-50;
+                ctx.fillStyle='rgba(255,250,235,0.92)';
+                ctx.fillRect(px,py,18,36);
+                ctx.strokeStyle=colors[i]; ctx.lineWidth=1;
+                ctx.strokeRect(px,py,18,36);
+                ctx.fillStyle=colors[i]; ctx.globalAlpha=0.55;
+                ctx.fillRect(px+2,py+4,14,2);
+                ctx.fillRect(px+2,py+8,12,2);
+                ctx.fillRect(px+2,py+14,14,2);
+                ctx.globalAlpha=1;
+                if(i===2){
+                    // The crossed-out one
+                    ctx.strokeStyle='#ff3333'; ctx.lineWidth=1.4;
+                    ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px+18,py+36); ctx.moveTo(px+18,py); ctx.lineTo(px,py+36); ctx.stroke();
+                }
+            }
+            break;
+        }
+        case 'compactor': {
+            // Squat industrial box with seam down the middle
+            ctx.fillStyle='rgba(45,30,20,0.92)';
+            ctx.fillRect(-22,-32,44,28);
+            ctx.strokeRect(-22,-32,44,28);
+            // Hatch seam
+            ctx.beginPath(); ctx.moveTo(0,-32); ctx.lineTo(0,-4); ctx.stroke();
+            // Hazard stripes along bottom
+            for(let i=-20;i<20;i+=6){
+                ctx.fillStyle=i%2?'#ffcc00':'#1a1208';
+                ctx.beginPath(); ctx.moveTo(i,-6); ctx.lineTo(i+6,-6); ctx.lineTo(i+3,-3); ctx.closePath(); ctx.fill();
+            }
+            // Idle light
+            ctx.fillStyle=c; ctx.globalAlpha=0.4+Math.sin(T/700)*0.3;
+            ctx.beginPath(); ctx.arc(16,-26,2,0,Math.PI*2); ctx.fill();
+            ctx.globalAlpha=1;
+            break;
+        }
+        case 'cabinet': {
+            // 4-drawer filing cabinet
+            ctx.fillStyle='rgba(45,45,55,0.9)';
+            ctx.fillRect(-15,-56,30,52);
+            ctx.strokeRect(-15,-56,30,52);
+            for(let i=0;i<4;i++){
+                const dy=-54+i*13;
+                ctx.strokeStyle=c; ctx.globalAlpha=0.5; ctx.lineWidth=0.6;
+                ctx.strokeRect(-13,dy,26,11);
+                // Drawer handle
+                ctx.fillStyle=c; ctx.fillRect(-3,dy+5,6,1.5);
+                ctx.globalAlpha=1;
+            }
+            // Lock indicator on top drawer
+            ctx.fillStyle='#ff5555'; ctx.globalAlpha=0.7+Math.sin(T/500)*0.25;
+            ctx.beginPath(); ctx.arc(-10,-49,1.6,0,Math.PI*2); ctx.fill();
+            ctx.globalAlpha=1;
+            break;
+        }
+        case 'holoboard': {
+            // Floating rectangular hologram on a small post
+            // Post
+            ctx.fillStyle='rgba(20,25,40,0.9)';
+            ctx.fillRect(-3,-22,6,18);
+            ctx.strokeRect(-3,-22,6,18);
+            // Holo panel (slightly translucent rectangle with scanlines)
+            ctx.shadowBlur = isNear?20:12;
+            ctx.fillStyle='rgba(40,90,140,0.25)';
+            ctx.fillRect(-32,-66,64,40);
+            ctx.strokeStyle=c; ctx.lineWidth=1.2;
+            ctx.strokeRect(-32,-66,64,40);
+            // Scanlines
+            ctx.strokeStyle=c; ctx.globalAlpha=0.18;
+            for(let y=-64;y<-28;y+=4){
+                ctx.beginPath(); ctx.moveTo(-30,y); ctx.lineTo(30,y); ctx.stroke();
+            }
+            ctx.globalAlpha=1;
+            // Animated dot ticker
+            const tick = (T/40)%60;
+            ctx.fillStyle=c;
+            for(let i=0;i<4;i++){
+                const dx = -26 + ((tick + i*15) % 56);
+                ctx.beginPath(); ctx.arc(dx,-32,1.4,0,Math.PI*2); ctx.fill();
+            }
+            break;
+        }
+        case 'window': {
+            // Long curved viewport, framed
+            // Frame
+            ctx.fillStyle='rgba(30,35,50,0.85)';
+            ctx.fillRect(-40,-58,80,52);
+            ctx.strokeRect(-40,-58,80,52);
+            // Viewport interior — distant stars + nexus glow
+            ctx.fillStyle='#020306';
+            ctx.fillRect(-36,-54,72,44);
+            // Stars
+            for(let i=0;i<14;i++){
+                const sx=-34 + ((i*13.7) % 68);
+                const sy=-52 + ((i*9.3) % 40);
+                const tw=0.3+Math.sin(T/700+i*1.7)*0.3;
+                ctx.fillStyle=`rgba(255,255,255,${tw})`;
+                ctx.fillRect(sx,sy,1,1);
+            }
+            // Distant Nexus wreckage smear
+            const ng=ctx.createRadialGradient(0,-30,2,0,-30,30);
+            ng.addColorStop(0,'rgba(255,180,80,0.35)');
+            ng.addColorStop(0.6,'rgba(120,60,200,0.12)');
+            ng.addColorStop(1,'transparent');
+            ctx.fillStyle=ng;
+            ctx.fillRect(-36,-54,72,44);
+            // Rotating antenna blink
+            ctx.fillStyle='#ff4444'; ctx.globalAlpha=Math.max(0,Math.sin(T/900))*0.9;
+            ctx.beginPath(); ctx.arc(8,-32,1.5,0,Math.PI*2); ctx.fill();
+            ctx.globalAlpha=1;
+            break;
+        }
+        case 'clock': {
+            // Round wall clock with a small digital display below
+            ctx.fillStyle='rgba(35,35,45,0.92)';
+            ctx.beginPath(); ctx.arc(0,-40,16,0,Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(0,-40,16,0,Math.PI*2); ctx.stroke();
+            // Tick marks
+            ctx.strokeStyle=c; ctx.lineWidth=0.8; ctx.globalAlpha=0.7;
+            for(let i=0;i<12;i++){
+                const a=Math.PI*2*i/12 - Math.PI/2;
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(a)*13,Math.sin(a)*13 - 40);
+                ctx.lineTo(Math.cos(a)*15,Math.sin(a)*15 - 40);
+                ctx.stroke();
+            }
+            ctx.globalAlpha=1;
+            // Frozen hands at ~02:14
+            ctx.strokeStyle=c; ctx.lineWidth=1.5;
+            // Hour
+            ctx.beginPath(); ctx.moveTo(0,-40); ctx.lineTo(Math.cos(-Math.PI/2+Math.PI/6)*7, Math.sin(-Math.PI/2+Math.PI/6)*7 - 40); ctx.stroke();
+            // Minute
+            ctx.beginPath(); ctx.moveTo(0,-40); ctx.lineTo(Math.cos(-Math.PI/2+0.4)*11, Math.sin(-Math.PI/2+0.4)*11 - 40); ctx.stroke();
+            // Digital readout
+            ctx.fillStyle='rgba(20,15,25,0.92)';
+            ctx.fillRect(-18,-18,36,10);
+            ctx.strokeStyle=c; ctx.lineWidth=0.8;
+            ctx.strokeRect(-18,-18,36,10);
+            ctx.fillStyle=c; ctx.font='bold 6px Courier New'; ctx.textAlign='center';
+            ctx.shadowBlur=0;
+            ctx.fillText('UNRESOLVED', 0, -11);
+            break;
+        }
+    }
+    ctx.shadowBlur=0;
+    // Hover ring on the ground
+    if(isNear){
+        const rPulse=0.25+Math.sin(T/220)*0.15;
+        ctx.strokeStyle=c; ctx.globalAlpha=rPulse; ctx.lineWidth=1.3;
+        ctx.beginPath(); ctx.ellipse(0,2,26,7,0,0,Math.PI*2); ctx.stroke();
+        ctx.globalAlpha=1;
+    }
+    // Name plate — only when near (objects keep the world quieter than NPC plates do)
+    if(isNear){
+        ctx.fillStyle='rgba(0,0,10,0.78)';
+        ctx.fillRect(-44,-86,88,16);
+        ctx.strokeStyle=c; ctx.globalAlpha=0.35; ctx.lineWidth=0.6;
+        ctx.strokeRect(-44,-86,88,16); ctx.globalAlpha=1;
+        ctx.font='bold 9px Courier New'; ctx.textAlign='center'; ctx.fillStyle=c;
+        ctx.shadowBlur=4; ctx.shadowColor=c;
+        ctx.fillText(obj.name,0,-74); ctx.shadowBlur=0;
+    }
+    ctx.restore();
+}
 
 // Hide certain NPCs until story flags are met. Krat only appears at the station
 // after the rescue (when the MODULE ACCESS key is in the player's inventory).
@@ -197,8 +544,18 @@ function updateStation(){
             if(_npcHidden(npc)) continue;
             if(npc.floor===st.floor&&Math.abs(st.playerX-npc.x)<60){st.interactTarget=npc;break;}
         }
+        // Interactive object proximity — only consider if no NPC already snagged the target.
+        // Per-object `radius` lets bigger props (window, holo) be grabbed from farther.
+        if(!st.interactTarget && typeof STATION_OBJECTS!=='undefined'){
+            for(const obj of STATION_OBJECTS){
+                if(obj.floor!==st.floor) continue;
+                if(_stationObjectHidden(obj)) continue;
+                const r=obj.radius||45;
+                if(Math.abs(st.playerX-obj.x)<r){ st.interactTarget=obj; break; }
+            }
+        }
         // Airlock proximity (floor 0 only, left side)
-        if(st.floor===0&&st.playerX<80) st.interactTarget={id:'airlock',name:'AIRLOCK',role:'airlock'};
+        if(st.floor===0&&st.playerX<80&&!st.interactTarget) st.interactTarget={id:'airlock',name:'AIRLOCK',role:'airlock'};
         // Elevator proximity (at x~1700 on floor 0, x~100 on floor 1)
         const elevX=st.floor===0?STATION_WIDTH-100:100;
         if(Math.abs(st.playerX-elevX)<50&&!st.interactTarget) st.interactTarget={id:'elevator',name:'ELEVATOR',role:'elevator'};
@@ -542,6 +899,21 @@ function drawStation(){
             ctx.beginPath();ctx.arc(npc.x-16,floorY-20,4,0,Math.PI*2);ctx.fill();
             ctx.beginPath();ctx.arc(npc.x+10,floorY-19,3,0,Math.PI*2);ctx.fill();
             ctx.globalAlpha=1;ctx.shadowBlur=0;
+        }
+    }
+
+    // === INTERACTIVE OBJECTS ===
+    // Drawn before NPCs so an NPC's nameplate / hover glow can layer on top
+    // if they happen to be at similar x positions.
+    if(typeof STATION_OBJECTS!=='undefined'){
+        for(const obj of STATION_OBJECTS){
+            if(obj.floor!==flr) continue;
+            if(_stationObjectHidden(obj)) continue;
+            const isNearObj = st.interactTarget && st.interactTarget.id===obj.id;
+            ctx.save();
+            ctx.translate(obj.x, floorY);
+            _drawStationObject(obj, T, isNearObj);
+            ctx.restore();
         }
     }
 

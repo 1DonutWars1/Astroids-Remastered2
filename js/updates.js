@@ -42,6 +42,18 @@
 // ============================================================
 const UPDATES = [
     {
+        version: 'v1.0.13',
+        date: '2026-05-31',
+        title: 'Relay Station Populated',
+        notes: [
+            'Added a bunch of new NPCs to the Relay Station and a set of interactive props on both floors. Walk around, talk to people, poke at things. No tutorial prompts on the objects — you\'ll find them.',
+            'Floor 0 (ground deck) gained: BARTENDER DROOG, KIRI the plant keeper, JANITOR JEM. Floor 1 (upper deck) gained: HISTORIAN ELDA, CHAPLAIN MORI, HACKER ZED, and a stray TOURIST who came for the view.',
+            'New interactive objects: a busted coffee dispenser, a dusty potted plant, a vending machine (all out), a Lumina recruitment poster board, a trash compactor, a locked filing cabinet, a holo news ticker, an observation window onto the Nexus wreckage, and a wall clock whose hands stopped at 02:14.',
+            { spoiler:true, text:'Several of the new NPCs and props lean into the lore: Historian Elda lays out the 2-hour-station / 200-year-Nexus time slip and the 47,234 number; Chaplain Mori talks about families grieving people who are simultaneously alive and gone; Hacker Zed confirms the Sector 11 escape protocol is real but dumps you back into your pre-upload body with no memory; the observation window looks out at the Nexus wreckage with one of its antenna arrays still rotating; the news ticker quotes Lumina propaganda from the morning the Nexus went live.' },
+            { spoiler:true, text:'Other props and NPCs hint at the same themes more obliquely: the filing cabinet labeled "PRE-INITIALIZATION PERSONNEL — DO NOT OPEN" with faint scratching from inside; Janitor Jem\'s tooth-in-the-airlock-filter story; the Lumina poster scratched out and marked "LIARS"; the clock\'s "NEXUS TIME — UNRESOLVED" readout.' }
+        ]
+    },
+    {
         version: 'v1.0.12',
         date: '2026-05-31',
         title: 'Retroactive Spoiler Covers',
