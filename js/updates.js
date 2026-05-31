@@ -25,6 +25,14 @@
 // ============================================================
 const UPDATES = [
     {
+        version: 'v1.0.9',
+        date: '2026-05-30',
+        title: 'Phantom Boss Music Fix',
+        notes: [
+            'Fixed a bug where the Boss 1 (or other synth) music could keep playing quietly in the background underneath every other track. Caused by stale audio-play() promises rejecting after the music had already changed, starting an orphaned synth timer that nothing could stop. Music transitions are now guarded against stale fallbacks, and the synth tracks self-clean any previous timer before starting.'
+        ]
+    },
+    {
         version: 'v1.0.8',
         date: '2026-05-30',
         title: 'Tutorial, Input & Boss Practice Polish',

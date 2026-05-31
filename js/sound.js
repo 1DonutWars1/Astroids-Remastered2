@@ -128,6 +128,7 @@ const Sound = {
 
     // Synth fallbacks
     _synthBGM() {
+        if(this._musicTimer){clearInterval(this._musicTimer);this._musicTimer=null;}
         this._step=0;
         this._musicTimer=setInterval(()=>{
             if(!G.running||this.muted)return;
@@ -138,6 +139,7 @@ const Sound = {
         },140);
     },
     _synthBoss1() {
+        if(this._musicTimer){clearInterval(this._musicTimer);this._musicTimer=null;}
         this._step=0;
         this._musicTimer=setInterval(()=>{
             if(!G.running||this.muted)return;
@@ -150,6 +152,7 @@ const Sound = {
         },100);
     },
     _synthBoss2() {
+        if(this._musicTimer){clearInterval(this._musicTimer);this._musicTimer=null;}
         this._step=0;
         this._musicTimer=setInterval(()=>{
             if(!G.running||this.muted)return;
@@ -162,6 +165,7 @@ const Sound = {
         },187);
     },
     _synthNexus() {
+        if(this._musicTimer){clearInterval(this._musicTimer);this._musicTimer=null;}
         this._step=0;
         this._musicTimer=setInterval(()=>{
             if(!G.running||this.muted)return;
@@ -190,6 +194,7 @@ const Sound = {
         },110);
     },
     _synthBoss3(phase2) {
+        if(this._musicTimer){clearInterval(this._musicTimer);this._musicTimer=null;}
         this._step=0;
         this._musicTimer=setInterval(()=>{
             if(!G.running||this.muted)return;
@@ -212,58 +217,64 @@ const Sound = {
         this.currentTrack=track;
         if(track==='none') return;
 
+        // Helper: only run the synth fallback if the track we were trying to
+        // play is still the active one. Without this guard, a play() promise
+        // that rejects asynchronously (e.g. because _stopAllAudio paused the
+        // element) starts a synth timer for music the user no longer wants,
+        // and that timer can outlive every future _stopAllAudio call.
+        const _fallback = (forTrack, fn) => () => { if(this.currentTrack===forTrack) fn(); };
         if(track==='bgm'){
             if(this.bgmAudio&&!this.muted){
-                this.bgmAudio.play().catch(()=>{this._synthBGM();});
+                this.bgmAudio.play().catch(_fallback('bgm',()=>this._synthBGM()));
             } else this._synthBGM();
         }
         else if(track==='boss1') this._synthBoss1();
         else if(track==='boss2') this._synthBoss2();
         else if(track==='boss3'){
             if(this.boss3Audio&&!this.muted){
-                this.boss3Audio.play().catch(()=>{this._synthBoss3(false);});
+                this.boss3Audio.play().catch(_fallback('boss3',()=>this._synthBoss3(false)));
             } else this._synthBoss3(false);
         }
         else if(track==='boss3phase2'){
             if(this.boss3P2Audio&&!this.muted){
-                this.boss3P2Audio.play().catch(()=>{this._synthBoss3(true);});
+                this.boss3P2Audio.play().catch(_fallback('boss3phase2',()=>this._synthBoss3(true)));
             } else this._synthBoss3(true);
         }
         else if(track==='boss4'){
             if(this.boss4Audio&&!this.muted){
-                this.boss4Audio.play().catch(()=>{this._synthBoss2();});
+                this.boss4Audio.play().catch(_fallback('boss4',()=>this._synthBoss2()));
             } else this._synthBoss2(); // fallback to synth boss2 music
         }
         else if(track==='boss5'){
             if(this.boss5Audio&&!this.muted){
-                this.boss5Audio.play().catch(()=>{this._synthBoss2();});
+                this.boss5Audio.play().catch(_fallback('boss5',()=>this._synthBoss2()));
             } else this._synthBoss2();
         }
         else if(track==='rouge'){
             if(this.rougeAudio&&!this.muted){
-                this.rougeAudio.play().catch(()=>{this._synthBoss1();});
+                this.rougeAudio.play().catch(_fallback('rouge',()=>this._synthBoss1()));
             } else this._synthBoss1();
         }
         else if(track==='nexus'){
             if(this.nexusAudio&&!this.muted){
-                this.nexusAudio.play().catch(()=>{this._synthNexus();});
+                this.nexusAudio.play().catch(_fallback('nexus',()=>this._synthNexus()));
             } else this._synthNexus();
         }
         else if(track==='grimm'){
             if(this.grimmAudio&&!this.muted){
-                this.grimmAudio.play().catch(()=>{this._synthBoss1();});
+                this.grimmAudio.play().catch(_fallback('grimm',()=>this._synthBoss1()));
             } else this._synthBoss1();
         }
         else if(track==='sector2'){
             if(this.sector2Audio&&!this.muted){
                 this.sector2Audio.loop=true;
-                this.sector2Audio.play().catch(()=>{this._synthBGM();});
+                this.sector2Audio.play().catch(_fallback('sector2',()=>this._synthBGM()));
             } else this._synthBGM();
         }
         else if(track==='chaosking'){
             if(this.chaosKingAudio&&!this.muted){
                 this.chaosKingAudio.loop=true;
-                this.chaosKingAudio.play().catch(()=>{this._synthBoss2();});
+                this.chaosKingAudio.play().catch(_fallback('chaosking',()=>this._synthBoss2()));
             } else this._synthBoss2();
         }
     },
