@@ -625,6 +625,31 @@
         .update-notes { color: #99aabb; font-size: 12px; line-height: 1.6; }
         .update-notes ul { margin: 4px 0 0 16px; padding: 0; }
         .update-notes li { margin-bottom: 4px; }
+        /* Spoiler-covered patch notes (see _renderUpdateNote in updates.js).
+           Default state shows the cover and hides the real text; .revealed
+           swaps them. Tinted red so it visually screams "do not click yet". */
+        .note-spoiler {
+            display: inline-block; position: relative; cursor: pointer;
+            border-radius: 3px; transition: background 0.15s;
+            line-height: 1.3;
+        }
+        .note-spoiler .note-spoiler-cover {
+            display: inline-block;
+            background: #1a0508; color: #ff6677;
+            border: 1px dashed rgba(255,102,119,0.5);
+            padding: 1px 8px; letter-spacing: 1.5px; font-size: 10px;
+            font-weight: bold; text-transform: uppercase;
+            user-select: none;
+        }
+        .note-spoiler .note-spoiler-text { display: none; }
+        .note-spoiler.revealed .note-spoiler-cover { display: none; }
+        .note-spoiler.revealed .note-spoiler-text {
+            display: inline; color: #ffb0b8;
+        }
+        .note-spoiler:hover .note-spoiler-cover {
+            background: #2a0810; color: #ff99aa;
+            border-color: rgba(255,153,170,0.7);
+        }
         .set-reset {
             width: 100%; padding: 8px; margin-top: 8px; background: transparent;
             color: #555; border: 1px solid rgba(255,255,255,0.08); cursor: pointer;

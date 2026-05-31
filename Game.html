@@ -187,6 +187,17 @@
     <div id="practiceHint">PRESS 'E' FOR SETTINGS</div>
 </div>
 
+<!-- Dev: Corrupted file (data fragment) browser. Opened by either dev menu. -->
+<div id="devFragmentBrowser" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:520px;max-height:80vh;background:rgba(5,8,12,0.97);border:2px solid #ffaa33;border-radius:8px;z-index:350;padding:18px;box-shadow:0 0 40px rgba(255,170,51,0.25);flex-direction:column;font-family:'Courier New',monospace;">
+    <h3 style="color:#ffaa33;margin:0 0 6px;text-align:center;letter-spacing:3px;border-bottom:1px solid rgba(255,170,51,0.3);padding-bottom:8px;font-size:14px;">CORRUPTED FILE BROWSER &mdash; DEV</h3>
+    <div style="color:#998866;font-size:11px;text-align:center;margin-bottom:10px;">Instant-grant any data fragment. Already-owned files are dimmed.</div>
+    <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <button onclick="devGrantAllFragments()" style="flex:1;background:rgba(255,170,51,0.15);border:1px solid #ffaa33;color:#ffaa33;padding:6px;font-family:inherit;font-size:11px;cursor:pointer;letter-spacing:1px;">GRANT ALL</button>
+        <button onclick="devCloseFragmentBrowser()" style="flex:1;background:rgba(255,68,68,0.15);border:1px solid #ff4444;color:#ff4444;padding:6px;font-family:inherit;font-size:11px;cursor:pointer;letter-spacing:1px;">CLOSE</button>
+    </div>
+    <div id="devFragmentList" style="flex:1;overflow-y:auto;border:1px solid rgba(255,170,51,0.15);padding:6px;font-size:11px;"></div>
+</div>
+
 <div id="debugMenu">
     <h3>DEV CONSOLE</h3>
     <div class="dev-hdr">CHEATS</div>
@@ -214,6 +225,7 @@
     <button onclick="spawnBoss(7)">SPAWN NEXUS-0 (SECRET)</button>
     <button onclick="spawnAsteroid(undefined,undefined,undefined,'fuel')">SPAWN FUEL</button>
     <button onclick="devSpawnLoreAsteroid()">SPAWN LORE ASTEROID</button>
+    <button onclick="devOpenFragmentBrowser()" style="border-color:#ffaa33;color:#ffaa33;">GRANT CORRUPTED FILES…</button>
     <button onclick="startBossRush()">START BOSS RUSH (DLC)</button>
     <button onclick="spawnGilbert()">SPAWN GILBERT (DLC)</button>
     <button onclick="spawnGilbertAlly()">SPAWN GILBERT ALLY (DLC)</button>
@@ -284,6 +296,8 @@
     <button onclick="if(typeof devSpawnWreckType==='function')devSpawnWreckType(2)">SPAWN RESEARCH VESSEL</button>
     <button onclick="if(typeof devSpawnWreckType==='function')devSpawnWreckType(3)">SPAWN ESCAPE PODS</button>
     <button onclick="if(typeof interactiveWrecks!=='undefined')interactiveWrecks=[];">CLEAR EXPLORABLE WRECKS</button>
+    <div class="dev-hdr">CORRUPTED FILES</div>
+    <button onclick="devOpenFragmentBrowser()" style="border-color:#ffaa33;color:#ffaa33;">GRANT CORRUPTED FILES…</button>
     <div class="dev-hdr">SCENERY</div>
     <button onclick="if(typeof initSector2Wrecks==='function')initSector2Wrecks();">RESET WRECKS</button>
     <button onclick="devMoreWrecks()">ADD 3 WRECKS</button>

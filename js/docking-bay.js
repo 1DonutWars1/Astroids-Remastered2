@@ -86,6 +86,85 @@ function tryDropDataFragment(force){
     G.dataFragmentPopup={ file:frag.file, t:0, life:240 };
     try{if(Sound.powerup) Sound.powerup();}catch(e){}
 }
+// --- Dev: instant grant for data fragments. Used by the dev menus. ---
+// _devOwnsFragment(frag): checks the inventory for an existing recovered copy.
+function _devOwnsFragment(frag){
+    if(!Array.isArray(G.inventory)) return false;
+    const f=(frag.file||'').toLowerCase();
+    for(const it of G.inventory){
+        if(it && it.type==='document' && it.file && it.file.toLowerCase()===f) return true;
+    }
+    return false;
+}
+// Grant a specific fragment by id. Returns true if added, false if already owned.
+function devGrantFragment(id){
+    const frag=getFragmentById(id);
+    if(!frag) return false;
+    if(!Array.isArray(G.inventory)) G.inventory=[];
+    if(!Array.isArray(G.dataFragmentsSeen)) G.dataFragmentsSeen=[];
+    if(_devOwnsFragment(frag)) return false;
+    G.inventory.push({
+        id:'doc_'+frag.id,
+        name:'CORRUPTED DATA',
+        type:'document',
+        file:frag.file,
+        fragId:frag.id,
+        desc:'Unreadable without a terminal. ('+frag.file+')'
+    });
+    if(!G.dataFragmentsSeen.includes(frag.id)) G.dataFragmentsSeen.push(frag.id);
+    if(G.slotId && typeof saves!=='undefined' && saves[G.slotId]){
+        saves[G.slotId].inventory=G.inventory.slice();
+        saves[G.slotId].dataFragmentsSeen=G.dataFragmentsSeen.slice();
+        if(typeof saveToDisk==='function') saveToDisk();
+    }
+    G.dataFragmentPopup={ file:frag.file, t:0, life:180 };
+    try{if(Sound.powerup) Sound.powerup();}catch(e){}
+    return true;
+}
+// Grant every fragment not already owned. Returns count of newly added.
+function devGrantAllFragments(){
+    let added=0;
+    for(const f of DATA_FRAGMENTS){ if(devGrantFragment(f.id)) added++; }
+    _devRenderFragmentList(); // refresh the open browser
+    try{
+        const note=document.getElementById('devFragmentNotice');
+        if(note) note.innerText = added>0 ? ('Granted '+added+' new file(s).') : 'You already owned every file.';
+    }catch(e){}
+    return added;
+}
+function _devRenderFragmentList(){
+    const host=document.getElementById('devFragmentList');
+    if(!host) return;
+    const rows=DATA_FRAGMENTS.map(f=>{
+        const owned=_devOwnsFragment(f);
+        const fileLabel=(f.file||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const sourceLabel=(f.source||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const btn=owned
+            ? '<span style="color:#558855;font-size:10px;letter-spacing:1px;padding:2px 8px;">OWNED</span>'
+            : '<button onclick="devGrantFragment(\''+f.id+'\');_devRenderFragmentList();" style="background:rgba(255,170,51,0.15);border:1px solid #ffaa33;color:#ffaa33;padding:2px 10px;font-family:inherit;font-size:10px;cursor:pointer;letter-spacing:1px;">GRANT</button>';
+        return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 6px;border-bottom:1px solid rgba(255,170,51,0.08);'+(owned?'opacity:0.55;':'')+'">'
+             + '<div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
+             +   '<div style="color:#eedcc0;font-size:11px;">'+fileLabel+'</div>'
+             +   '<div style="color:#7a6450;font-size:9px;letter-spacing:1px;">'+sourceLabel+'</div>'
+             + '</div>'
+             + btn
+             + '</div>';
+    }).join('');
+    host.innerHTML = rows
+        + '<div id="devFragmentNotice" style="color:#998866;font-size:10px;text-align:center;padding:8px 0 2px;letter-spacing:1px;"></div>';
+}
+function devOpenFragmentBrowser(){
+    const m=document.getElementById('devFragmentBrowser');
+    if(!m) return;
+    m.style.display='flex';
+    _devRenderFragmentList();
+    try{if(Sound.ui) Sound.ui();}catch(e){}
+}
+function devCloseFragmentBrowser(){
+    const m=document.getElementById('devFragmentBrowser');
+    if(m) m.style.display='none';
+    try{if(Sound.ui) Sound.ui();}catch(e){}
+}
 function drawDataFragmentPopup(){
     const p=G.dataFragmentPopup;
     if(!p) return;
