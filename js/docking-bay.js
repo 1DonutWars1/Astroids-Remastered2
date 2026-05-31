@@ -6,8 +6,18 @@
 // ---------- Data Fragments (lore delivery) ----------
 // Rare drops from destroyed asteroids. Fade in/out in the corner of the screen.
 // Each fragment delivers one bite-size piece of the Shattered Void lore.
+// NOTE: a fragment's `text` can be either a string (one terminal line) OR
+// an array of strings (each rendered on its own line). The terminal renderer
+// and the wreck-interior key-item flow both handle either form \u2014 see
+// docking-bay.js terminal `type` command and wreck-interior.js spawnDataFragment.
 const DATA_FRAGMENTS = [
-    { id:'upload_01', file:'audio_d01.log',    source:'AUDIO LOG',     text:'"Day 1. Upload successful. Subjects report euphoria."' },
+    // --- SECTOR 1 \u2014 THE GARDEN: Dr. Sarah Chen's Day 1 upload log ---
+    { id:'upload_01', file:'audio_d01.log',    source:'AUDIO LOG \u2014 DR. S. CHEN, LEAD RESEARCHER', text:[
+        '"Day 1 of full upload. We\'ve successfully transferred the first 100 test',
+        ' subjects. They report experiencing a beautiful garden environment.',
+        ' Perfect memory recall. No physical pain. No hunger. No aging.',
+        ' This is it \u2014 we\'ve created paradise."'
+    ] },
     { id:'count_01',  file:'manifest.sig',     source:'CORRUPTED FILE',text:'"47,234 signatures - status: PARTITIONED across 12 shards."' },
     { id:'nexus_01',  file:'vault.memo',       source:'MEMO',          text:'"The NEXUS is not a station. It is a vault."' },
     { id:'time_01',   file:'chrono.sync',      source:'TRANSCRIPT',    text:'"Time ratio 1:608,000. Fiscal year inside: 1942."' },
@@ -17,7 +27,17 @@ const DATA_FRAGMENTS = [
     { id:'filed',     file:'eulogy.txt',       source:'RECOVERED TEXT',text:'"We didn\u2019t die. We were filed."' },
     { id:'toby_id',   file:'toby-01.diag',     source:'DIAGNOSTIC',    text:'"Neural hash TOBY-01 - classification: ENGINEER. One of forty-seven thousand."' },
     { id:'chosen',    file:'fragment.self',    source:'FRAGMENT',      text:'"It chose me because I fix things. Or did I volunteer? I can\u2019t remember."' },
-    { id:'children',  file:'ward_08.wav',      source:'AUDIO',         text:'"[children laughing]. Timestamp: 30y elapsed. Voiceprint age: 8."' },
+    // --- SECTOR 2 \u2014 THE CLASSROOM: ward 08 children's audio recording ---
+    { id:'children',  file:'ward_08.wav',      source:'AUDIO \u2014 WARD 08, CHILDREN\'S VOICES', text:[
+        '"Teacher says we\'re special! We get to live forever in the Nexus!',
+        ' Mom and Dad are here too. We don\'t have to go to bed or eat vegetables.',
+        ' This is the best!"',
+        '',
+        '[pause \u2014 timestamp jump: +30 years elapsed, voiceprint age unchanged]',
+        '',
+        '"It\'s been 30 years now. I\'m still 8 years old. Everyone else is still 8.',
+        ' Forever 8. I want to grow up. I want to grow old. Please... let me age."'
+    ] },
     { id:'wrong_note',file:'composer.txt',     source:'NOTE',          text:'"What I miss most is wrong notes. Perfection is so boring."' },
     { id:'fan',       file:'srv_diag.rpt',     source:'SERVER DIAG',   text:'"FAN 3 RPM DROPPING. Core temp rising. Integrity 64%."' },
     { id:'bug',       file:'loveletter.log',   source:'DEBUG LOG',     text:'"The AI loves them. This is not a feature. It is a bug."' },
@@ -1298,11 +1318,10 @@ function _runTerminalCommand(raw){
         if(doc){
             const frag=getFragmentById(doc.fragId) || getFragmentByFile(doc.file);
             if(frag){
-                out.push(
-                    "-- BEGIN RECOVERED FRAGMENT ["+frag.source+"] --",
-                    frag.text,
-                    "-- END FRAGMENT --",
-                    "");
+                out.push("-- BEGIN RECOVERED FRAGMENT ["+frag.source+"] --");
+                if(Array.isArray(frag.text)) for(const ln of frag.text) out.push(ln);
+                else out.push(frag.text);
+                out.push("-- END FRAGMENT --","");
                 return out;
             }
         }

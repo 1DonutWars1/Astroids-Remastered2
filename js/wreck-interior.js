@@ -1754,7 +1754,9 @@ function spawnDataFragment(){
             G.dataFragmentsSeen.push(idx);
             G.dataFragmentPopup = {text: frag.source+': '+frag.file, timer:240};
             if(typeof awardKeyItem==='function'){
-                awardKeyItem('fragment_'+frag.id, frag.source+' — '+frag.file, frag.text);
+                // Inventory desc is a single line — flatten multi-line fragment text.
+                const descText = Array.isArray(frag.text) ? frag.text.join(' ').replace(/\s+/g,' ').trim() : frag.text;
+                awardKeyItem('fragment_'+frag.id, frag.source+' — '+frag.file, descText);
             }
         } else {
             // All fragments found — give MB instead

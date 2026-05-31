@@ -25,6 +25,16 @@
 // ============================================================
 const UPDATES = [
     {
+        version: 'v1.0.10',
+        date: '2026-05-31',
+        title: 'Sector 1 & 2 Lore Expansion',
+        notes: [
+            'Expanded the THE GARDEN (Sector 1) data fragment audio_d01.log into the full Dr. Sarah Chen Day-1 upload log: 100 transferred test subjects, the beautiful garden environment, perfect recall, no pain, no hunger, no aging — "we\'ve created paradise."',
+            'Expanded the THE CLASSROOM (Sector 2) data fragment ward_08.wav into the full children\'s recording: the initial joy at being uploaded ("Mom and Dad are here too"), followed by the +30y voiceprint jump where they\'re still 8, asking to be allowed to grow old.',
+            'Terminal `type <filename>` and wreck-interior crate drops now render multi-line fragment text correctly (single-line fragments are unaffected).'
+        ]
+    },
+    {
         version: 'v1.0.9',
         date: '2026-05-30',
         title: 'Phantom Boss Music Fix',
