@@ -1,6 +1,6 @@
 
 how to play:
 download the zipped folder
-Unzip the contents
+exract the contents
 open game.html
 
