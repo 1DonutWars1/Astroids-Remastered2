@@ -36,8 +36,50 @@
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
     function ui() { try { Sound.ui(); } catch (e) {} }
 
-    // ---- Transport: BroadcastChannel (default) --------------------------
+    // ---- Transport ------------------------------------------------------
+    //  Auto-selected:
+    //   - Served over http(s) (i.e. via server.js on the LAN) → HTTP relay,
+    //     which reaches every device on the same Wi-Fi. This is real co-op.
+    //   - Opened as a file:// page → BroadcastChannel, which only reaches
+    //     other tabs of the SAME browser on the SAME machine (local testing).
     function makeTransport(onmessage) {
+        const proto = (location.protocol || '').toLowerCase();
+        if (proto === 'http:' || proto === 'https:') return makeRelayTransport(onmessage);
+        return makeBroadcastTransport(onmessage);
+    }
+
+    // Cross-device: post outgoing messages to the relay, poll for incoming.
+    function makeRelayTransport(onmessage) {
+        let lastSeq = 0, alive = true;
+        function poll() {
+            if (!alive) return;
+            fetch('/coop/poll?since=' + lastSeq, { cache: 'no-store' })
+                .then(r => r.json())
+                .then(d => {
+                    lastSeq = d.seq;
+                    if (d.msgs) for (const m of d.msgs) { try { onmessage(m); } catch (e) {} }
+                    if (alive) setTimeout(poll, 700);
+                })
+                .catch(() => { if (alive) setTimeout(poll, 1500); });
+        }
+        // Sync to the current head first so we don't replay old chatter, then poll.
+        fetch('/coop/poll', { cache: 'no-store' })
+            .then(r => r.json()).then(d => { lastSeq = d.seq; poll(); })
+            .catch(() => poll());
+        return {
+            ok: true,
+            send(obj) {
+                fetch('/coop/send', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(obj), keepalive: true
+                }).catch(() => {});
+            },
+            close() { alive = false; }
+        };
+    }
+
+    // Same-machine fallback (file://): every tab of this browser shares a channel.
+    function makeBroadcastTransport(onmessage) {
         if (typeof BroadcastChannel === 'undefined') {
             console.warn('[coop] BroadcastChannel unavailable — co-op discovery disabled in this browser.');
             return { ok: false, send() {}, close() {} };

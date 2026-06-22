@@ -42,6 +42,16 @@
 // ============================================================
 const UPDATES = [
     {
+        version: 'v1.1.1',
+        date: '2026-06-22',
+        title: 'Co-op Pairing Goes Cross-Device',
+        notes: [
+            'Co-op pairing now works between separate devices on the same Wi-Fi, not just two tabs on one computer.',
+            'To use it, one person runs the included server (run "node server.js" in the game folder) and everyone opens the address it prints in their browser. Hosting and PAIR then find each other across the network.',
+            'Opening the game as a plain file still works for local two-tab testing.'
+        ]
+    },
+    {
         version: 'v1.1.0',
         date: '2026-06-22',
         title: 'Co-op Pairing (Lobby)',
