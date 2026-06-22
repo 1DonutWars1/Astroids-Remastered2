@@ -434,12 +434,35 @@
         <div style="display:inline-block;position:relative;">
             <button class="btn" id="moreBtn" style="border-color:#cc66ff;color:#cc66ff;padding:10px 30px;font-size:16px;" onclick="toggleMoreMenu()">MORE ▾</button>
             <div id="moreDropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);min-width:240px;background:rgba(8,4,18,0.96);border:1px solid rgba(204,102,255,0.6);border-radius:8px;padding:8px;z-index:200;box-shadow:0 0 30px rgba(204,102,255,0.25);backdrop-filter:blur(8px);">
+                <button class="btn" style="display:block;width:100%;border-color:rgba(255,102,204,0.6);color:#ff66cc;padding:10px 16px;font-size:14px;margin:0 0 6px 0;" onclick="openCoopPair()">PAIR &#9656; FIND CO-OP GAME</button>
                 <button class="btn" style="display:block;width:100%;border-color:rgba(204,102,255,0.6);color:#cc66ff;padding:10px 16px;font-size:14px;margin:0;" onclick="startCombatPlayground()">COMBAT PLAYGROUND</button>
                 <div style="color:#666;font-size:10px;text-align:center;margin-top:6px;letter-spacing:1px;">MORE COMING SOON</div>
             </div>
         </div>
     </div>
     <div class="controls-hint">Controls customizable in Settings</div>
+</div>
+
+<div id="modeSelect" style="display:none;">
+    <div class="cs-inner">
+        <h1>NEW GAME</h1>
+        <h2>CHOOSE HOW YOU WANT TO PLAY</h2>
+        <div class="diff-grid">
+            <div class="diff-card" onclick="pickMode('solo')" style="border-color:#00ccff;">
+                <span class="diff-name" style="color:#00ccff;">SOLO</span>
+                <span class="diff-desc">Play the campaign on your own. The classic experience.</span>
+            </div>
+            <div class="diff-card" onclick="pickMode('coop')" style="border-color:#ff66cc;">
+                <span class="diff-name" style="color:#ff66cc;">CO-OP</span>
+                <span class="diff-desc">Host a game on your Wi-Fi and team up with a friend (2 players). They join from the PAIR menu.</span>
+            </div>
+        </div>
+        <button class="cs-back" onclick="cancelModeSelect()">BACK</button>
+    </div>
+</div>
+
+<div id="coopLobby" style="display:none;">
+    <div id="coopInner"></div>
 </div>
 
 <div id="difficultySelect" style="display:none;">
@@ -598,6 +621,7 @@
 <script src="js/sound.js"></script>
 <script src="js/globals.js"></script>
 <script src="js/saves.js"></script>
+<script src="js/coop.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/achievements.js"></script>
 <script src="js/updates.js"></script>

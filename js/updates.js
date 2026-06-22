@@ -42,6 +42,19 @@
 // ============================================================
 const UPDATES = [
     {
+        version: 'v1.1.0',
+        date: '2026-06-22',
+        title: 'Co-op Pairing (Lobby)',
+        notes: [
+            'New saves now ask how you want to play: SOLO (the classic campaign) or CO-OP.',
+            'Starting a CO-OP save hosts a party and advertises it to other players on the same Wi-Fi.',
+            'Added a PAIR option under the MORE menu — it searches your Wi-Fi for hosted co-op games and lets you request to join one.',
+            'Hosts stay in control: when someone asks to join, you get an ACCEPT / DECLINE prompt before they enter your party.',
+            'Parties currently cap at 2 players.',
+            'Heads up: this update is the lobby/party system only — actually playing the campaign together (and the button to launch a co-op match) is coming in a future update.'
+        ]
+    },
+    {
         version: 'v1.0.13',
         date: '2026-05-31',
         title: 'Relay Station Populated',

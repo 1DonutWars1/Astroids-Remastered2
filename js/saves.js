@@ -74,8 +74,8 @@ function renameSlot(e,id){
 function selectSlot(id) {
     if(event&&event.target&&event.target.classList.contains('del-btn')) return;
     Sound.ui();
-    // New slot → show difficulty selection first, then class
-    if(!saves[id]){ openDifficultySelect(id); return; }
+    // New slot → choose Solo vs Co-op, then difficulty, then class
+    if(!saves[id]){ openModeSelect(id); return; }
     G.slotId=id; G.tutorial=false; G.practice=false;
     // Migrate old saves
     const s=saves[id];
@@ -279,6 +279,26 @@ function drawClassShipPreview(canvasId, classKey) {
 
 let _pendingSlotId = null;
 let _pendingDifficulty = null;
+let _pendingCoop = false;   // true while creating a new save as a co-op host
+
+// New-game mode select: Solo vs Co-op. Shown before difficulty for new saves.
+function openModeSelect(slotId) {
+    _pendingSlotId = slotId;
+    _pendingCoop = false;
+    document.getElementById('modeSelect').style.display = 'block';
+}
+function cancelModeSelect() {
+    Sound.ui();
+    _pendingSlotId = null;
+    _pendingCoop = false;
+    document.getElementById('modeSelect').style.display = 'none';
+}
+function pickMode(mode) {
+    Sound.ui();
+    _pendingCoop = (mode === 'coop');
+    document.getElementById('modeSelect').style.display = 'none';
+    openDifficultySelect(_pendingSlotId);
+}
 
 function openDifficultySelect(slotId) {
     _pendingSlotId = slotId;
@@ -287,6 +307,7 @@ function openDifficultySelect(slotId) {
 function cancelDifficultySelect() {
     Sound.ui();
     _pendingSlotId = null;
+    _pendingCoop = false;
     document.getElementById('difficultySelect').style.display = 'none';
 }
 function pickDifficulty(diff) {
@@ -307,6 +328,7 @@ function openClassSelect(slotId) {
 function cancelClassSelect() {
     Sound.ui();
     _pendingSlotId = null;
+    _pendingCoop = false;
     document.getElementById('classSelect').style.display = 'none';
 }
 function pickClass(cls) {
@@ -337,7 +359,15 @@ function pickClass(cls) {
         difficulty: difficulty
     };
     saves[id]._newSave = true; // flag for intro cutscene
+    if(_pendingCoop) saves[id].coop = true;
     saveToDisk();
+    if(_pendingCoop){
+        _pendingCoop = false;
+        // Co-op host: open the pairing lobby and start advertising on the
+        // local network. No game start yet — that's the next phase.
+        hostCoopGame(name);
+        return;
+    }
     // Now select the slot normally
     selectSlot(id);
 }

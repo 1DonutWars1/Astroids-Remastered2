@@ -770,3 +770,98 @@
             letter-spacing: 2px; transition: all 0.2s;
         }
         .ach-close:hover { background: linear-gradient(180deg, #fff, #eee); }
+
+        /* ---- New-game mode select (Solo / Co-op) ---- */
+        #modeSelect {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(ellipse at center, rgba(5,5,20,0.98), rgba(0,0,0,0.99));
+            z-index: 400; overflow-y: auto; font-family: inherit;
+        }
+        #modeSelect .cs-inner { max-width: 700px; margin: 80px auto; padding: 20px; text-align: center; }
+        #modeSelect h1 {
+            font-size: 36px; letter-spacing: 5px; margin-bottom: 5px;
+            background: linear-gradient(90deg, #00ccff, #ff66cc);
+            background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 15px rgba(255,102,204,0.4));
+        }
+        #modeSelect h2 { font-size: 13px; color: #555; letter-spacing: 3px; margin-bottom: 30px; }
+        #modeSelect .cs-back {
+            margin-top: 25px; background: transparent; border: 1px solid #333; color: #555;
+            padding: 8px 30px; font-family: inherit; font-size: 13px; cursor: pointer;
+            transition: all 0.2s; border-radius: 4px; letter-spacing: 2px;
+        }
+        #modeSelect .cs-back:hover { border-color: #888; color: #aaa; }
+
+        /* ---- Co-op lobby (pairing / party) ---- */
+        #coopLobby {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(ellipse at center, rgba(12,4,18,0.98), rgba(0,0,0,0.99));
+            z-index: 401; overflow-y: auto; font-family: inherit;
+        }
+        #coopInner { max-width: 560px; margin: 70px auto; padding: 24px; text-align: center; }
+        .coop-h1 {
+            font-size: 34px; letter-spacing: 5px; margin-bottom: 10px;
+            background: linear-gradient(90deg, #ff66cc, #aa66ff);
+            background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 15px rgba(255,102,204,0.45));
+        }
+        .coop-sub { font-size: 13px; color: #aa88bb; letter-spacing: 1px; margin-bottom: 22px; }
+        .coop-spin {
+            display: inline-block; width: 11px; height: 11px; margin-right: 9px; vertical-align: middle;
+            border: 2px solid rgba(255,102,204,0.25); border-top-color: #ff66cc; border-radius: 50%;
+            animation: coopspin 0.8s linear infinite;
+        }
+        @keyframes coopspin { to { transform: rotate(360deg); } }
+        .coop-party { display: flex; flex-direction: column; gap: 8px; margin: 0 auto 8px; max-width: 420px; }
+        .coop-slot {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 18px; border: 2px dashed rgba(120,90,150,0.35); border-radius: 10px;
+            background: rgba(20,12,28,0.6); min-height: 52px;
+        }
+        .coop-slot.filled {
+            border: 2px solid rgba(255,102,204,0.55); border-style: solid;
+            background: linear-gradient(180deg, rgba(40,20,50,0.8), rgba(20,10,28,0.85));
+            box-shadow: 0 0 18px rgba(255,102,204,0.12);
+        }
+        .coop-name { font-size: 16px; color: #fff; letter-spacing: 1px; }
+        .coop-tag { font-size: 11px; letter-spacing: 2px; font-weight: bold; }
+        .coop-empty { font-size: 13px; color: #6a5a78; letter-spacing: 2px; }
+        .coop-count { font-size: 12px; color: #886699; letter-spacing: 2px; margin: 10px 0 4px; }
+        .coop-section {
+            font-size: 12px; color: #ff66cc; letter-spacing: 3px; margin: 20px 0 10px;
+            border-bottom: 1px solid rgba(255,102,204,0.25); padding-bottom: 6px;
+        }
+        .coop-req {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 14px; margin: 8px auto; max-width: 420px;
+            border: 1px solid rgba(255,102,204,0.4); border-radius: 8px; background: rgba(30,15,38,0.7);
+        }
+        .coop-req-btns { display: flex; gap: 8px; }
+        .coop-list { display: flex; flex-direction: column; gap: 10px; margin: 0 auto; max-width: 440px; }
+        .coop-game {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 16px; border: 1px solid rgba(160,110,255,0.4); border-radius: 10px;
+            background: linear-gradient(180deg, rgba(28,16,40,0.8), rgba(16,9,24,0.85));
+            transition: all 0.2s;
+        }
+        .coop-game:hover { border-color: rgba(255,102,204,0.7); transform: translateX(3px); }
+        .coop-game-info { text-align: left; }
+        .coop-meta { font-size: 11px; color: #886699; letter-spacing: 1px; margin-top: 3px; }
+        .coop-btn {
+            background: transparent; border: 1px solid #ff66cc; color: #ff66cc;
+            padding: 8px 14px; font-family: inherit; font-size: 12px; letter-spacing: 1px;
+            border-radius: 6px; cursor: pointer; transition: all 0.18s; white-space: nowrap;
+        }
+        .coop-btn:hover:not([disabled]) { background: rgba(255,102,204,0.15); box-shadow: 0 0 14px rgba(255,102,204,0.25); }
+        .coop-accept { border-color: #66ff99; color: #66ff99; }
+        .coop-accept:hover { background: rgba(102,255,153,0.15); box-shadow: 0 0 14px rgba(102,255,153,0.25); }
+        .coop-reject { border-color: #ff5566; color: #ff5566; }
+        .coop-reject:hover { background: rgba(255,85,102,0.15); box-shadow: 0 0 14px rgba(255,85,102,0.25); }
+        .coop-hint { font-size: 12px; color: #776688; line-height: 1.7; max-width: 420px; margin: 14px auto 0; }
+        .coop-error { font-size: 13px; color: #ff7799; letter-spacing: 1px; margin: 10px auto; max-width: 420px; }
+        #coopLobby .cs-back {
+            margin-top: 26px; background: transparent; border: 1px solid #333; color: #777;
+            padding: 9px 32px; font-family: inherit; font-size: 13px; cursor: pointer;
+            transition: all 0.2s; border-radius: 4px; letter-spacing: 2px;
+        }
+        #coopLobby .cs-back:hover { border-color: #ff6688; color: #ff99bb; }
