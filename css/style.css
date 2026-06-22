@@ -865,3 +865,23 @@
             transition: all 0.2s; border-radius: 4px; letter-spacing: 2px;
         }
         #coopLobby .cs-back:hover { border-color: #ff6688; color: #ff99bb; }
+        .coop-step {
+            font-size: 12px; color: #ff66cc; letter-spacing: 2px; font-weight: bold;
+            max-width: 440px; margin: 20px auto 8px; text-align: left;
+        }
+        .coop-code, .coop-input {
+            display: block; width: 100%; max-width: 440px; margin: 0 auto;
+            background: rgba(10,6,16,0.92); border: 1px solid rgba(160,110,255,0.4);
+            border-radius: 8px; color: #cfc0e0; font-family: 'Courier New', monospace;
+            font-size: 13px; padding: 11px 13px; resize: vertical;
+        }
+        .coop-code {
+            color: #9fd0ff; background: rgba(8,12,22,0.92);
+            border-color: rgba(120,160,255,0.35); word-break: break-all; cursor: text;
+        }
+        .coop-input:focus, .coop-code:focus {
+            outline: none; border-color: #ff66cc; box-shadow: 0 0 12px rgba(255,102,204,0.22);
+        }
+        input.coop-input { text-align: center; letter-spacing: 2px; font-size: 16px; }
+        .coop-copy { margin-top: 10px; }
+        #coopLobby .coop-btn.coop-join { display: inline-block; margin-top: 16px; padding: 10px 26px; font-size: 14px; }

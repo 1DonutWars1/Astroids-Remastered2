@@ -42,26 +42,16 @@
 // ============================================================
 const UPDATES = [
     {
-        version: 'v1.1.1',
-        date: '2026-06-22',
-        title: 'Co-op Pairing Goes Cross-Device',
-        notes: [
-            'Co-op pairing now works between separate devices on the same Wi-Fi, not just two tabs on one computer.',
-            'To use it, one person runs the included server (run "node server.js" in the game folder) and everyone opens the address it prints in their browser. Hosting and PAIR then find each other across the network.',
-            'Opening the game as a plain file still works for local two-tab testing.'
-        ]
-    },
-    {
         version: 'v1.1.0',
         date: '2026-06-22',
-        title: 'Co-op Pairing (Lobby)',
+        title: 'Co-op Pairing (Connect Code)',
         notes: [
             'New saves now ask how you want to play: SOLO (the classic campaign) or CO-OP.',
-            'Starting a CO-OP save hosts a party and advertises it to other players on the same Wi-Fi.',
-            'Added a PAIR option under the MORE menu — it searches your Wi-Fi for hosted co-op games and lets you request to join one.',
-            'Hosts stay in control: when someone asks to join, you get an ACCEPT / DECLINE prompt before they enter your party.',
-            'Parties currently cap at 2 players.',
-            'Heads up: this update is the lobby/party system only — actually playing the campaign together (and the button to launch a co-op match) is coming in a future update.'
+            'Co-op links two players directly, device to device, with no server and nothing extra to run.',
+            'The first time you use co-op, you pick a username — that\'s the name your partner sees in the party.',
+            'To play: the host gets an invite code and sends it to a friend; the friend pastes it on the new PAIR screen (under the MORE menu) and sends back a reply code; once the host pastes that in, you\'re paired.',
+            'Parties cap at 2 players.',
+            'Heads up: this update is the pairing/party system only — actually playing a match together (and the button to launch it) is coming in a future update.'
         ]
     },
     {
