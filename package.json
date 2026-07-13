@@ -1,0 +1,34 @@
+{
+  "name": "asteroids-remastered",
+  "version": "1.0.0",
+  "description": "Asteroids Remastered - standalone desktop build",
+  "main": "main.js",
+  "author": "1DonutWars1",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "dist:dir": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.astroidsremastered.game",
+    "productName": "Asteroids Remastered",
+    "files": [
+      "main.js",
+      "game/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    }
+  }
+}

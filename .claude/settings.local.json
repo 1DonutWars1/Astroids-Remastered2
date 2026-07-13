@@ -4,7 +4,17 @@
       "Bash(sed -n '474,2930p' index.html)",
       "Bash(node --check /tmp/game_check.js)",
       "Bash(grep -n \"^<script>$\" index.html)",
-      "Bash(grep -v \"//\")"
+      "Bash(grep -v \"//\")",
+      "Bash(npm -v)",
+      "Bash(npx -v)",
+      "PowerShell(npm install *)",
+      "PowerShell(node --check main.js; if \\($?\\) { \"main.js syntax OK\" })",
+      "PowerShell(\"Electron: \" + \\(& node_modules\\\\.bin\\\\electron.cmd --version\\); \"Builder: \" + \\(& node_modules\\\\.bin\\\\electron-builder.cmd --version\\))",
+      "Bash(git rm *)",
+      "Bash(git mv *)",
+      "Bash(node --check main.js)",
+      "PowerShell($dev = \\(Get-ItemProperty \"HKLM:\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\AppModelUnlock\" -ErrorAction SilentlyContinue\\).AllowDevelopmentWithoutDevLicense; Write-Output \\(\"Developer Mode \\(1 = ON\\): \" + $dev\\); $c = \"$env:LOCALAPPDATA\\\\electron-builder\\\\Cache\\\\winCodeSign\"; Write-Output \\(\"winCodeSign cache exists: \" + \\(Test-Path $c\\)\\))",
+      "PowerShell($c = \"$env:LOCALAPPDATA\\\\electron-builder\\\\Cache\\\\winCodeSign\"; if \\(Test-Path $c\\) { Remove-Item $c -Recurse -Force -ErrorAction SilentlyContinue; Write-Output \"Deleted half-extracted winCodeSign cache \\(will rebuild cleanly next time\\).\" } else { Write-Output \"No winCodeSign cache to delete.\" })"
     ]
   }
 }
